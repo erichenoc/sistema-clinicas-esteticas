@@ -1,0 +1,808 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useForm, useFieldArray } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import {
+  ArrowLeft,
+  Plus,
+  Pencil,
+  Trash2,
+  Package,
+  Loader2,
+  X,
+  Calendar,
+  Percent,
+  Clock,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
+import { packageSchema, type PackageFormData } from '@/lib/validations/treatments'
+import { toast } from 'sonner'
+import { z } from 'zod'
+
+// Mock data - tratamientos disponibles
+const mockTreatments = [
+  { id: '1', name: 'Limpieza Facial Profunda', price: 80, durationMinutes: 60, categoryName: 'Facial' },
+  { id: '2', name: 'Botox - Frente', price: 350, durationMinutes: 30, categoryName: 'Inyectables' },
+  { id: '3', name: 'Depilación Láser - Axilas', price: 120, durationMinutes: 20, categoryName: 'Láser' },
+  { id: '4', name: 'Hidratación Facial', price: 95, durationMinutes: 45, categoryName: 'Facial' },
+  { id: '5', name: 'Ácido Hialurónico - Labios', price: 400, durationMinutes: 30, categoryName: 'Inyectables' },
+  { id: '6', name: 'Radiofrecuencia Corporal', price: 150, durationMinutes: 60, categoryName: 'Corporal' },
+]
+
+// Mock data - paquetes existentes
+const mockPackages = [
+  {
+    id: '1',
+    name: 'Paquete Facial Completo',
+    description: '3 limpiezas + 3 hidrataciones',
+    type: 'sessions_pack' as const,
+    items: [
+      { treatmentId: '1', treatmentName: 'Limpieza Facial Profunda', quantity: 3, price: 80 },
+      { treatmentId: '4', treatmentName: 'Hidratación Facial', quantity: 3, price: 95 },
+    ],
+    regularPrice: 525,
+    salePrice: 450,
+    validityDays: 90,
+    salesCount: 12,
+    isActive: true,
+  },
+  {
+    id: '2',
+    name: 'Bono Depilación 6 Sesiones',
+    description: 'Depilación láser axilas',
+    type: 'sessions_pack' as const,
+    items: [
+      { treatmentId: '3', treatmentName: 'Depilación Láser - Axilas', quantity: 6, price: 120 },
+    ],
+    regularPrice: 720,
+    salePrice: 600,
+    validityDays: 180,
+    salesCount: 25,
+    isActive: true,
+  },
+  {
+    id: '3',
+    name: 'Pack Rejuvenecimiento',
+    description: 'Botox + Ácido Hialurónico',
+    type: 'bundle' as const,
+    items: [
+      { treatmentId: '2', treatmentName: 'Botox - Frente', quantity: 1, price: 350 },
+      { treatmentId: '5', treatmentName: 'Ácido Hialurónico - Labios', quantity: 1, price: 400 },
+    ],
+    regularPrice: 750,
+    salePrice: 680,
+    validityDays: 30,
+    salesCount: 8,
+    isActive: true,
+  },
+]
+
+// Schema modificado para el formulario
+const packageFormSchema = z.object({
+  name: z.string().min(1, 'El nombre es requerido').max(200),
+  description: z.string().max(1000).optional(),
+  type: z.enum(['bundle', 'sessions_pack']),
+  items: z.array(z.object({
+    treatmentId: z.string().min(1, 'Selecciona un tratamiento'),
+    quantity: z.number().int().min(1, 'Mínimo 1'),
+  })).min(1, 'Agrega al menos un tratamiento'),
+  regularPrice: z.number().positive('Debe ser mayor a 0'),
+  salePrice: z.number().positive('Debe ser mayor a 0'),
+  validityDays: z.number().int().min(1).optional().nullable(),
+  isActive: z.boolean(),
+})
+
+type PackageFormValues = z.infer<typeof packageFormSchema>
+
+export default function PaquetesPage() {
+  const [packages, setPackages] = useState(mockPackages)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingPackage, setEditingPackage] = useState<typeof mockPackages[0] | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const form = useForm<PackageFormValues>({
+    resolver: zodResolver(packageFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      type: 'sessions_pack',
+      items: [{ treatmentId: '', quantity: 1 }],
+      regularPrice: 0,
+      salePrice: 0,
+      validityDays: 90,
+      isActive: true,
+    },
+  })
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'items',
+  })
+
+  const watchItems = form.watch('items')
+  const watchType = form.watch('type')
+
+  // Calcular precio regular automáticamente
+  const calculateRegularPrice = () => {
+    return watchItems.reduce((total, item) => {
+      const treatment = mockTreatments.find((t) => t.id === item.treatmentId)
+      return total + (treatment?.price || 0) * (item.quantity || 0)
+    }, 0)
+  }
+
+  const calculateDiscount = () => {
+    const regular = form.watch('regularPrice')
+    const sale = form.watch('salePrice')
+    if (regular > 0 && sale > 0) {
+      return Math.round(((regular - sale) / regular) * 100)
+    }
+    return 0
+  }
+
+  const openCreateDialog = () => {
+    setEditingPackage(null)
+    form.reset({
+      name: '',
+      description: '',
+      type: 'sessions_pack',
+      items: [{ treatmentId: '', quantity: 1 }],
+      regularPrice: 0,
+      salePrice: 0,
+      validityDays: 90,
+      isActive: true,
+    })
+    setIsDialogOpen(true)
+  }
+
+  const openEditDialog = (pkg: typeof mockPackages[0]) => {
+    setEditingPackage(pkg)
+    form.reset({
+      name: pkg.name,
+      description: pkg.description || '',
+      type: pkg.type,
+      items: pkg.items.map((item) => ({
+        treatmentId: item.treatmentId,
+        quantity: item.quantity,
+      })),
+      regularPrice: pkg.regularPrice,
+      salePrice: pkg.salePrice,
+      validityDays: pkg.validityDays,
+      isActive: pkg.isActive,
+    })
+    setIsDialogOpen(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    setPackages(packages.filter((p) => p.id !== id))
+    toast.success('Paquete eliminado')
+  }
+
+  const handleAutoPrice = () => {
+    const regularPrice = calculateRegularPrice()
+    form.setValue('regularPrice', regularPrice)
+    form.setValue('salePrice', Math.round(regularPrice * 0.85)) // 15% descuento por defecto
+  }
+
+  async function onSubmit(data: PackageFormValues) {
+    setIsLoading(true)
+
+    try {
+      const itemsWithDetails = data.items.map((item) => {
+        const treatment = mockTreatments.find((t) => t.id === item.treatmentId)
+        return {
+          treatmentId: item.treatmentId,
+          treatmentName: treatment?.name || '',
+          quantity: item.quantity,
+          price: treatment?.price || 0,
+        }
+      })
+
+      if (editingPackage) {
+        setPackages(
+          packages.map((p) =>
+            p.id === editingPackage.id
+              ? {
+                  ...p,
+                  name: data.name,
+                  description: data.description || '',
+                  type: data.type,
+                  regularPrice: data.regularPrice,
+                  salePrice: data.salePrice,
+                  validityDays: data.validityDays ?? 90,
+                  isActive: data.isActive,
+                  items: itemsWithDetails,
+                  salesCount: p.salesCount,
+                }
+              : p
+          )
+        )
+        toast.success('Paquete actualizado')
+      } else {
+        const newPackage = {
+          id: Date.now().toString(),
+          name: data.name,
+          description: data.description || '',
+          type: data.type,
+          regularPrice: data.regularPrice,
+          salePrice: data.salePrice,
+          validityDays: data.validityDays ?? 90,
+          isActive: data.isActive,
+          items: itemsWithDetails,
+          salesCount: 0,
+        }
+        setPackages([...packages, newPackage])
+        toast.success('Paquete creado')
+      }
+
+      setIsDialogOpen(false)
+      form.reset()
+    } catch (error) {
+      toast.error('Error al guardar el paquete')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP',
+    }).format(price)
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/tratamientos">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Paquetes</h1>
+            <p className="text-muted-foreground">
+              Crea paquetes y bonos de tratamientos
+            </p>
+          </div>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Paquete
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingPackage ? 'Editar Paquete' : 'Nuevo Paquete'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingPackage
+                  ? 'Modifica los datos del paquete'
+                  : 'Crea un paquete o bono combinando tratamientos'}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Información básica */}
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: Paquete Facial Completo" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descripción</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Descripción del paquete..."
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de Paquete *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona el tipo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="sessions_pack">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Bono de Sesiones
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="bundle">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                Pack Combinado
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {watchType === 'sessions_pack'
+                            ? 'Múltiples sesiones del mismo tratamiento'
+                            : 'Combinación de diferentes tratamientos'}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Tratamientos incluidos */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Tratamientos incluidos *</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => append({ treatmentId: '', quantity: 1 })}
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Agregar
+                    </Button>
+                  </div>
+
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="flex gap-3 items-start">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.treatmentId`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona tratamiento" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {mockTreatments.map((treatment) => (
+                                  <SelectItem
+                                    key={treatment.id}
+                                    value={treatment.id}
+                                  >
+                                    <div className="flex justify-between items-center gap-4 w-full">
+                                      <span>{treatment.name}</span>
+                                      <span className="text-muted-foreground">
+                                        {formatPrice(treatment.price)}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem className="w-24">
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={1}
+                                placeholder="Cant."
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(parseInt(e.target.value) || 1)
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAutoPrice}
+                    className="w-full"
+                  >
+                    <Percent className="mr-2 h-4 w-4" />
+                    Calcular precio automático (15% desc.)
+                  </Button>
+                </div>
+
+                <Separator />
+
+                {/* Precios */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="regularPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Precio Regular *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              $
+                            </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              className="pl-7"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="salePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Precio de Venta *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              $
+                            </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              className="pl-7"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {calculateDiscount() > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-700 dark:text-green-400">
+                    <Percent className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      {calculateDiscount()}% de descuento
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="validityDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vigencia (días)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              min={1}
+                              className="pl-10"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) =>
+                                field.onChange(
+                                  e.target.value
+                                    ? parseInt(e.target.value)
+                                    : null
+                                )
+                              }
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Días para usar el paquete desde la compra
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Estado</FormLabel>
+                        <div className="flex items-center gap-3 rounded-lg border p-3">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <span className="text-sm">
+                            {field.value ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {editingPackage ? 'Guardar' : 'Crear'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Lista de paquetes */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {packages.map((pkg) => (
+          <Card
+            key={pkg.id}
+            className={`relative overflow-hidden ${
+              !pkg.isActive ? 'opacity-60' : ''
+            }`}
+          >
+            {/* Badge de descuento */}
+            {pkg.regularPrice > pkg.salePrice && (
+              <div className="absolute top-3 right-3">
+                <Badge variant="destructive">
+                  -{Math.round(((pkg.regularPrice - pkg.salePrice) / pkg.regularPrice) * 100)}%
+                </Badge>
+              </div>
+            )}
+
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Package className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                    <Badge variant="outline" className="mt-1">
+                      {pkg.type === 'sessions_pack'
+                        ? 'Bono de Sesiones'
+                        : 'Pack Combinado'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              {pkg.description && (
+                <CardDescription className="mt-2">
+                  {pkg.description}
+                </CardDescription>
+              )}
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {/* Tratamientos incluidos */}
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">
+                  Incluye:
+                </span>
+                <ul className="space-y-1">
+                  {pkg.items.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="text-sm flex items-center justify-between"
+                    >
+                      <span className="truncate">
+                        {item.quantity}x {item.treatmentName}
+                      </span>
+                      <span className="text-muted-foreground ml-2">
+                        {formatPrice(item.price * item.quantity)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <Separator />
+
+              {/* Precios */}
+              <div className="flex items-end justify-between">
+                <div>
+                  {pkg.regularPrice !== pkg.salePrice && (
+                    <span className="text-sm text-muted-foreground line-through">
+                      {formatPrice(pkg.regularPrice)}
+                    </span>
+                  )}
+                  <p className="text-2xl font-bold text-primary">
+                    {formatPrice(pkg.salePrice)}
+                  </p>
+                </div>
+                <div className="text-right text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {pkg.validityDays} días
+                  </div>
+                  <div>{pkg.salesCount} vendidos</div>
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => openEditDialog(pkg)}
+                >
+                  <Pencil className="mr-2 h-3 w-3" />
+                  Editar
+                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar paquete?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Los paquetes ya
+                        vendidos a pacientes no se verán afectados.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(pkg.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {/* Card para crear nuevo */}
+        <Card
+          className="flex items-center justify-center min-h-[300px] border-dashed cursor-pointer hover:border-primary transition-colors"
+          onClick={openCreateDialog}
+        >
+          <div className="text-center text-muted-foreground">
+            <Plus className="h-10 w-10 mx-auto mb-2" />
+            <p className="font-medium">Crear nuevo paquete</p>
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
