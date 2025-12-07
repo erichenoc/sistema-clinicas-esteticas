@@ -257,7 +257,54 @@ export interface Database {
           deleted_at?: string | null
         }
       }
-      // Add more tables as needed...
+      // Patient Medical History
+      patient_medical_history: {
+        Row: {
+          id: string
+          patient_id: string
+          allergies: string[]
+          current_medications: string[]
+          chronic_conditions: string[]
+          previous_surgeries: string[]
+          previous_aesthetic_treatments: string[]
+          is_pregnant: boolean
+          is_breastfeeding: boolean
+          uses_retinoids: boolean
+          sun_exposure_level: string
+          additional_notes: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          allergies?: string[]
+          current_medications?: string[]
+          chronic_conditions?: string[]
+          previous_surgeries?: string[]
+          previous_aesthetic_treatments?: string[]
+          is_pregnant?: boolean
+          is_breastfeeding?: boolean
+          uses_retinoids?: boolean
+          sun_exposure_level?: string
+          additional_notes?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          allergies?: string[]
+          current_medications?: string[]
+          chronic_conditions?: string[]
+          previous_surgeries?: string[]
+          previous_aesthetic_treatments?: string[]
+          is_pregnant?: boolean
+          is_breastfeeding?: boolean
+          uses_retinoids?: boolean
+          sun_exposure_level?: string
+          additional_notes?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
