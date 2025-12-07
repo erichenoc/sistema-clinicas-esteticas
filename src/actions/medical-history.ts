@@ -119,7 +119,7 @@ export async function getPatientWithMedicalHistory(patientId: string) {
     .eq('id', patientId)
     .single()
 
-  if (patientError) {
+  if (patientError || !patient) {
     console.error('Error fetching patient:', patientError)
     return null
   }
@@ -131,7 +131,7 @@ export async function getPatientWithMedicalHistory(patientId: string) {
     .single()
 
   return {
-    ...patient,
+    ...(patient as Record<string, unknown>),
     medicalHistory: medicalHistory || null,
   }
 }
