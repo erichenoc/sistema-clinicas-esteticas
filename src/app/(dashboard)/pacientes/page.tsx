@@ -33,7 +33,7 @@ export default async function PacientesPage() {
     lastName: p.last_name,
     email: p.email || '',
     phone: p.phone || '',
-    dateOfBirth: p.birth_date || '',
+    dateOfBirth: p.date_of_birth || '',
     status: p.status as 'active' | 'inactive' | 'vip' | 'blocked',
     tags: p.tags || [],
     avatarUrl: p.avatar_url,
@@ -45,7 +45,7 @@ export default async function PacientesPage() {
   const activeCount = patients.filter((p) => p.status === 'active').length
   const vipCount = patients.filter((p) => p.status === 'vip').length
   const inactiveCount = patients.filter((p) => p.status === 'inactive').length
-  const newCount = patients.filter((p) => p.status === 'new').length
+  const blockedCount = patients.filter((p) => p.status === 'blocked').length
 
   return (
     <div className="space-y-6">
@@ -90,8 +90,8 @@ export default async function PacientesPage() {
           <p className="text-2xl font-bold text-yellow-600">{vipCount}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Nuevos</p>
-          <p className="text-2xl font-bold text-blue-600">{newCount}</p>
+          <p className="text-sm text-muted-foreground">Inactivos</p>
+          <p className="text-2xl font-bold text-gray-600">{inactiveCount}</p>
         </div>
       </div>
 
@@ -143,8 +143,8 @@ export default async function PacientesPage() {
           Activos ({activeCount})
         </Button>
         <Button variant="outline" size="sm" className="rounded-full">
-          <span className="mr-2 h-2 w-2 rounded-full bg-blue-500" />
-          Nuevos ({newCount})
+          <span className="mr-2 h-2 w-2 rounded-full bg-gray-500" />
+          Inactivos ({inactiveCount})
         </Button>
       </div>
 

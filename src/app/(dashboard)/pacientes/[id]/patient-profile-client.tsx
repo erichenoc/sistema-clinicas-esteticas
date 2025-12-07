@@ -39,10 +39,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MedicalHistoryDialog, type MedicalHistoryData } from '../_components/medical-history-form'
+export type { MedicalHistoryData }
 import { toast } from 'sonner'
 import { saveMedicalHistory } from '@/actions/medical-history'
 
-interface PatientData {
+export interface PatientData {
   id: string
   first_name: string
   last_name: string
@@ -50,6 +51,7 @@ interface PatientData {
   phone: string
   phone_secondary: string | null
   date_of_birth: string | null
+  birth_date?: string | null
   gender: string | null
   document_type: string | null
   document_number: string | null
@@ -65,13 +67,13 @@ interface PatientData {
   tags: string[] | null
   notes: string | null
   avatar_url: string | null
-  total_spent: number
-  visit_count: number
+  total_spent?: number
+  visit_count?: number
   last_visit_at: string | null
   created_at: string
 }
 
-interface MedicalHistoryDbData {
+export interface MedicalHistoryDbData {
   id: string
   patient_id: string
   allergies: string[] | null
@@ -290,7 +292,7 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Gastado</p>
-                <p className="text-2xl font-bold">{formatCurrency(patient.total_spent)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(patient.total_spent ?? 0)}</p>
               </div>
             </div>
           </CardContent>
@@ -644,7 +646,7 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
           <Card>
             <CardHeader>
               <CardTitle>Historial de Pagos</CardTitle>
-              <CardDescription>Total gastado: {formatCurrency(patient.total_spent)}</CardDescription>
+              <CardDescription>Total gastado: {formatCurrency(patient.total_spent ?? 0)}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-center py-8 text-muted-foreground">

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getPatientWithMedicalHistory } from '@/actions/medical-history'
-import { PatientProfileClient } from './patient-profile-client'
+import { PatientProfileClient, type PatientData, type MedicalHistoryDbData } from './patient-profile-client'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -17,8 +17,8 @@ export default async function PatientProfilePage({ params }: PageProps) {
 
   return (
     <PatientProfileClient
-      patient={patientData}
-      medicalHistory={patientData.medicalHistory}
+      patient={patientData as unknown as PatientData}
+      medicalHistory={patientData.medicalHistory as MedicalHistoryDbData | null}
     />
   )
 }

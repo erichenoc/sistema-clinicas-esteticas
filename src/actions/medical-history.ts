@@ -2,12 +2,14 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { Patient } from '@/types/database'
 
 // Get all patients for listing
-export async function getPatients() {
+export async function getPatients(): Promise<Patient[]> {
   const supabase = createAdminClient()
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('patients')
     .select('*')
     .order('created_at', { ascending: false })
@@ -17,7 +19,7 @@ export async function getPatients() {
     return []
   }
 
-  return data || []
+  return (data || []) as Patient[]
 }
 
 export interface MedicalHistoryData {
