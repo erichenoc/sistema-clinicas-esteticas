@@ -64,42 +64,37 @@ export async function saveMedicalHistory(data: MedicalHistoryData) {
 
   let result
 
+  const updateData = {
+    allergies: data.allergies,
+    current_medications: data.current_medications,
+    chronic_conditions: data.chronic_conditions,
+    previous_surgeries: data.previous_surgeries,
+    previous_aesthetic_treatments: data.previous_aesthetic_treatments,
+    is_pregnant: data.is_pregnant,
+    is_breastfeeding: data.is_breastfeeding,
+    uses_retinoids: data.uses_retinoids,
+    sun_exposure_level: data.sun_exposure_level,
+    additional_notes: data.additional_notes,
+    updated_at: new Date().toISOString(),
+  }
+
   if (existing) {
     // Update existing record
-    result = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result = await (supabase as any)
       .from('patient_medical_history')
-      .update({
-        allergies: data.allergies,
-        current_medications: data.current_medications,
-        chronic_conditions: data.chronic_conditions,
-        previous_surgeries: data.previous_surgeries,
-        previous_aesthetic_treatments: data.previous_aesthetic_treatments,
-        is_pregnant: data.is_pregnant,
-        is_breastfeeding: data.is_breastfeeding,
-        uses_retinoids: data.uses_retinoids,
-        sun_exposure_level: data.sun_exposure_level,
-        additional_notes: data.additional_notes,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('patient_id', data.patient_id)
       .select()
       .single()
   } else {
     // Insert new record
-    result = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result = await (supabase as any)
       .from('patient_medical_history')
       .insert({
         patient_id: data.patient_id,
-        allergies: data.allergies,
-        current_medications: data.current_medications,
-        chronic_conditions: data.chronic_conditions,
-        previous_surgeries: data.previous_surgeries,
-        previous_aesthetic_treatments: data.previous_aesthetic_treatments,
-        is_pregnant: data.is_pregnant,
-        is_breastfeeding: data.is_breastfeeding,
-        uses_retinoids: data.uses_retinoids,
-        sun_exposure_level: data.sun_exposure_level,
-        additional_notes: data.additional_notes,
+        ...updateData,
       })
       .select()
       .single()
