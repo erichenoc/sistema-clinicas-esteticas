@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Card,
@@ -216,6 +216,11 @@ function formatCurrency(amount: number): string {
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState('month')
+  const [todayDate, setTodayDate] = useState('')
+
+  useEffect(() => {
+    setTodayDate(new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }))
+  }, [])
 
   const completedToday = todayAppointments.filter(a => a.status === 'completed').length
   const totalToday = todayAppointments.length
@@ -228,7 +233,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">
-            Bienvenido de vuelta. Aquí está el resumen de hoy, {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}.
+            Bienvenido de vuelta. Aqui esta el resumen de hoy{todayDate && `, ${todayDate}`}.
           </p>
         </div>
         <div className="flex gap-2">

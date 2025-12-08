@@ -18,7 +18,8 @@ import {
   Activity,
   Percent,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +27,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { toast } from 'sonner'
 
 // Mock data - en producción vendría de Supabase
 const financialSummary = {
@@ -125,11 +134,153 @@ function calculateChange(current: number, previous: number): { value: number; is
 export default function ReportesPage() {
   const [period, setPeriod] = useState('month')
   const [activeTab, setActiveTab] = useState('financiero')
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportingReport, setExportingReport] = useState<string | null>(null)
 
   const revenueChange = calculateChange(financialSummary.totalRevenue, financialSummary.previousRevenue)
   const profitChange = calculateChange(financialSummary.netProfit, financialSummary.previousProfit)
   const ticketChange = calculateChange(financialSummary.averageTicket, financialSummary.previousTicket)
   const newPatientsChange = calculateChange(patientStats.newThisMonth, patientStats.previousNew)
+
+  const getPeriodLabel = () => {
+    switch (period) {
+      case 'week': return 'Esta Semana'
+      case 'month': return 'Este Mes'
+      case 'quarter': return 'Este Trimestre'
+      case 'year': return 'Este Ano'
+      default: return 'Periodo Seleccionado'
+    }
+  }
+
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    toast.loading('Generando PDF...', { id: 'export-pdf' })
+
+    // Simulate PDF generation
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    // In production, this would call a server action or API to generate PDF
+    // For now, we'll use window.print() as a fallback
+    toast.dismiss('export-pdf')
+    toast.success('Abriendo vista de impresion para guardar como PDF')
+
+    // Apply print styles and trigger print
+    const printContent = document.querySelector('main')
+    if (printContent) {
+      window.print()
+    }
+
+    setIsExporting(false)
+  }
+
+  const handleExportExcel = async () => {
+    setIsExporting(true)
+    toast.loading('Generando archivo Excel...', { id: 'export-excel' })
+
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    // In production, this would generate a real Excel file
+    // For demo, we'll create a CSV
+    const csvContent = generateCSVContent()
+    downloadFile(csvContent, `reporte-${activeTab}-${period}.csv`, 'text/csv')
+
+    toast.dismiss('export-excel')
+    toast.success('Archivo descargado exitosamente')
+    setIsExporting(false)
+  }
+
+  const generateCSVContent = () => {
+    // Generate CSV based on active tab
+    let headers = ''
+    let rows = ''
+
+    switch (activeTab) {
+      case 'financiero':
+        headers = 'Categoria,Monto,Porcentaje\n'
+        rows = revenueByCategory.map(r => `${r.category},${r.amount},${r.percentage}%`).join('\n')
+        break
+      case 'pacientes':
+        headers = 'Grupo de Edad,Cantidad,Porcentaje\n'
+        rows = patientsByAgeGroup.map(g => `${g.group} anos,${g.count},${g.percentage}%`).join('\n')
+        break
+      case 'operativo':
+        headers = 'Metrica,Valor\n'
+        rows = `Total Citas,${appointmentStats.total}\nCompletadas,${appointmentStats.completed}\nCanceladas,${appointmentStats.cancelled}\nNo-Show,${appointmentStats.noShow}`
+        break
+      case 'equipo':
+        headers = 'Profesional,Ingresos,Citas,Rating,Comision\n'
+        rows = professionalPerformance.map(p => `${p.name},${p.revenue},${p.appointments},${p.rating},${p.commission}`).join('\n')
+        break
+      case 'inventario':
+        headers = 'Producto,Stock Actual,Stock Minimo,Estado\n'
+        rows = inventoryAlerts.map(a => `${a.product},${a.stock},${a.minStock},${a.status}`).join('\n')
+        break
+      default:
+        headers = 'Data\n'
+        rows = 'Sin datos'
+    }
+
+    return headers + rows
+  }
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleGenerateReport = async (reportName: string) => {
+    setExportingReport(reportName)
+    toast.loading(`Generando ${reportName}...`, { id: `report-${reportName}` })
+
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    // Generate appropriate content based on report type
+    let content = ''
+    const date = new Date().toLocaleDateString('es-DO')
+
+    switch (reportName) {
+      case 'Reporte de Ventas':
+        content = `REPORTE DE VENTAS - ${getPeriodLabel()}\nFecha: ${date}\n\nIngresos Totales: ${formatCurrency(financialSummary.totalRevenue)}\nGastos: ${formatCurrency(financialSummary.totalExpenses)}\nUtilidad Neta: ${formatCurrency(financialSummary.netProfit)}\n\nDETALLE POR CATEGORIA:\n${revenueByCategory.map(r => `- ${r.category}: ${formatCurrency(r.amount)} (${r.percentage}%)`).join('\n')}`
+        break
+      case 'Reporte de Pacientes':
+        content = `REPORTE DE PACIENTES - ${getPeriodLabel()}\nFecha: ${date}\n\nPacientes Activos: ${patientStats.totalActive}\nNuevos Este Mes: ${patientStats.newThisMonth}\nTasa de Retencion: ${patientStats.retentionRate}%\n\nDISTRIBUCION POR EDAD:\n${patientsByAgeGroup.map(g => `- ${g.group} anos: ${g.count} pacientes (${g.percentage}%)`).join('\n')}`
+        break
+      case 'Reporte de Citas':
+        content = `REPORTE DE CITAS - ${getPeriodLabel()}\nFecha: ${date}\n\nTotal Citas: ${appointmentStats.total}\nCompletadas: ${appointmentStats.completed}\nCanceladas: ${appointmentStats.cancelled}\nNo-Shows: ${appointmentStats.noShow}\nOcupacion: ${appointmentStats.occupancyRate}%\nDia Pico: ${appointmentStats.peakDay}\nHorario Pico: ${appointmentStats.peakHour}`
+        break
+      case 'Reporte de Inventario':
+        content = `REPORTE DE INVENTARIO - ${getPeriodLabel()}\nFecha: ${date}\n\nValor Total: ${formatCurrency(485000)}\nSKUs Activos: 156\nStock Bajo: 12 productos\nPor Vencer: 5 productos\n\nALERTAS:\n${inventoryAlerts.map(a => `- ${a.product}: ${a.stock} unidades (min: ${a.minStock}) - ${a.status.toUpperCase()}`).join('\n')}`
+        break
+      case 'Reporte de Comisiones':
+        const totalComm = professionalPerformance.reduce((sum, p) => sum + p.commission, 0)
+        content = `REPORTE DE COMISIONES - ${getPeriodLabel()}\nFecha: ${date}\n\nTotal Comisiones: ${formatCurrency(totalComm)}\n\nDETALLE POR PROFESIONAL:\n${professionalPerformance.map(p => `- ${p.name}: ${formatCurrency(p.commission)} (${p.appointments} citas)`).join('\n')}`
+        break
+      case 'Reporte de Tratamientos':
+        content = `REPORTE DE TRATAMIENTOS - ${getPeriodLabel()}\nFecha: ${date}\n\nTOP TRATAMIENTOS:\n${topTreatments.map((t, i) => `${i+1}. ${t.name}: ${t.sessions} sesiones - ${formatCurrency(t.revenue)} (${t.growth >= 0 ? '+' : ''}${t.growth}%)`).join('\n')}`
+        break
+      case 'Reporte de Productividad':
+        content = `REPORTE DE PRODUCTIVIDAD - ${getPeriodLabel()}\nFecha: ${date}\n\nRENDIMIENTO DEL EQUIPO:\n${professionalPerformance.map(p => `- ${p.name}:\n  Ingresos: ${formatCurrency(p.revenue)}\n  Citas: ${p.appointments}\n  Rating: ${p.rating}/5`).join('\n\n')}`
+        break
+      case 'Reporte Fiscal':
+        content = `REPORTE FISCAL - ${getPeriodLabel()}\nFecha: ${date}\n\nRESUMEN FISCAL:\nIngresos Brutos: ${formatCurrency(financialSummary.totalRevenue)}\nGastos Deducibles: ${formatCurrency(financialSummary.totalExpenses)}\nBase Imponible: ${formatCurrency(financialSummary.netProfit)}\n\nNota: Este reporte es informativo. Consulte con su contador para declaraciones oficiales.`
+        break
+      default:
+        content = `REPORTE - ${getPeriodLabel()}\nFecha: ${date}\n\nContenido del reporte...`
+    }
+
+    downloadFile(content, `${reportName.toLowerCase().replace(/ /g, '-')}-${date}.txt`, 'text/plain')
+
+    toast.dismiss(`report-${reportName}`)
+    toast.success(`${reportName} descargado exitosamente`)
+    setExportingReport(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -156,10 +307,28 @@ export default function ReportesPage() {
             <Filter className="mr-2 h-4 w-4" />
             Filtros
           </Button>
-          <Button>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <FileText className="mr-2 h-4 w-4" />
+                Exportar como PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Exportar como Excel (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -770,18 +939,24 @@ export default function ReportesPage() {
             {[
               { name: 'Reporte de Ventas', description: 'Detalle de todas las transacciones', icon: DollarSign },
               { name: 'Reporte de Pacientes', description: 'Lista completa con historial', icon: Users },
-              { name: 'Reporte de Citas', description: 'Estadísticas de agenda', icon: Calendar },
+              { name: 'Reporte de Citas', description: 'Estadisticas de agenda', icon: Calendar },
               { name: 'Reporte de Inventario', description: 'Stock y movimientos', icon: Package },
               { name: 'Reporte de Comisiones', description: 'Pagos a profesionales', icon: Percent },
-              { name: 'Reporte de Tratamientos', description: 'Servicios más solicitados', icon: Activity },
-              { name: 'Reporte de Productividad', description: 'Métricas del equipo', icon: Target },
+              { name: 'Reporte de Tratamientos', description: 'Servicios mas solicitados', icon: Activity },
+              { name: 'Reporte de Productividad', description: 'Metricas del equipo', icon: Target },
               { name: 'Reporte Fiscal', description: 'Para declaraciones', icon: FileText },
             ].map((report) => (
               <button
                 key={report.name}
-                className="flex flex-col items-start gap-2 p-4 rounded-lg border hover:bg-muted transition-colors text-left"
+                onClick={() => handleGenerateReport(report.name)}
+                disabled={exportingReport === report.name}
+                className="flex flex-col items-start gap-2 p-4 rounded-lg border hover:bg-muted transition-colors text-left disabled:opacity-50 disabled:cursor-wait"
               >
-                <report.icon className="h-5 w-5 text-primary" />
+                {exportingReport === report.name ? (
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                ) : (
+                  <report.icon className="h-5 w-5 text-primary" />
+                )}
                 <div>
                   <p className="font-medium text-sm">{report.name}</p>
                   <p className="text-xs text-muted-foreground">{report.description}</p>

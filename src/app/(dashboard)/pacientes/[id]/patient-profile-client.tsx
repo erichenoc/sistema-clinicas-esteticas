@@ -248,20 +248,31 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                if (patient.phone) {
+                  window.open(`https://wa.me/${patient.phone.replace(/\D/g, '')}`, '_blank')
+                } else {
+                  toast.error('El paciente no tiene numero de telefono registrado')
+                }
+              }}>
                 <MessageSquare className="mr-2 h-4 w-4" />
-                Enviar mensaje
+                Enviar mensaje WhatsApp
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileText className="mr-2 h-4 w-4" />
-                Ver consentimientos
+              <DropdownMenuItem asChild>
+                <Link href={`/consentimientos?paciente=${patient.id}`}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Ver consentimientos
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info('Galeria de fotos proximamente disponible')}>
                 <Camera className="mr-2 h-4 w-4" />
                 Galeria de fotos
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => toast.warning('Funcion de desactivar paciente en desarrollo')}
+              >
                 Desactivar paciente
               </DropdownMenuItem>
             </DropdownMenuContent>

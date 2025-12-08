@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Users,
@@ -301,6 +301,16 @@ export default function ProfesionalesPage() {
   const [activeTab, setActiveTab] = useState('equipo')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [todayDate, setTodayDate] = useState('')
+
+  useEffect(() => {
+    setTodayDate(new Date().toLocaleDateString('es-MX', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }))
+  }, [])
 
   // Stats
   const totalProfessionals = mockProfessionals.length
@@ -697,12 +707,7 @@ export default function ProfesionalesPage() {
               <div>
                 <CardTitle>Asistencia de Hoy</CardTitle>
                 <CardDescription>
-                  {new Date().toLocaleDateString('es-MX', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {todayDate || 'Cargando fecha...'}
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm">
