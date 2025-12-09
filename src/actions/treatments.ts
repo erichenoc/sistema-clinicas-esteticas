@@ -3,6 +3,83 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+// =============================================
+// DATOS DE DEMO - 39 Tratamientos de Dra. Pamela Moquete
+// =============================================
+
+const DEMO_CATEGORIES = [
+  {
+    id: 'cat-facial-001',
+    clinic_id: '00000000-0000-0000-0000-000000000001',
+    name: 'Tratamientos Faciales',
+    slug: 'tratamientos-faciales',
+    description: 'Tratamientos estéticos para el rostro',
+    icon: 'sparkles',
+    color: '#EC4899',
+    sort_order: 1,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'cat-corporal-001',
+    clinic_id: '00000000-0000-0000-0000-000000000001',
+    name: 'Tratamientos Corporales',
+    slug: 'tratamientos-corporales',
+    description: 'Tratamientos estéticos para el cuerpo',
+    icon: 'activity',
+    color: '#8B5CF6',
+    sort_order: 2,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
+const DEMO_TREATMENTS: TreatmentListItemData[] = [
+  // TRATAMIENTOS FACIALES (17)
+  { id: 'trat-001', name: 'HIFU Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 15000, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-002', name: 'Limpieza Facial Profunda', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 2500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-003', name: 'Microdermoabrasión Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 3500, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-004', name: 'Transdermoterapia', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 4000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-005', name: 'Dermapen', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 5000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-006', name: 'Mesoterapia Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 4500, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-007', name: 'Peelings Faciales', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 3000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-008', name: 'Tratamiento para Espinillas', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 3500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-009', name: 'Tratamiento para Manchas', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 4000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-010', name: 'Rejuvenecimiento Lifting Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 8000, duration_minutes: 90, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-011', name: 'Rellenos Faciales', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 12000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-012', name: 'Toxina Botulínica', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 10000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-013', name: 'Hilos Tensores Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 25000, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-014', name: 'Terapia de Inducción de Colágeno', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 5500, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-015', name: 'Radiofrecuencia Facial', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 4000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-016', name: 'Aumento de Labios', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 8000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  { id: 'trat-017', name: 'Perfilado de Nariz', category_name: 'Tratamientos Faciales', category_color: '#EC4899', price: 10000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop' },
+  // TRATAMIENTOS CORPORALES (22)
+  { id: 'trat-018', name: 'Emsculpt', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 8000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-019', name: 'Tratamiento para Estrías', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-020', name: 'Tratamiento para Celulitis', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-021', name: 'Tratamiento para Varices', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 3500, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-022', name: 'Lipoláser', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 6000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-023', name: 'Tratamiento para Alopecia', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 5000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-024', name: 'Tratamiento para Hiperhidrosis', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 12000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-025', name: 'Vacuumterapia', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 2500, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-026', name: 'Tratamiento Flacidez Corporal', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-027', name: 'Drenaje Linfático', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 2500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-028', name: 'Peelings Corporales', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 3500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-029', name: 'Eliminación de Cicatrices', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4500, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-030', name: 'Ultracavitación Corporal', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 3500, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-031', name: 'Blanqueamiento Corporal', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4000, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-032', name: 'Radiofrecuencia Corporal', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-033', name: 'Eliminación de Queloides', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 5000, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-034', name: 'Exfoliaciones y Envolturas', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 3500, duration_minutes: 75, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-035', name: 'Microdermoabrasión Corporal', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4000, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-036', name: 'Tratamientos Reductores de Grasa', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 4500, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-037', name: 'Masajes Relajantes y Terapéuticos', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 2000, duration_minutes: 60, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-038', name: 'Electrocauterización de Verrugas', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 1500, duration_minutes: 30, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+  { id: 'trat-039', name: 'Regeneración con Factores de Crecimiento', category_name: 'Tratamientos Corporales', category_color: '#8B5CF6', price: 8000, duration_minutes: 45, is_active: true, image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop' },
+]
+
 // Tipos
 export interface TreatmentCategoryData {
   id: string
@@ -119,7 +196,19 @@ export async function getCategories(): Promise<CategoryWithCountData[]> {
 
   if (error) {
     console.error('Error fetching categories:', error)
-    return []
+    // Retornar datos de demo si hay error de BD
+    return DEMO_CATEGORIES.map(cat => ({
+      ...cat,
+      treatment_count: DEMO_TREATMENTS.filter(t => t.category_name === cat.name).length,
+    })) as CategoryWithCountData[]
+  }
+
+  // Si no hay categorías en la BD, retornar datos de demo
+  if (!categories || categories.length === 0) {
+    return DEMO_CATEGORIES.map(cat => ({
+      ...cat,
+      treatment_count: DEMO_TREATMENTS.filter(t => t.category_name === cat.name).length,
+    })) as CategoryWithCountData[]
   }
 
   // Obtener conteo de tratamientos por categoria
@@ -289,7 +378,13 @@ export async function getTreatments(options?: {
 
   if (error) {
     console.error('Error fetching treatments:', error)
-    return []
+    // Retornar datos de demo si hay error de BD
+    return DEMO_TREATMENTS
+  }
+
+  // Si no hay tratamientos en la BD, retornar datos de demo
+  if (!data || data.length === 0) {
+    return DEMO_TREATMENTS
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
