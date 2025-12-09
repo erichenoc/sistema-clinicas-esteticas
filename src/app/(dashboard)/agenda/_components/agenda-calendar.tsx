@@ -77,6 +77,11 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
   useEffect(() => {
     setCurrentDate(new Date())
     setMounted(true)
+    // Set day view on mobile by default
+    const isMobile = window.innerWidth < 768
+    if (isMobile) {
+      setView('timeGridDay')
+    }
   }, [])
 
   // Filtrar citas por profesional
@@ -240,7 +245,7 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
 
       {/* Calendario */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 overflow-x-auto">
           {mounted ? (
             <FullCalendar
               ref={calendarRef}

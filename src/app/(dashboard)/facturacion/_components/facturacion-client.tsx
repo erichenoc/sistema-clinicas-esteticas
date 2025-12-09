@@ -288,23 +288,26 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
           <h1 className="text-3xl font-bold">Facturacion</h1>
           <p className="text-muted-foreground">Cotizaciones, facturas y comprobantes fiscales</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
             <Link href="/facturacion/contabilidad">
               <Calculator className="mr-2 h-4 w-4" />
-              Contabilidad DGII
+              <span className="hidden sm:inline">Contabilidad DGII</span>
+              <span className="sm:hidden">DGII</span>
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/facturacion/cotizaciones/nueva">
               <FileText className="mr-2 h-4 w-4" />
-              Nueva Cotizacion
+              <span className="hidden sm:inline">Nueva Cotizacion</span>
+              <span className="sm:hidden">Cotizar</span>
             </Link>
           </Button>
-          <Button asChild>
+          <Button size="sm" asChild>
             <Link href="/facturacion/facturas/nueva">
               <Receipt className="mr-2 h-4 w-4" />
-              Nueva Factura
+              <span className="hidden sm:inline">Nueva Factura</span>
+              <span className="sm:hidden">Facturar</span>
             </Link>
           </Button>
         </div>

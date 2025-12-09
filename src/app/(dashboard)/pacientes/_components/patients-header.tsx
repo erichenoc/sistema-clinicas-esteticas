@@ -79,14 +79,14 @@ export function PatientsHeader({ patients }: PatientsHeaderProps) {
           Gestiona la informacion de tus pacientes
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleImport} disabled={isImporting}>
           {isImporting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Upload className="mr-2 h-4 w-4" />
           )}
-          Importar
+          <span className="hidden xs:inline">Importar</span>
         </Button>
         <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
           {isExporting ? (
@@ -94,12 +94,13 @@ export function PatientsHeader({ patients }: PatientsHeaderProps) {
           ) : (
             <Download className="mr-2 h-4 w-4" />
           )}
-          Exportar
+          <span className="hidden xs:inline">Exportar</span>
         </Button>
-        <Button asChild>
+        <Button asChild size="sm">
           <Link href="/pacientes/nuevo">
             <Plus className="mr-2 h-4 w-4" />
-            Nuevo Paciente
+            <span className="hidden sm:inline">Nuevo Paciente</span>
+            <span className="sm:hidden">Nuevo</span>
           </Link>
         </Button>
       </div>

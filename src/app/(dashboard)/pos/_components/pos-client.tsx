@@ -182,9 +182,9 @@ export function POSClient({ treatments, packages, products, patients }: POSClien
   )
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 p-0 -m-6">
+    <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-4rem)] gap-4 p-0 -m-6">
       {/* Left Panel - Products/Services */}
-      <div className="flex-1 flex flex-col bg-background p-4">
+      <div className="flex-1 flex flex-col bg-background p-4 min-h-[50vh] lg:min-h-0">
         {/* Search and Tabs */}
         <div className="space-y-4 mb-4">
           <div className="relative">
@@ -345,7 +345,7 @@ export function POSClient({ treatments, packages, products, patients }: POSClien
       </div>
 
       {/* Right Panel - Cart */}
-      <div className="w-[400px] bg-card border-l flex flex-col">
+      <div className="w-full lg:w-[400px] bg-card border-t lg:border-t-0 lg:border-l flex flex-col">
         {/* Patient Selection */}
         <div className="p-4 border-b">
           <Label className="text-xs text-muted-foreground">Cliente</Label>

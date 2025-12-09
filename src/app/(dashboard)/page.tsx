@@ -330,7 +330,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={appointment.id}
-                    className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors gap-3"
                   >
                     <div className="flex items-center gap-4">
                       <div className="text-center min-w-[60px]">
@@ -338,17 +338,17 @@ export default function DashboardPage() {
                         <p className="text-xs text-gray-500">{appointment.endTime}</p>
                       </div>
                       <div className="h-10 w-[2px] bg-gray-200 rounded-full" />
-                      <div>
-                        <p className="font-medium">{appointment.patient}</p>
-                        <p className="text-sm text-gray-600">{appointment.treatment}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{appointment.patient}</p>
+                        <p className="text-sm text-gray-600 truncate">{appointment.treatment}</p>
                         <p className="text-xs text-gray-500">{appointment.professional}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge variant="secondary" className={`${status.bgColor} ${status.color}`}>
+                    <div className="flex sm:flex-col items-center sm:items-end gap-2 ml-auto">
+                      <Badge variant="secondary" className={`${status.bgColor} ${status.color} whitespace-nowrap text-xs`}>
                         {status.label}
                       </Badge>
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm font-medium text-gray-600 whitespace-nowrap">
                         {formatCurrency(appointment.amount)}
                       </span>
                     </div>

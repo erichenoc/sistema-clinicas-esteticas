@@ -54,23 +54,24 @@ export default async function TratamientosPage() {
             Gestiona el catalogo de servicios de tu clinica
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
             <Link href="/tratamientos/categorias">
               <Filter className="mr-2 h-4 w-4" />
               Categorias
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/tratamientos/paquetes">
               <Package className="mr-2 h-4 w-4" />
               Paquetes
             </Link>
           </Button>
-          <Button asChild>
+          <Button size="sm" asChild>
             <Link href="/tratamientos/nuevo">
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo Tratamiento
+              <span className="hidden sm:inline">Nuevo Tratamiento</span>
+              <span className="sm:hidden">Nuevo</span>
             </Link>
           </Button>
         </div>
