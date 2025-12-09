@@ -1,12 +1,19 @@
+/* Google Fonts - Montserrat for body, Playfair Display as Histeagin alternative */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 @import "tw-animate-css";
+
+/* MED LUXE Aesthetics & Wellness - Luxury Theme */
+/* Brand Guidelines Implementation */
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-montserrat);
+  --font-serif: var(--font-playfair);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -44,79 +51,221 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* MED LUXE Brand Fonts */
+  --font-montserrat: 'Montserrat', system-ui, sans-serif;
+  --font-playfair: 'Playfair Display', Georgia, serif;
+
+  /* MED LUXE Brand Colors - Luxury Palette */
+  --radius: 0.75rem;
+
+  /* Primary: Gold/Caramel - Elegant warmth */
+  --primary: #A67C52;
+  --primary-foreground: #FFFFFF;
+
+  /* Secondary: Teal/Spa - Calming wellness */
+  --secondary: #93beb8;
+  --secondary-foreground: #1a1a1a;
+
+  /* Accent: Rose Gold - Soft luxury */
+  --accent: #e8a0c0;
+  --accent-foreground: #1a1a1a;
+
+  /* Background: Warm cream - Sophisticated neutral */
+  --background: #FDFCFA;
+  --foreground: #3d3d3d;
+
+  /* Card: Pure white with warmth */
+  --card: #FFFFFF;
+  --card-foreground: #3d3d3d;
+
+  /* Popover */
+  --popover: #FFFFFF;
+  --popover-foreground: #3d3d3d;
+
+  /* Muted: Soft neutrals */
+  --muted: #f5f3f0;
+  --muted-foreground: #737373;
+
+  /* Border: Warm beige */
+  --border: #e8e4df;
+  --input: #e8e4df;
+  --ring: #A67C52;
+
+  /* Destructive: Muted rose */
+  --destructive: #c9515c;
+
+  /* Chart colors - Brand harmonious */
+  --chart-1: #A67C52;
+  --chart-2: #93beb8;
+  --chart-3: #e8a0c0;
+  --chart-4: #eaa86a;
+  --chart-5: #998577;
+
+  /* Sidebar - Luxury dark variant */
+  --sidebar: #3d3632;
+  --sidebar-foreground: #f5f3f0;
+  --sidebar-primary: #A67C52;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #4d4440;
+  --sidebar-accent-foreground: #f5f3f0;
+  --sidebar-border: #524b46;
+  --sidebar-ring: #A67C52;
+
+  /* MED LUXE Extended palette */
+  --medluxe-gold: #A67C52;
+  --medluxe-gold-light: #c9a67a;
+  --medluxe-gold-dark: #8a6543;
+  --medluxe-teal: #93beb8;
+  --medluxe-teal-light: #a9cbc6;
+  --medluxe-rose: #e8a0c0;
+  --medluxe-rose-light: #f1c6d9;
+  --medluxe-cream: #fbeee1;
+  --medluxe-warm-gray: #998577;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #1a1816;
+  --foreground: #f5f3f0;
+  --card: #252220;
+  --card-foreground: #f5f3f0;
+  --popover: #252220;
+  --popover-foreground: #f5f3f0;
+  --primary: #c9a67a;
+  --primary-foreground: #1a1816;
+  --secondary: #a9cbc6;
+  --secondary-foreground: #1a1816;
+  --muted: #302c29;
+  --muted-foreground: #a3a3a3;
+  --accent: #edb3cd;
+  --accent-foreground: #1a1816;
+  --destructive: #e57373;
+  --border: #3d3632;
+  --input: #3d3632;
+  --ring: #c9a67a;
+  --chart-1: #c9a67a;
+  --chart-2: #a9cbc6;
+  --chart-3: #edb3cd;
+  --chart-4: #eeb988;
+  --chart-5: #b09989;
+  --sidebar: #1a1816;
+  --sidebar-foreground: #f5f3f0;
+  --sidebar-primary: #c9a67a;
+  --sidebar-primary-foreground: #1a1816;
+  --sidebar-accent: #302c29;
+  --sidebar-accent-foreground: #f5f3f0;
+  --sidebar-border: #3d3632;
+  --sidebar-ring: #c9a67a;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-montserrat);
   }
+
+  /* Luxury Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-playfair);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  /* Refined scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--medluxe-warm-gray);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--medluxe-gold);
+  }
+}
+
+@layer utilities {
+  /* MED LUXE Custom utilities */
+  .font-display {
+    font-family: var(--font-playfair);
+  }
+
+  .font-body {
+    font-family: var(--font-montserrat);
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, var(--medluxe-gold) 0%, var(--medluxe-gold-light) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-luxury {
+    background: linear-gradient(135deg, var(--medluxe-cream) 0%, #FFFFFF 100%);
+  }
+
+  .border-luxury {
+    border-color: var(--medluxe-gold);
+    border-opacity: 0.2;
+  }
+
+  .shadow-luxury {
+    box-shadow: 0 4px 20px -2px rgba(166, 124, 82, 0.08),
+                0 2px 8px -2px rgba(166, 124, 82, 0.04);
+  }
+
+  .shadow-luxury-lg {
+    box-shadow: 0 10px 40px -4px rgba(166, 124, 82, 0.12),
+                0 4px 16px -4px rgba(166, 124, 82, 0.06);
+  }
+
+  /* Elegant hover effect */
+  .hover-luxury {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-luxury:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px -4px rgba(166, 124, 82, 0.15);
+  }
+
+  /* Glass morphism luxury */
+  .glass-luxury {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(166, 124, 82, 0.1);
+  }
+}
+
+/* Animation keyframes */
+@keyframes shimmer-luxury {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer-luxury {
+  background: linear-gradient(
+    90deg,
+    var(--medluxe-cream) 0%,
+    var(--medluxe-gold-light) 50%,
+    var(--medluxe-cream) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-luxury 2s infinite;
 }

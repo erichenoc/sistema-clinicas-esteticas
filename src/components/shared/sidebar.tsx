@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Calendar,
-  Stethoscope,
+  Sparkles,
   ClipboardList,
   ShoppingCart,
   Receipt,
@@ -16,10 +16,12 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { MedLuxeLogoSimple } from './medluxe-logo'
 
 const navigation = [
   {
@@ -40,7 +42,7 @@ const navigation = [
   {
     name: 'Tratamientos',
     href: '/tratamientos',
-    icon: Stethoscope,
+    icon: Sparkles,
   },
   {
     name: 'Sesiones',
@@ -53,7 +55,7 @@ const navigation = [
     icon: ShoppingCart,
   },
   {
-    name: 'Facturación',
+    name: 'Facturacion',
     href: '/facturacion',
     icon: Receipt,
   },
@@ -68,6 +70,11 @@ const navigation = [
     icon: UserCog,
   },
   {
+    name: 'Consentimientos',
+    href: '/consentimientos',
+    icon: FileText,
+  },
+  {
     name: 'Reportes',
     href: '/reportes',
     icon: BarChart3,
@@ -76,7 +83,7 @@ const navigation = [
 
 const bottomNavigation = [
   {
-    name: 'Configuración',
+    name: 'Configuracion',
     href: '/configuracion',
     icon: Settings,
   },
@@ -86,22 +93,20 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="font-semibold">Clínica Estética</span>
+    <div className="flex h-full w-72 flex-col bg-[#3d3632]">
+      {/* Logo Section */}
+      <div className="flex h-20 items-center justify-center border-b border-[#524b46] px-6">
+        <Link href="/" className="transition-opacity hover:opacity-80">
+          <MedLuxeLogoSimple inverted />
         </Link>
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="flex-1 px-4 py-6">
         <nav className="flex flex-col gap-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href ||
+            const isActive =
+              pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href))
 
             return (
@@ -109,14 +114,22 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'bg-[#A67C52] text-white shadow-lg shadow-[#A67C52]/20'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white'
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                {item.name}
+                <item.icon
+                  className={cn(
+                    'h-5 w-5 transition-transform duration-200',
+                    !isActive && 'group-hover:scale-110'
+                  )}
+                />
+                <span className="tracking-wide">{item.name}</span>
+                {isActive && (
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-white/80" />
+                )}
               </Link>
             )
           })}
@@ -124,7 +137,7 @@ export function Sidebar() {
       </ScrollArea>
 
       {/* Bottom Navigation */}
-      <div className="border-t px-3 py-4">
+      <div className="border-t border-[#524b46] px-4 py-4">
         <nav className="flex flex-col gap-1">
           {bottomNavigation.map((item) => {
             const isActive = pathname.startsWith(item.href)
@@ -134,24 +147,41 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'bg-[#A67C52] text-white'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white'
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                {item.name}
+                <span className="tracking-wide">{item.name}</span>
               </Link>
             )
           })}
-          <Separator className="my-2" />
+
+          <Separator className="my-3 bg-[#524b46]" />
+
+          {/* User Profile Section */}
+          <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#A67C52] text-sm font-medium text-white">
+              ML
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                Med Luxe Admin
+              </p>
+              <p className="text-xs text-white/50 truncate">
+                Administrador
+              </p>
+            </div>
+          </div>
+
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 px-3 text-muted-foreground hover:text-destructive"
+            className="w-full justify-start gap-3 px-4 text-white/60 hover:bg-red-500/10 hover:text-red-400"
           >
             <LogOut className="h-5 w-5" />
-            Cerrar sesión
+            <span className="tracking-wide">Cerrar sesion</span>
           </Button>
         </nav>
       </div>
