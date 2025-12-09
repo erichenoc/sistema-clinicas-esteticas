@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { MedLuxeLogoSimple } from './medluxe-logo'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 const navigation = [
   {
@@ -91,6 +93,19 @@ const bottomNavigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      toast.success('Sesion cerrada exitosamente')
+      router.push('/login')
+    } catch (error) {
+      console.error('Error al cerrar sesion:', error)
+      toast.error('Error al cerrar sesion')
+    }
+  }
 
   return (
     <div className="flex h-full w-72 flex-col bg-sidebar">
@@ -179,6 +194,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 px-4 text-white/60 hover:bg-red-500/10 hover:text-red-400"
+            onClick={handleLogout}
           >
             <LogOut className="h-5 w-5" />
             <span className="tracking-wide">Cerrar sesion</span>
