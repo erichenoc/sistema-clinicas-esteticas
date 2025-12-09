@@ -231,8 +231,8 @@ export default function DashboardPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
             Bienvenido de vuelta. Aqui esta el resumen de hoy{todayDate && `, ${todayDate}`}.
           </p>
         </div>
@@ -257,7 +257,7 @@ export default function DashboardPage() {
         {mainStats.map((stat) => (
           <Card key={stat.name}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.name}
               </CardTitle>
               <div className={`p-2 rounded-lg ${stat.bgColor}`}>
@@ -278,10 +278,10 @@ export default function DashboardPage() {
                   }`}>
                     {stat.change}
                   </span>
-                  <span className="text-xs text-gray-500">vs mes anterior</span>
+                  <span className="text-xs text-muted-foreground">vs mes anterior</span>
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 mt-1">{stat.subtext}</p>
+                <p className="text-xs text-muted-foreground mt-1">{stat.subtext}</p>
               )}
             </CardContent>
           </Card>
@@ -294,7 +294,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium">Progreso del día</p>
-              <p className="text-xs text-gray-500">{completedToday} de {totalToday} citas completadas</p>
+              <p className="text-xs text-muted-foreground">{completedToday} de {totalToday} citas completadas</p>
             </div>
             <span className="text-2xl font-bold">{Math.round(progressPercent)}%</span>
           </div>
@@ -330,25 +330,25 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={appointment.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors gap-3"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 hover:bg-muted transition-colors gap-3"
                   >
                     <div className="flex items-center gap-4">
                       <div className="text-center min-w-[60px]">
                         <p className="text-lg font-semibold">{appointment.time}</p>
-                        <p className="text-xs text-gray-500">{appointment.endTime}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.endTime}</p>
                       </div>
-                      <div className="h-10 w-[2px] bg-gray-200 rounded-full" />
+                      <div className="h-10 w-[2px] bg-border rounded-full" />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{appointment.patient}</p>
-                        <p className="text-sm text-gray-600 truncate">{appointment.treatment}</p>
-                        <p className="text-xs text-gray-500">{appointment.professional}</p>
+                        <p className="text-sm text-muted-foreground truncate">{appointment.treatment}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.professional}</p>
                       </div>
                     </div>
                     <div className="flex sm:flex-col items-center sm:items-end gap-2 ml-auto">
                       <Badge variant="secondary" className={`${status.bgColor} ${status.color} whitespace-nowrap text-xs`}>
                         {status.label}
                       </Badge>
-                      <span className="text-sm font-medium text-gray-600 whitespace-nowrap">
+                      <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
                         {formatCurrency(appointment.amount)}
                       </span>
                     </div>
@@ -383,9 +383,9 @@ export default function DashboardPage() {
                     <AlertTriangle className={`h-5 w-5 mt-0.5 ${severity.color}`} />
                     <div className="flex-1">
                       <p className={`text-sm font-medium ${severity.color}`}>{alert.title}</p>
-                      <p className="text-xs text-gray-600 mt-0.5">{alert.message}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
                 )
               })}
@@ -411,14 +411,14 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {topTreatments.map((treatment, index) => (
                 <div key={treatment.name} className="flex items-center gap-4">
-                  <span className="text-lg font-bold text-gray-400 w-6">
+                  <span className="text-lg font-bold text-muted-foreground w-6">
                     {index + 1}
                   </span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
                       <p className="font-medium">{treatment.name}</p>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500">{treatment.sessions} sesiones</span>
+                        <span className="text-sm text-muted-foreground">{treatment.sessions} sesiones</span>
                         <span className={`text-sm font-medium flex items-center ${
                           treatment.growth >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
@@ -436,7 +436,7 @@ export default function DashboardPage() {
                         value={(treatment.sessions / 70) * 100}
                         className="h-2 flex-1"
                       />
-                      <span className="text-sm font-medium text-gray-600 min-w-[100px] text-right">
+                      <span className="text-sm font-medium text-muted-foreground min-w-[100px] text-right">
                         {formatCurrency(treatment.revenue)}
                       </span>
                     </div>
@@ -474,7 +474,7 @@ export default function DashboardPage() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{sale.patient}</p>
-                    <p className="text-xs text-gray-500">{sale.type} • {sale.time}</p>
+                    <p className="text-xs text-muted-foreground">{sale.type} • {sale.time}</p>
                   </div>
                   <span className="text-sm font-semibold">
                     {formatCurrency(sale.amount)}
@@ -484,7 +484,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-4 pt-4 border-t">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Total del día</span>
+                <span className="text-muted-foreground">Total del día</span>
                 <span className="font-bold text-lg">
                   {formatCurrency(recentSales.reduce((acc, s) => acc + s.amount, 0))}
                 </span>
@@ -511,13 +511,13 @@ export default function DashboardPage() {
               <div
                 key={professional.name}
                 className={`p-4 rounded-lg border ${
-                  index === 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'
+                  index === 0 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-muted'
                 }`}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <Avatar className="h-12 w-12">
                     <AvatarFallback className={`${
-                      index === 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200'
+                      index === 0 ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' : 'bg-muted-foreground/20'
                     } font-semibold`}>
                       {professional.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </AvatarFallback>
@@ -526,7 +526,7 @@ export default function DashboardPage() {
                     <p className="font-medium">{professional.name}</p>
                     <div className="flex items-center gap-1">
                       <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                      <span className="text-sm text-gray-600">{professional.rating}</span>
+                      <span className="text-sm text-muted-foreground">{professional.rating}</span>
                     </div>
                   </div>
                   {index === 0 && (
@@ -535,11 +535,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <p className="text-gray-500">Ingresos</p>
+                    <p className="text-muted-foreground">Ingresos</p>
                     <p className="font-semibold">{formatCurrency(professional.revenue)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Citas</p>
+                    <p className="text-muted-foreground">Citas</p>
                     <p className="font-semibold">{professional.appointments}</p>
                   </div>
                 </div>
