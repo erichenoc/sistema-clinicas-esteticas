@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { Plus, Search, Filter, LayoutGrid, List, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,79 +15,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TreatmentCard } from './_components/treatment-card'
 import { TreatmentTable } from './_components/treatment-table'
 import { TreatmentFilters } from './_components/treatment-filters'
+import { getTreatments, getCategories } from '@/actions/treatments'
+import type { TreatmentListItem } from '@/types/treatments'
 
-// Mock data - será reemplazado por datos de Supabase
-const mockCategories = [
-  { id: '1', name: 'Facial', slug: 'facial', color: '#ec4899', treatmentCount: 8 },
-  { id: '2', name: 'Corporal', slug: 'corporal', color: '#8b5cf6', treatmentCount: 5 },
-  { id: '3', name: 'Láser', slug: 'laser', color: '#ef4444', treatmentCount: 4 },
-  { id: '4', name: 'Inyectables', slug: 'inyectables', color: '#06b6d4', treatmentCount: 6 },
-]
+export default async function TratamientosPage() {
+  const [dbTreatments, dbCategories] = await Promise.all([
+    getTreatments(),
+    getCategories(),
+  ])
 
-const mockTreatments = [
-  {
-    id: '1',
-    name: 'Limpieza Facial Profunda',
-    categoryName: 'Facial',
-    categoryColor: '#ec4899',
-    price: 80,
-    durationMinutes: 60,
-    isActive: true,
-    imageUrl: null,
-  },
-  {
-    id: '2',
-    name: 'Botox - Frente',
-    categoryName: 'Inyectables',
-    categoryColor: '#06b6d4',
-    price: 350,
-    durationMinutes: 30,
-    isActive: true,
-    imageUrl: null,
-  },
-  {
-    id: '3',
-    name: 'Depilación Láser - Axilas',
-    categoryName: 'Láser',
-    categoryColor: '#ef4444',
-    price: 120,
-    durationMinutes: 20,
-    isActive: true,
-    imageUrl: null,
-  },
-  {
-    id: '4',
-    name: 'Hidratación Facial',
-    categoryName: 'Facial',
-    categoryColor: '#ec4899',
-    price: 95,
-    durationMinutes: 45,
-    isActive: true,
-    imageUrl: null,
-  },
-  {
-    id: '5',
-    name: 'Ácido Hialurónico - Labios',
-    categoryName: 'Inyectables',
-    categoryColor: '#06b6d4',
-    price: 400,
-    durationMinutes: 30,
-    isActive: true,
-    imageUrl: null,
-  },
-  {
-    id: '6',
-    name: 'Radiofrecuencia Corporal',
-    categoryName: 'Corporal',
-    categoryColor: '#8b5cf6',
-    price: 150,
-    durationMinutes: 60,
-    isActive: false,
-    imageUrl: null,
-  },
-]
+  // Transform to expected format for components
+  const treatments: TreatmentListItem[] = dbTreatments.map((t) => ({
+    id: t.id,
+    name: t.name,
+    categoryName: t.category_name,
+    categoryColor: t.category_color,
+    price: t.price,
+    durationMinutes: t.duration_minutes,
+    isActive: t.is_active,
+    imageUrl: t.image_url,
+  }))
 
-export default function TratamientosPage() {
+  const categories = dbCategories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    color: c.color,
+    treatmentCount: c.treatment_count,
+  }))
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -93,14 +51,14 @@ export default function TratamientosPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tratamientos</h1>
           <p className="text-muted-foreground">
-            Gestiona el catálogo de servicios de tu clínica
+            Gestiona el catalogo de servicios de tu clinica
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link href="/tratamientos/categorias">
               <Filter className="mr-2 h-4 w-4" />
-              Categorías
+              Categorias
             </Link>
           </Button>
           <Button variant="outline" asChild>
@@ -118,7 +76,7 @@ export default function TratamientosPage() {
         </div>
       </div>
 
-      {/* Filtros y búsqueda */}
+      {/* Filtros y busqueda */}
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -129,11 +87,11 @@ export default function TratamientosPage() {
         </div>
         <Select defaultValue="all">
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Categoría" />
+            <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas las categorías</SelectItem>
-            {mockCategories.map((category) => (
+            <SelectItem value="all">Todas las categorias</SelectItem>
+            {categories.map((category) => (
               <SelectItem key={category.id} value={category.id}>
                 <div className="flex items-center gap-2">
                   <div
@@ -158,10 +116,10 @@ export default function TratamientosPage() {
         </Select>
       </div>
 
-      {/* Categorías rápidas */}
+      {/* Categorias rapidas */}
       <TreatmentFilters
-        categories={mockCategories}
-        totalCount={mockTreatments.length}
+        categories={categories}
+        totalCount={treatments.length}
       />
 
       {/* Vista de tratamientos */}
@@ -178,15 +136,27 @@ export default function TratamientosPage() {
         </div>
 
         <TabsContent value="grid" className="mt-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {mockTreatments.map((treatment) => (
-              <TreatmentCard key={treatment.id} treatment={treatment} />
-            ))}
-          </div>
+          {treatments.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No hay tratamientos registrados</p>
+              <Button asChild className="mt-4">
+                <Link href="/tratamientos/nuevo">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear primer tratamiento
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {treatments.map((treatment) => (
+                <TreatmentCard key={treatment.id} treatment={treatment} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="list" className="mt-4">
-          <TreatmentTable treatments={mockTreatments} />
+          <TreatmentTable treatments={treatments} />
         </TabsContent>
       </Tabs>
     </div>
