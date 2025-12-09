@@ -117,7 +117,7 @@ const mockAppointments: Record<string, AppointmentListItem> = {
     patientPhone: '5598765432',
     patientEmail: 'ana.martinez@email.com',
     patientAvatar: null,
-    professionalName: 'Dr. Carlos López',
+    professionalName: 'Dra. Pamela Moquete',
     roomName: 'Cabina 2',
     roomColor: '#3b82f6',
     treatmentDisplayName: 'Botox - Frente',

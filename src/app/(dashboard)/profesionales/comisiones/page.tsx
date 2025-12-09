@@ -44,7 +44,7 @@ const mockComisiones = [
   {
     id: '1',
     professionalId: '1',
-    professionalName: 'Dra. María García López',
+    professionalName: 'Dra. Pamela Moquete',
     professionalAvatar: null,
     period: '2024-01',
     totalSales: 85000,
@@ -57,7 +57,7 @@ const mockComisiones = [
   {
     id: '2',
     professionalId: '2',
-    professionalName: 'Dr. Carlos Rodríguez Pérez',
+    professionalName: 'Dra. Pamela Moquete',
     professionalAvatar: null,
     period: '2024-01',
     totalSales: 120000,
@@ -70,7 +70,7 @@ const mockComisiones = [
   {
     id: '3',
     professionalId: '1',
-    professionalName: 'Dra. María García López',
+    professionalName: 'Dra. Pamela Moquete',
     professionalAvatar: null,
     period: '2024-02',
     totalSales: 92000,
@@ -83,7 +83,7 @@ const mockComisiones = [
   {
     id: '4',
     professionalId: '2',
-    professionalName: 'Dr. Carlos Rodríguez Pérez',
+    professionalName: 'Dra. Pamela Moquete',
     professionalAvatar: null,
     period: '2024-02',
     totalSales: 115000,
@@ -96,7 +96,7 @@ const mockComisiones = [
   {
     id: '5',
     professionalId: '3',
-    professionalName: 'Lic. Ana Martínez Silva',
+    professionalName: 'Dra. Pamela Moquete',
     professionalAvatar: null,
     period: '2024-01',
     totalSales: 45000,
@@ -109,9 +109,9 @@ const mockComisiones = [
 ]
 
 const mockProfessionals = [
-  { id: '1', name: 'Dra. María García López', rate: 0.15 },
-  { id: '2', name: 'Dr. Carlos Rodríguez Pérez', rate: 0.25 },
-  { id: '3', name: 'Lic. Ana Martínez Silva', rate: 0.10 },
+  { id: '1', name: 'Dra. Pamela Moquete', rate: 0.15 },
+  { id: '2', name: 'Dra. Pamela Moquete', rate: 0.25 },
+  { id: '3', name: 'Dra. Pamela Moquete', rate: 0.10 },
 ]
 
 export default function ComisionesPage() {

@@ -87,7 +87,7 @@ const todayAppointments = [
     time: '09:00',
     endTime: '09:45',
     status: 'completed',
-    professional: 'Dra. Ana López',
+    professional: 'Dra. Pamela Moquete',
     amount: 5500,
   },
   {
@@ -97,7 +97,7 @@ const todayAppointments = [
     time: '10:00',
     endTime: '10:45',
     status: 'in_progress',
-    professional: 'Dra. Ana López',
+    professional: 'Dra. Pamela Moquete',
     amount: 4500,
   },
   {
@@ -107,7 +107,7 @@ const todayAppointments = [
     time: '11:00',
     endTime: '12:00',
     status: 'waiting',
-    professional: 'Lic. Carmen Ruiz',
+    professional: 'Dra. Pamela Moquete',
     amount: 1200,
   },
   {
@@ -117,7 +117,7 @@ const todayAppointments = [
     time: '12:00',
     endTime: '13:00',
     status: 'confirmed',
-    professional: 'Lic. Carmen Ruiz',
+    professional: 'Dra. Pamela Moquete',
     amount: 2800,
   },
   {
@@ -127,7 +127,7 @@ const todayAppointments = [
     time: '14:00',
     endTime: '15:00',
     status: 'scheduled',
-    professional: 'Dra. Ana López',
+    professional: 'Dra. Pamela Moquete',
     amount: 1500,
   },
 ]
@@ -187,9 +187,7 @@ const recentSales = [
 
 // Top profesionales del mes
 const topProfessionals = [
-  { name: 'Dra. Ana López', revenue: 85000, appointments: 48, rating: 4.9 },
-  { name: 'Dr. Carlos Méndez', revenue: 72000, appointments: 32, rating: 4.8 },
-  { name: 'Lic. Carmen Ruiz', revenue: 45000, appointments: 55, rating: 4.7 },
+  { name: 'Dra. Pamela Moquete', revenue: 202000, appointments: 135, rating: 5.0 },
 ]
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {

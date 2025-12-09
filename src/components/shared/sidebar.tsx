@@ -17,6 +17,7 @@ import {
   Settings,
   LogOut,
   FileText,
+  Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -70,6 +71,11 @@ const navigation = [
     name: 'Profesionales',
     href: '/profesionales',
     icon: UserCog,
+  },
+  {
+    name: 'Nomina',
+    href: '/nomina',
+    icon: Wallet,
   },
   {
     name: 'Consentimientos',

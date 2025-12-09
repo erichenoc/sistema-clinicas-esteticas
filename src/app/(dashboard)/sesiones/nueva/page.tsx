@@ -64,9 +64,7 @@ const mockPatients = [
 ]
 
 const mockProfessionals = [
-  { id: '1', name: 'Dra. María García', specialty: 'Dermatología' },
-  { id: '2', name: 'Dr. Carlos López', specialty: 'Medicina Estética' },
-  { id: '3', name: 'Lic. Ana Martínez', specialty: 'Cosmetología' },
+  { id: '1', name: 'Dra. Pamela Moquete', specialty: 'Medicina Estética' },
 ]
 
 const mockTreatments = [
