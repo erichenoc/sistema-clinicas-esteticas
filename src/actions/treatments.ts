@@ -526,3 +526,348 @@ export async function getTreatmentStats(): Promise<{
 
   return { total, active, inactive, byCategory }
 }
+
+// =============================================
+// PAQUETES
+// =============================================
+
+export interface PackageItemData {
+  treatmentId: string
+  treatmentName: string
+  quantity: number
+  price: number
+}
+
+export interface PackageData {
+  id: string
+  name: string
+  description: string | null
+  type: 'bundle' | 'sessions_pack'
+  items: PackageItemData[]
+  regularPrice: number
+  salePrice: number
+  validityDays: number
+  salesCount: number
+  isActive: boolean
+}
+
+export interface TreatmentForPackage {
+  id: string
+  name: string
+  price: number
+  durationMinutes: number
+  categoryName: string | null
+}
+
+export interface CreatePackageInput {
+  name: string
+  description?: string
+  type: 'bundle' | 'sessions_pack'
+  items: { treatmentId: string; quantity: number }[]
+  regularPrice: number
+  salePrice: number
+  validityDays?: number
+  isActive?: boolean
+}
+
+// Obtener tratamientos para selector de paquetes
+export async function getTreatmentsForPackages(): Promise<TreatmentForPackage[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('treatments')
+    .select(`
+      id,
+      name,
+      price,
+      duration_minutes,
+      treatment_categories (
+        name
+      )
+    `)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching treatments for packages:', error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    price: t.price || 0,
+    durationMinutes: t.duration_minutes || 0,
+    categoryName: t.treatment_categories?.name || null,
+  }))
+}
+
+// Obtener todos los paquetes
+export async function getPackages(): Promise<PackageData[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: packages, error } = await (supabase as any)
+    .from('treatment_packages')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching packages:', error)
+    return []
+  }
+
+  // Obtener tratamientos para mapear nombres
+  const treatments = await getTreatmentsForPackages()
+  const treatmentMap = new Map(treatments.map(t => [t.id, t]))
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (packages || []).map((p: any) => {
+    // items puede ser JSONB o array, asegurar que sea array
+    const rawItems = p.items || []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: PackageItemData[] = rawItems.map((item: any) => {
+      const treatment = treatmentMap.get(item.treatmentId || item.treatment_id)
+      return {
+        treatmentId: item.treatmentId || item.treatment_id,
+        treatmentName: item.treatmentName || item.treatment_name || treatment?.name || 'Tratamiento',
+        quantity: item.quantity || 1,
+        price: item.price || treatment?.price || 0,
+      }
+    })
+
+    return {
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      type: p.type || 'sessions_pack',
+      items,
+      regularPrice: p.original_price || p.regular_price || 0,
+      salePrice: p.price || p.sale_price || 0,
+      validityDays: p.validity_days || 90,
+      salesCount: p.sales_count || 0,
+      isActive: p.is_active ?? true,
+    }
+  })
+}
+
+// Obtener paquete por ID
+export async function getPackageById(id: string): Promise<PackageData | null> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('treatment_packages')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    console.error('Error fetching package:', error)
+    return null
+  }
+
+  const treatments = await getTreatmentsForPackages()
+  const treatmentMap = new Map(treatments.map(t => [t.id, t]))
+
+  const rawItems = data.items || []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items: PackageItemData[] = rawItems.map((item: any) => {
+    const treatment = treatmentMap.get(item.treatmentId || item.treatment_id)
+    return {
+      treatmentId: item.treatmentId || item.treatment_id,
+      treatmentName: item.treatmentName || item.treatment_name || treatment?.name || 'Tratamiento',
+      quantity: item.quantity || 1,
+      price: item.price || treatment?.price || 0,
+    }
+  })
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    type: data.type || 'sessions_pack',
+    items,
+    regularPrice: data.original_price || data.regular_price || 0,
+    salePrice: data.price || data.sale_price || 0,
+    validityDays: data.validity_days || 90,
+    salesCount: data.sales_count || 0,
+    isActive: data.is_active ?? true,
+  }
+}
+
+// Crear paquete
+export async function createPackage(
+  input: CreatePackageInput
+): Promise<{ data: PackageData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // Obtener tratamientos para construir items con nombres y precios
+  const treatments = await getTreatmentsForPackages()
+  const treatmentMap = new Map(treatments.map(t => [t.id, t]))
+
+  const items = input.items.map(item => {
+    const treatment = treatmentMap.get(item.treatmentId)
+    return {
+      treatmentId: item.treatmentId,
+      treatmentName: treatment?.name || 'Tratamiento',
+      quantity: item.quantity,
+      price: treatment?.price || 0,
+    }
+  })
+
+  const totalSessions = items.reduce((sum, item) => sum + item.quantity, 0)
+
+  const packageData = {
+    clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
+    name: input.name,
+    description: input.description || null,
+    type: input.type,
+    items,
+    price: input.salePrice,
+    original_price: input.regularPrice,
+    validity_days: input.validityDays || 90,
+    total_sessions: totalSessions,
+    is_active: input.isActive ?? true,
+    sales_count: 0,
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('treatment_packages')
+    .insert(packageData)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating package:', error)
+    return { data: null, error: 'Error al crear el paquete' }
+  }
+
+  revalidatePath('/tratamientos/paquetes')
+  revalidatePath('/pos')
+
+  return {
+    data: {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      type: data.type,
+      items,
+      regularPrice: data.original_price,
+      salePrice: data.price,
+      validityDays: data.validity_days,
+      salesCount: data.sales_count || 0,
+      isActive: data.is_active,
+    },
+    error: null,
+  }
+}
+
+// Actualizar paquete
+export async function updatePackage(
+  id: string,
+  input: Partial<CreatePackageInput>
+): Promise<{ data: PackageData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // Si hay items, reconstruirlos con nombres y precios
+  let items: PackageItemData[] | undefined
+  let totalSessions: number | undefined
+
+  if (input.items) {
+    const treatments = await getTreatmentsForPackages()
+    const treatmentMap = new Map(treatments.map(t => [t.id, t]))
+
+    items = input.items.map(item => {
+      const treatment = treatmentMap.get(item.treatmentId)
+      return {
+        treatmentId: item.treatmentId,
+        treatmentName: treatment?.name || 'Tratamiento',
+        quantity: item.quantity,
+        price: treatment?.price || 0,
+      }
+    })
+
+    totalSessions = items.reduce((sum, item) => sum + item.quantity, 0)
+  }
+
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.name !== undefined) updateData.name = input.name
+  if (input.description !== undefined) updateData.description = input.description
+  if (input.type !== undefined) updateData.type = input.type
+  if (items !== undefined) updateData.items = items
+  if (input.regularPrice !== undefined) updateData.original_price = input.regularPrice
+  if (input.salePrice !== undefined) updateData.price = input.salePrice
+  if (input.validityDays !== undefined) updateData.validity_days = input.validityDays
+  if (totalSessions !== undefined) updateData.total_sessions = totalSessions
+  if (input.isActive !== undefined) updateData.is_active = input.isActive
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('treatment_packages')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating package:', error)
+    return { data: null, error: 'Error al actualizar el paquete' }
+  }
+
+  revalidatePath('/tratamientos/paquetes')
+  revalidatePath('/pos')
+
+  // Reconstruir items del resultado si no los tenemos
+  const finalItems = items || (data.items || []).map((item: PackageItemData) => ({
+    treatmentId: item.treatmentId,
+    treatmentName: item.treatmentName,
+    quantity: item.quantity,
+    price: item.price,
+  }))
+
+  return {
+    data: {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      type: data.type,
+      items: finalItems,
+      regularPrice: data.original_price,
+      salePrice: data.price,
+      validityDays: data.validity_days,
+      salesCount: data.sales_count || 0,
+      isActive: data.is_active,
+    },
+    error: null,
+  }
+}
+
+// Eliminar paquete (soft delete)
+export async function deletePackage(id: string): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('treatment_packages')
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting package:', error)
+    return { success: false, error: 'Error al eliminar el paquete' }
+  }
+
+  revalidatePath('/tratamientos/paquetes')
+  revalidatePath('/pos')
+  return { success: true, error: null }
+}

@@ -537,6 +537,215 @@ export async function getInventoryStats(): Promise<InventoryStats> {
   }
 }
 
+// =============================================
+// LOTES PARA VISTA DE LISTA
+// =============================================
+
+export interface LotListItemData {
+  id: string
+  lotNumber: string
+  productId: string
+  productName: string
+  productBrand: string | null
+  quantity: number
+  usedQuantity: number
+  costPerUnit: number
+  expirationDate: string | null
+  receivedDate: string
+  supplier: string | null
+  status: string
+}
+
+export async function getLotsForList(): Promise<LotListItemData[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('product_lots')
+    .select(`
+      *,
+      products (
+        name,
+        description
+      ),
+      suppliers (
+        name
+      )
+    `)
+    .order('expiry_date', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching lots for list:', error)
+    return []
+  }
+
+  const today = new Date()
+  const thirtyDaysFromNow = new Date()
+  thirtyDaysFromNow.setDate(today.getDate() + 30)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((lot: any) => {
+    let status = lot.status || 'active'
+
+    // Calcular status basado en fecha de vencimiento y cantidad
+    if (lot.current_quantity <= 0) {
+      status = 'depleted'
+    } else if (lot.expiry_date) {
+      const expiryDate = new Date(lot.expiry_date)
+      if (expiryDate < today) {
+        status = 'expired'
+      } else if (expiryDate <= thirtyDaysFromNow) {
+        status = 'expiring_soon'
+      }
+    }
+
+    return {
+      id: lot.id,
+      lotNumber: lot.lot_number,
+      productId: lot.product_id,
+      productName: lot.products?.name || 'Producto',
+      productBrand: lot.products?.description || null,
+      quantity: lot.initial_quantity || 0,
+      usedQuantity: (lot.initial_quantity || 0) - (lot.current_quantity || 0),
+      costPerUnit: lot.unit_cost || 0,
+      expirationDate: lot.expiry_date,
+      receivedDate: lot.received_date,
+      supplier: lot.suppliers?.name || null,
+      status,
+    }
+  })
+}
+
+export interface LotStats {
+  activeLotes: number
+  expiringLotes: number
+  totalValue: number
+}
+
+export async function getLotStats(): Promise<LotStats> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: lots, error } = await (supabase as any)
+    .from('product_lots')
+    .select('current_quantity, unit_cost, expiry_date, status')
+
+  if (error) {
+    console.error('Error fetching lot stats:', error)
+    return { activeLotes: 0, expiringLotes: 0, totalValue: 0 }
+  }
+
+  const today = new Date()
+  const thirtyDaysFromNow = new Date()
+  thirtyDaysFromNow.setDate(today.getDate() + 30)
+
+  let activeLotes = 0
+  let expiringLotes = 0
+  let totalValue = 0
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lots?.forEach((lot: any) => {
+    const remaining = lot.current_quantity || 0
+    const cost = lot.unit_cost || 0
+
+    if (remaining > 0) {
+      totalValue += remaining * cost
+
+      if (lot.expiry_date) {
+        const expiryDate = new Date(lot.expiry_date)
+        if (expiryDate > today) {
+          activeLotes++
+          if (expiryDate <= thirtyDaysFromNow) {
+            expiringLotes++
+          }
+        }
+      } else {
+        activeLotes++
+      }
+    }
+  })
+
+  return { activeLotes, expiringLotes, totalValue }
+}
+
+export interface ProductForLot {
+  id: string
+  name: string
+  brand: string | null
+}
+
+export async function getProductsForLots(): Promise<ProductForLot[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('products')
+    .select('id, name, description')
+    .eq('is_active', true)
+    .eq('requires_lot_tracking', true)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching products for lots:', error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    brand: p.description,
+  }))
+}
+
+export interface SupplierForLot {
+  id: string
+  name: string
+}
+
+export async function getSuppliersForLots(): Promise<SupplierForLot[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('suppliers')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching suppliers:', error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((s: any) => ({
+    id: s.id,
+    name: s.name,
+  }))
+}
+
+export async function deleteLot(id: string): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('product_lots')
+    .update({
+      status: 'depleted',
+      current_quantity: 0,
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting lot:', error)
+    return { success: false, error: 'Error al eliminar el lote' }
+  }
+
+  revalidatePath('/inventario/lotes')
+  return { success: true, error: null }
+}
+
 // Buscar productos
 export async function searchProducts(query: string): Promise<ProductListItemData[]> {
   const supabase = createAdminClient()
