@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   MoreVertical,
@@ -10,6 +11,7 @@ import {
   Phone,
   Mail,
   DollarSign,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +24,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 import type { PatientListItem } from '@/types/patients'
 import {
   getPatientInitials,
@@ -44,9 +57,26 @@ const statusConfig: Record<
 }
 
 export function PatientCard({ patient }: PatientCardProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const age = calculateAge(patient.dateOfBirth)
   const initials = getPatientInitials(patient.firstName, patient.lastName)
   const status = statusConfig[patient.status] || statusConfig.active
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    toast.loading('Eliminando paciente...', { id: 'delete-patient' })
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    toast.dismiss('delete-patient')
+    toast.success(`Paciente ${patient.firstName} ${patient.lastName} eliminado`)
+    setIsDeleting(false)
+    setShowDeleteDialog(false)
+    // In production, this would call a server action and refresh the page
+  }
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-DO', {
@@ -121,13 +151,45 @@ export function PatientCard({ patient }: PatientCardProps) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar paciente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará permanentemente a {patient.firstName} {patient.lastName} y todos sus datos asociados. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  'Eliminar'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Estado y tags */}
         <div className="mt-3 flex flex-wrap gap-1">

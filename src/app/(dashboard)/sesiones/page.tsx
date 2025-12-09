@@ -14,7 +14,9 @@ import {
   XCircle,
   Play,
   FileText,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -195,6 +197,16 @@ const mockProfessionals = [
 export default function SesionesPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [professionalFilter, setProfessionalFilter] = useState('all')
+  const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(null)
+
+  const handleCancelSession = async (sessionId: string, patientName: string) => {
+    setCancellingSessionId(sessionId)
+    toast.loading('Cancelando sesion...', { id: 'cancel-session' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('cancel-session')
+    toast.success(`Sesion de ${patientName} cancelada`)
+    setCancellingSessionId(null)
+  }
 
   const filteredSessions = mockSessions.filter((session) => {
     if (statusFilter !== 'all' && session.status !== statusFilter) return false
@@ -432,8 +444,16 @@ export default function SesionesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {session.status === 'in_progress' && (
-                              <DropdownMenuItem className="text-destructive">
-                                <XCircle className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleCancelSession(session.id, session.patientName)}
+                                disabled={cancellingSessionId === session.id}
+                              >
+                                {cancellingSessionId === session.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                )}
                                 Cancelar sesión
                               </DropdownMenuItem>
                             )}

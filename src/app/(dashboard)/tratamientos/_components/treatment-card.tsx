@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { Clock, MoreVertical, Pencil, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Clock, MoreVertical, Pencil, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 import type { TreatmentListItem } from '@/types/treatments'
 
 interface TreatmentCardProps {
@@ -19,6 +31,29 @@ interface TreatmentCardProps {
 }
 
 export function TreatmentCard({ treatment }: TreatmentCardProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isToggling, setIsToggling] = useState(false)
+
+  const handleToggleActive = async () => {
+    setIsToggling(true)
+    toast.loading(treatment.isActive ? 'Desactivando...' : 'Activando...', { id: 'toggle-status' })
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    toast.dismiss('toggle-status')
+    toast.success(`Tratamiento ${treatment.isActive ? 'desactivado' : 'activado'}`)
+    setIsToggling(false)
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    toast.loading('Eliminando tratamiento...', { id: 'delete-treatment' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('delete-treatment')
+    toast.success(`Tratamiento "${treatment.name}" eliminado`)
+    setIsDeleting(false)
+    setShowDeleteDialog(false)
+  }
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-DO', {
       style: 'currency',
@@ -106,8 +141,10 @@ export function TreatmentCard({ treatment }: TreatmentCardProps) {
                   Editar
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                {treatment.isActive ? (
+              <DropdownMenuItem onClick={handleToggleActive} disabled={isToggling}>
+                {isToggling ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : treatment.isActive ? (
                   <>
                     <EyeOff className="mr-2 h-4 w-4" />
                     Desactivar
@@ -120,13 +157,45 @@ export function TreatmentCard({ treatment }: TreatmentCardProps) {
                 )}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar tratamiento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará permanentemente &quot;{treatment.name}&quot; del catálogo. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  'Eliminar'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Estado */}
         {!treatment.isActive && (

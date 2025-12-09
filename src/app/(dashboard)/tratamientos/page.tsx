@@ -12,6 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TreatmentCard } from './_components/treatment-card'
 import { TreatmentTable } from './_components/treatment-table'
+import { TreatmentFilters } from './_components/treatment-filters'
 
 // Mock data - será reemplazado por datos de Supabase
 const mockCategories = [
@@ -158,25 +159,10 @@ export default function TratamientosPage() {
       </div>
 
       {/* Categorías rápidas */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" className="rounded-full">
-          Todos ({mockTreatments.length})
-        </Button>
-        {mockCategories.map((category) => (
-          <Button
-            key={category.id}
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-          >
-            <div
-              className="mr-2 h-2 w-2 rounded-full"
-              style={{ backgroundColor: category.color }}
-            />
-            {category.name} ({category.treatmentCount})
-          </Button>
-        ))}
-      </div>
+      <TreatmentFilters
+        categories={mockCategories}
+        totalCount={mockTreatments.length}
+      />
 
       {/* Vista de tratamientos */}
       <Tabs defaultValue="grid" className="w-full">

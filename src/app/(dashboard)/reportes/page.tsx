@@ -136,6 +136,8 @@ export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState('financiero')
   const [isExporting, setIsExporting] = useState(false)
   const [exportingReport, setExportingReport] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [orderingProduct, setOrderingProduct] = useState<string | null>(null)
 
   const revenueChange = calculateChange(financialSummary.totalRevenue, financialSummary.previousRevenue)
   const profitChange = calculateChange(financialSummary.netProfit, financialSummary.previousProfit)
@@ -235,6 +237,22 @@ export default function ReportesPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleToggleFilters = () => {
+    setShowFilters(!showFilters)
+    if (!showFilters) {
+      toast.info('Panel de filtros avanzados. Funcionalidad completa proximamente.')
+    }
+  }
+
+  const handleOrderProduct = async (productName: string) => {
+    setOrderingProduct(productName)
+    toast.loading('Creando orden de compra...', { id: 'order-product' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('order-product')
+    toast.success(`Orden de compra creada para "${productName}"`)
+    setOrderingProduct(null)
+  }
+
   const handleGenerateReport = async (reportName: string) => {
     setExportingReport(reportName)
     toast.loading(`Generando ${reportName}...`, { id: `report-${reportName}` })
@@ -303,7 +321,7 @@ export default function ReportesPage() {
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleToggleFilters}>
             <Filter className="mr-2 h-4 w-4" />
             Filtros
           </Button>
@@ -913,8 +931,17 @@ export default function ReportesPage() {
                       <Badge variant={alert.status === 'critical' ? 'destructive' : 'secondary'}>
                         {alert.status === 'critical' ? 'Crítico' : 'Bajo'}
                       </Badge>
-                      <Button size="sm" variant="outline">
-                        Ordenar
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOrderProduct(alert.product)}
+                        disabled={orderingProduct === alert.product}
+                      >
+                        {orderingProduct === alert.product ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Ordenar'
+                        )}
                       </Button>
                     </div>
                   </div>

@@ -20,8 +20,10 @@ import {
   ArrowRightLeft,
   Box,
   PackageOpen,
-  Building2
+  Building2,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -269,6 +271,8 @@ export default function InventarioPage() {
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add')
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
 
   // Stats
   const totalProducts = mockProducts.length
@@ -300,7 +304,37 @@ export default function InventarioPage() {
       quantity: adjustmentQuantity,
       reason: adjustmentReason,
     })
+    toast.success(`Stock ${adjustmentType === 'add' ? 'agregado' : 'retirado'} exitosamente`)
     setAdjustmentDialogOpen(false)
+  }
+
+  const handleToggleFilters = () => {
+    setShowFilters(!showFilters)
+    if (!showFilters) {
+      toast.info('Panel de filtros avanzados. Funcionalidad completa proximamente.')
+    }
+  }
+
+  const handleDeleteProduct = async (productName: string) => {
+    setProcessingAction(`delete-${productName}`)
+    toast.loading('Eliminando producto...', { id: 'delete-product' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('delete-product')
+    toast.success(`Producto "${productName}" eliminado`)
+    setProcessingAction(null)
+  }
+
+  const handleResolveAlert = async (productName: string, alertType: string) => {
+    setProcessingAction(`resolve-${productName}`)
+    toast.loading('Resolviendo alerta...', { id: 'resolve-alert' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('resolve-alert')
+    if (alertType === 'low_stock') {
+      toast.success(`Orden de compra creada para "${productName}"`)
+    } else {
+      toast.success(`Alerta de "${productName}" marcada como resuelta`)
+    }
+    setProcessingAction(null)
   }
 
   return (
@@ -458,7 +492,7 @@ export default function InventarioPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" onClick={handleToggleFilters}>
               <Filter className="h-4 w-4" />
             </Button>
           </div>
@@ -565,7 +599,10 @@ export default function InventarioPage() {
                                 Retirar stock
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => handleDeleteProduct(product.name)}
+                              >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Eliminar
                               </DropdownMenuItem>
@@ -706,8 +743,17 @@ export default function InventarioPage() {
                           {alert.branchName && <span>Sucursal: {alert.branchName}</span>}
                         </div>
                       </div>
-                      <Button size="sm" variant="outline">
-                        Resolver
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleResolveAlert(alert.productName, alert.alertType)}
+                        disabled={processingAction === `resolve-${alert.productName}`}
+                      >
+                        {processingAction === `resolve-${alert.productName}` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Resolver'
+                        )}
                       </Button>
                     </div>
                   </Card>

@@ -1,8 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import Link from 'next/link'
-import { Plus, Search, LayoutGrid, List, Download, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Search, LayoutGrid, List } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -14,6 +12,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PatientCard } from './_components/patient-card'
 import { PatientTable } from './_components/patient-table'
+import { PatientsHeader } from './_components/patients-header'
+import { PatientsFilters } from './_components/patients-filters'
 import { getPatients } from '@/actions/medical-history'
 import type { PatientListItem } from '@/types/patients'
 
@@ -52,30 +52,7 @@ export default async function PacientesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pacientes</h1>
-          <p className="text-muted-foreground">
-            Gestiona la información de tus pacientes
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="mr-2 h-4 w-4" />
-            Importar
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Button asChild>
-            <Link href="/pacientes/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Paciente
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PatientsHeader patients={patients} />
 
       {/* Estadísticas rápidas */}
       <div className="grid gap-4 sm:grid-cols-4">
@@ -131,24 +108,13 @@ export default async function PacientesPage() {
         </Select>
       </div>
 
-      {/* Filtros rápidos por etiquetas */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" className="rounded-full">
-          Todos ({patients.length})
-        </Button>
-        <Button variant="outline" size="sm" className="rounded-full">
-          <span className="mr-2 h-2 w-2 rounded-full bg-yellow-500" />
-          VIP ({vipCount})
-        </Button>
-        <Button variant="outline" size="sm" className="rounded-full">
-          <span className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-          Activos ({activeCount})
-        </Button>
-        <Button variant="outline" size="sm" className="rounded-full">
-          <span className="mr-2 h-2 w-2 rounded-full bg-gray-500" />
-          Inactivos ({inactiveCount})
-        </Button>
-      </div>
+      {/* Filtros rapidos por etiquetas */}
+      <PatientsFilters
+        totalCount={patients.length}
+        vipCount={vipCount}
+        activeCount={activeCount}
+        inactiveCount={inactiveCount}
+      />
 
       {/* Vista de pacientes */}
       <Tabs defaultValue="list" className="w-full">

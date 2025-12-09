@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, Pencil, Trash2, Eye, EyeOff } from 'lucide-react'
+import { MoreVertical, Pencil, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -19,6 +20,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 import type { TreatmentListItem } from '@/types/treatments'
 
 interface TreatmentTableProps {
@@ -26,6 +38,32 @@ interface TreatmentTableProps {
 }
 
 export function TreatmentTable({ treatments }: TreatmentTableProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [selectedTreatment, setSelectedTreatment] = useState<TreatmentListItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const handleToggleActive = async (treatment: TreatmentListItem) => {
+    setProcessingId(treatment.id)
+    toast.loading(treatment.isActive ? 'Desactivando...' : 'Activando...', { id: 'toggle-status' })
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    toast.dismiss('toggle-status')
+    toast.success(`Tratamiento ${treatment.isActive ? 'desactivado' : 'activado'}`)
+    setProcessingId(null)
+  }
+
+  const handleDelete = async () => {
+    if (!selectedTreatment) return
+    setIsDeleting(true)
+    toast.loading('Eliminando tratamiento...', { id: 'delete-treatment' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('delete-treatment')
+    toast.success(`Tratamiento "${selectedTreatment.name}" eliminado`)
+    setIsDeleting(false)
+    setDeleteDialogOpen(false)
+    setSelectedTreatment(null)
+  }
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-DO', {
       style: 'currency',
@@ -127,8 +165,13 @@ export function TreatmentTable({ treatments }: TreatmentTableProps) {
                         Editar
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      {treatment.isActive ? (
+                    <DropdownMenuItem
+                      onClick={() => handleToggleActive(treatment)}
+                      disabled={processingId === treatment.id}
+                    >
+                      {processingId === treatment.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : treatment.isActive ? (
                         <>
                           <EyeOff className="mr-2 h-4 w-4" />
                           Desactivar
@@ -141,7 +184,13 @@ export function TreatmentTable({ treatments }: TreatmentTableProps) {
                       )}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => {
+                        setSelectedTreatment(treatment)
+                        setDeleteDialogOpen(true)
+                      }}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Eliminar
                     </DropdownMenuItem>
@@ -152,6 +201,35 @@ export function TreatmentTable({ treatments }: TreatmentTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar tratamiento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente &quot;{selectedTreatment?.name}&quot; del catálogo. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

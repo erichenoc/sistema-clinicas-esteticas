@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Filter, ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Users, Clock } from 'lucide-react'
+import { Plus, Filter, ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Users, Clock, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -197,6 +198,8 @@ export default function AgendaPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentListItem | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [isRescheduling, setIsRescheduling] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   // Manejar SSR - solo renderizar calendario en cliente
   useEffect(() => {
@@ -269,6 +272,29 @@ export default function AgendaPage() {
         ? { weekday: 'long', day: 'numeric', month: 'long' }
         : { month: 'long', year: 'numeric' }
     return currentDate.toLocaleDateString('es-MX', options)
+  }
+
+  const handleReschedule = async () => {
+    if (!selectedAppointment) return
+    setIsRescheduling(true)
+    toast.loading('Preparando reprogramacion...', { id: 'reschedule' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('reschedule')
+    toast.success(`Cita de ${selectedAppointment.patientName} lista para reprogramar. Seleccione nueva fecha en el calendario.`)
+    setIsRescheduling(false)
+    setIsDetailOpen(false)
+  }
+
+  const handleCancelAppointment = async () => {
+    if (!selectedAppointment) return
+    setIsCancelling(true)
+    toast.loading('Cancelando cita...', { id: 'cancel-apt' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('cancel-apt')
+    toast.success(`Cita de ${selectedAppointment.patientName} cancelada`)
+    setIsCancelling(false)
+    setIsDetailOpen(false)
+    setSelectedAppointment(null)
   }
 
   return (
@@ -585,8 +611,12 @@ export default function AgendaPage() {
                   </Link>
                 </Button>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline">Reprogramar</Button>
-                  <Button variant="outline" className="text-destructive">
+                  <Button variant="outline" onClick={handleReschedule} disabled={isRescheduling}>
+                    {isRescheduling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Reprogramar
+                  </Button>
+                  <Button variant="outline" className="text-destructive" onClick={handleCancelAppointment} disabled={isCancelling}>
+                    {isCancelling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Cancelar
                   </Button>
                 </div>

@@ -22,7 +22,9 @@ import {
   XCircle,
   ArrowUpRight,
   Building2,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -214,6 +216,8 @@ export default function FacturacionPage() {
   const [invoiceSearch, setInvoiceSearch] = useState('')
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all')
   const [invoiceFiscalFilter, setInvoiceFiscalFilter] = useState('all')
+  const [isExporting, setIsExporting] = useState(false)
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
 
   const filteredQuotes = mockQuotes.filter((quote) => {
     const matchesSearch =
@@ -262,6 +266,122 @@ export default function FacturacionPage() {
       month: 'short',
       year: 'numeric',
     })
+  }
+
+  // Export handlers
+  const handleExportInvoices = async () => {
+    setIsExporting(true)
+    toast.loading('Exportando facturas...', { id: 'export-invoices' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    const headers = 'Numero,Cliente,NCF,Total,Por Cobrar,Vencimiento,Estado\n'
+    const rows = filteredInvoices.map(inv =>
+      `${inv.invoiceNumber},${inv.clientName},${inv.ncfNumber || '-'},${inv.total},${inv.amountDue},${inv.dueDate},${inv.status}`
+    ).join('\n')
+
+    const blob = new Blob([headers + rows], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `facturas-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.dismiss('export-invoices')
+    toast.success(`${filteredInvoices.length} facturas exportadas`)
+    setIsExporting(false)
+  }
+
+  const handleExportQuotes = async () => {
+    setIsExporting(true)
+    toast.loading('Exportando cotizaciones...', { id: 'export-quotes' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    const headers = 'Numero,Cliente,Total,Valida Hasta,Estado\n'
+    const rows = filteredQuotes.map(q =>
+      `${q.quoteNumber},${q.clientName},${q.total},${q.validUntil},${q.status}`
+    ).join('\n')
+
+    const blob = new Blob([headers + rows], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cotizaciones-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.dismiss('export-quotes')
+    toast.success(`${filteredQuotes.length} cotizaciones exportadas`)
+    setIsExporting(false)
+  }
+
+  // Invoice action handlers
+  const handleDownloadPDF = async (invoiceNumber: string) => {
+    setProcessingAction(`pdf-${invoiceNumber}`)
+    toast.loading('Generando PDF...', { id: 'download-pdf' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('download-pdf')
+    toast.success(`PDF de ${invoiceNumber} generado. Funcionalidad completa proximamente.`)
+    setProcessingAction(null)
+  }
+
+  const handleSendEmail = async (clientName: string, invoiceNumber: string) => {
+    setProcessingAction(`email-${invoiceNumber}`)
+    toast.loading('Enviando email...', { id: 'send-email' })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    toast.dismiss('send-email')
+    toast.success(`Factura ${invoiceNumber} enviada a ${clientName}`)
+    setProcessingAction(null)
+  }
+
+  const handleRegisterPayment = async (invoiceNumber: string, amountDue: number) => {
+    setProcessingAction(`payment-${invoiceNumber}`)
+    toast.loading('Registrando pago...', { id: 'register-payment' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('register-payment')
+    toast.success(`Pago registrado para ${invoiceNumber}. Monto pendiente: ${formatCurrency(amountDue)}`)
+    setProcessingAction(null)
+  }
+
+  const handleCancelInvoice = async (invoiceNumber: string) => {
+    setProcessingAction(`cancel-${invoiceNumber}`)
+    toast.loading('Anulando factura...', { id: 'cancel-invoice' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('cancel-invoice')
+    toast.success(`Factura ${invoiceNumber} anulada`)
+    setProcessingAction(null)
+  }
+
+  // Quote action handlers
+  const handleSendToClient = async (clientName: string, quoteNumber: string) => {
+    setProcessingAction(`send-${quoteNumber}`)
+    toast.loading('Enviando cotizacion...', { id: 'send-quote' })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    toast.dismiss('send-quote')
+    toast.success(`Cotizacion ${quoteNumber} enviada a ${clientName}`)
+    setProcessingAction(null)
+  }
+
+  const handleConvertToInvoice = async (quoteNumber: string) => {
+    setProcessingAction(`convert-${quoteNumber}`)
+    toast.loading('Convirtiendo a factura...', { id: 'convert-invoice' })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    toast.dismiss('convert-invoice')
+    toast.success(`Cotizacion ${quoteNumber} convertida a factura`)
+    setProcessingAction(null)
+  }
+
+  const handleDeleteQuote = async (quoteNumber: string) => {
+    setProcessingAction(`delete-${quoteNumber}`)
+    toast.loading('Eliminando cotizacion...', { id: 'delete-quote' })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    toast.dismiss('delete-quote')
+    toast.success(`Cotizacion ${quoteNumber} eliminada`)
+    setProcessingAction(null)
   }
 
   return (
@@ -397,8 +517,8 @@ export default function FacturacionPage() {
                 <SelectItem value="simple">Sin NCF</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={handleExportInvoices} disabled={isExporting}>
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -489,18 +609,18 @@ export default function FacturacionPage() {
                               Ver detalle
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadPDF(invoice.invoiceNumber)}>
                             <Download className="mr-2 h-4 w-4" />
                             Descargar PDF
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleSendEmail(invoice.clientName, invoice.invoiceNumber)}>
                             <Send className="mr-2 h-4 w-4" />
                             Enviar por email
                           </DropdownMenuItem>
                           {(invoice.status === 'pending' || invoice.status === 'partial') && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRegisterPayment(invoice.invoiceNumber, invoice.amountDue)}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" />
                                 Registrar pago
                               </DropdownMenuItem>
@@ -509,7 +629,7 @@ export default function FacturacionPage() {
                           {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleCancelInvoice(invoice.invoiceNumber)}>
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Anular factura
                               </DropdownMenuItem>
@@ -551,8 +671,8 @@ export default function FacturacionPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={handleExportQuotes} disabled={isExporting}>
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -635,12 +755,12 @@ export default function FacturacionPage() {
                               </Link>
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadPDF(quote.quoteNumber)}>
                             <Download className="mr-2 h-4 w-4" />
                             Descargar PDF
                           </DropdownMenuItem>
                           {quote.status === 'draft' && (
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSendToClient(quote.clientName, quote.quoteNumber)}>
                               <Send className="mr-2 h-4 w-4" />
                               Enviar al cliente
                             </DropdownMenuItem>
@@ -648,7 +768,7 @@ export default function FacturacionPage() {
                           {(quote.status === 'sent' || quote.status === 'accepted') && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleConvertToInvoice(quote.quoteNumber)}>
                                 <ArrowUpRight className="mr-2 h-4 w-4" />
                                 Convertir a factura
                               </DropdownMenuItem>
@@ -657,7 +777,7 @@ export default function FacturacionPage() {
                           {quote.status === 'draft' && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteQuote(quote.quoteNumber)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Eliminar
                               </DropdownMenuItem>
