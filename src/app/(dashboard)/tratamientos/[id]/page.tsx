@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -14,10 +14,10 @@ import {
   CheckCircle,
   Package,
   Clipboard,
-  Image as ImageIcon,
   Trash2,
   Copy,
   ToggleLeft,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,151 +38,115 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import type { Treatment, TreatmentCategory, TreatmentProtocolStep } from '@/types/treatments'
-
-// Mock data
-const mockCategories: Record<string, TreatmentCategory> = {
-  'facial': {
-    id: 'facial',
-    clinicId: '1',
-    name: 'Facial',
-    slug: 'facial',
-    description: 'Tratamientos faciales',
-    icon: 'sparkles',
-    color: '#ec4899',
-    sortOrder: 1,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  'inyectables': {
-    id: 'inyectables',
-    clinicId: '1',
-    name: 'Inyectables',
-    slug: 'inyectables',
-    description: 'Tratamientos inyectables',
-    icon: 'syringe',
-    color: '#06b6d4',
-    sortOrder: 2,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  'laser': {
-    id: 'laser',
-    clinicId: '1',
-    name: 'Láser',
-    slug: 'laser',
-    description: 'Tratamientos láser',
-    icon: 'zap',
-    color: '#ef4444',
-    sortOrder: 3,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-}
-
-const mockTreatments: Record<string, Treatment> = {
-  '1': {
-    id: '1',
-    clinicId: '1',
-    categoryId: 'facial',
-    name: 'Limpieza Facial Profunda',
-    slug: 'limpieza-facial-profunda',
-    description: 'Tratamiento completo de limpieza facial que incluye extracción de comedones, exfoliación y mascarilla hidratante.',
-    descriptionInternal: 'Usar productos de la línea Dermalogica. Para pieles sensibles, usar la línea UltraCalming.',
-    durationMinutes: 60,
-    bufferMinutes: 10,
-    price: 1200,
-    priceFrom: null,
-    cost: 250,
-    recommendedSessions: 4,
-    sessionIntervalDays: 30,
-    contraindications: [
-      'Rosácea activa',
-      'Herpes labial activo',
-      'Tratamiento con Isotretinoína',
-      'Quemaduras solares recientes',
-    ],
-    aftercareInstructions: 'Evitar exposición solar directa por 24 horas. Usar protector solar SPF 50. No usar maquillaje por 12 horas.',
-    requiredConsentId: null,
-    allowedProfessionalIds: ['1', '2', '3'],
-    requiredRoomTypes: ['cabin'],
-    requiredEquipmentIds: [],
-    consumables: [
-      { productId: 'prod-1', quantity: 1 },
-      { productId: 'prod-2', quantity: 2 },
-    ],
-    protocolSteps: [
-      { order: 1, title: 'Desmaquillado', description: 'Limpieza inicial con leche limpiadora', durationMinutes: 5 },
-      { order: 2, title: 'Análisis de piel', description: 'Evaluación con lámpara de Wood', durationMinutes: 5 },
-      { order: 3, title: 'Vapor y extracción', description: 'Apertura de poros y extracción de comedones', durationMinutes: 20 },
-      { order: 4, title: 'Exfoliación', description: 'Exfoliación enzimática según tipo de piel', durationMinutes: 10 },
-      { order: 5, title: 'Mascarilla', description: 'Aplicación de mascarilla hidratante', durationMinutes: 15 },
-      { order: 6, title: 'Finalización', description: 'Tónico, sérum y protector solar', durationMinutes: 5 },
-    ],
-    imageUrl: null,
-    galleryUrls: [],
-    isPublic: true,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    category: mockCategories['facial'],
-  },
-  '2': {
-    id: '2',
-    clinicId: '1',
-    categoryId: 'inyectables',
-    name: 'Botox - Frente',
-    slug: 'botox-frente',
-    description: 'Aplicación de toxina botulínica en la zona de la frente para suavizar líneas de expresión.',
-    descriptionInternal: 'Dosis recomendada: 10-20 unidades. Evaluar movilidad y ajustar según necesidad.',
-    durationMinutes: 30,
-    bufferMinutes: 15,
-    price: 5500,
-    priceFrom: null,
-    cost: 1800,
-    recommendedSessions: 3,
-    sessionIntervalDays: 120,
-    contraindications: [
-      'Embarazo o lactancia',
-      'Enfermedades neuromusculares',
-      'Alergia a la toxina botulínica',
-      'Infección en zona de aplicación',
-    ],
-    aftercareInstructions: 'No tocar ni masajear la zona tratada por 4 horas. No realizar ejercicio intenso por 24 horas. No acostarse por 4 horas.',
-    requiredConsentId: 'consent-botox',
-    allowedProfessionalIds: ['1', '2'],
-    requiredRoomTypes: ['cabin', 'consultation'],
-    requiredEquipmentIds: [],
-    consumables: [
-      { productId: 'botox-100u', quantity: 1 },
-    ],
-    protocolSteps: [
-      { order: 1, title: 'Fotografía', description: 'Tomar fotos pre-procedimiento', durationMinutes: 2 },
-      { order: 2, title: 'Limpieza', description: 'Desinfección de la zona', durationMinutes: 3 },
-      { order: 3, title: 'Marcación', description: 'Marcar puntos de aplicación', durationMinutes: 5 },
-      { order: 4, title: 'Aplicación', description: 'Inyección de toxina botulínica', durationMinutes: 15 },
-      { order: 5, title: 'Post-cuidados', description: 'Explicar cuidados e indicaciones', durationMinutes: 5 },
-    ],
-    imageUrl: null,
-    galleryUrls: [],
-    isPublic: true,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    category: mockCategories['inyectables'],
-  },
-}
+import { getTreatments, getCategories } from '@/actions/treatments'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+interface TreatmentDetail {
+  id: string
+  name: string
+  description: string
+  descriptionInternal: string
+  categoryName: string
+  categoryColor: string
+  price: number
+  cost: number
+  durationMinutes: number
+  bufferMinutes: number
+  recommendedSessions: number
+  sessionIntervalDays: number
+  contraindications: string[]
+  aftercareInstructions: string
+  protocolSteps: Array<{
+    order: number
+    title: string
+    description: string
+    durationMinutes: number
+  }>
+  consumables: Array<{
+    productId: string
+    quantity: number
+  }>
+  allowedProfessionalIds: string[]
+  isActive: boolean
+  isPublic: boolean
+}
+
 export default function TreatmentDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const treatment = mockTreatments[id]
+  const [treatment, setTreatment] = useState<TreatmentDetail | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadTreatment = async () => {
+      try {
+        const [treatments, categories] = await Promise.all([
+          getTreatments(),
+          getCategories(),
+        ])
+
+        const found = treatments.find(t => t.id === id)
+        if (!found) {
+          setTreatment(null)
+          setIsLoading(false)
+          return
+        }
+
+        // Get category info
+        const category = categories.find(c => c.name === found.category_name)
+
+        // Build treatment detail with defaults for demo data
+        const detail: TreatmentDetail = {
+          id: found.id,
+          name: found.name,
+          description: `Tratamiento profesional de ${found.name}. Resultados visibles desde la primera sesion.`,
+          descriptionInternal: 'Seguir protocolo estandar de la clinica.',
+          categoryName: found.category_name || 'General',
+          categoryColor: found.category_color || category?.color || '#6366f1',
+          price: found.price,
+          cost: Math.round(found.price * 0.35), // Estimate 35% cost
+          durationMinutes: found.duration_minutes,
+          bufferMinutes: 10,
+          recommendedSessions: 4,
+          sessionIntervalDays: 30,
+          contraindications: [
+            'Embarazo o lactancia',
+            'Infeccion activa en la zona',
+            'Enfermedades autoinmunes activas',
+          ],
+          aftercareInstructions: 'Evitar exposicion solar directa por 24-48 horas. Usar protector solar SPF 50+. Mantener la zona hidratada.',
+          protocolSteps: [
+            { order: 1, title: 'Evaluacion', description: 'Evaluacion inicial del paciente y zona a tratar', durationMinutes: 5 },
+            { order: 2, title: 'Preparacion', description: 'Limpieza y preparacion del area', durationMinutes: 10 },
+            { order: 3, title: 'Procedimiento', description: 'Aplicacion del tratamiento', durationMinutes: Math.max(found.duration_minutes - 20, 30) },
+            { order: 4, title: 'Finalizacion', description: 'Cuidados post-tratamiento e indicaciones', durationMinutes: 5 },
+          ],
+          consumables: [],
+          allowedProfessionalIds: ['1', '2', '3'],
+          isActive: found.is_active ?? true,
+          isPublic: true,
+        }
+
+        setTreatment(detail)
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Error loading treatment:', error)
+        setIsLoading(false)
+      }
+    }
+
+    loadTreatment()
+  }, [id])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   if (!treatment) {
     notFound()
@@ -217,9 +181,9 @@ export default function TreatmentDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-3">
               <div
                 className="h-4 w-4 rounded-full"
-                style={{ backgroundColor: treatment.category?.color || '#6366f1' }}
+                style={{ backgroundColor: treatment.categoryColor }}
               />
-              <Badge variant="outline">{treatment.category?.name}</Badge>
+              <Badge variant="outline">{treatment.categoryName}</Badge>
             </div>
             <h1 className="text-2xl font-bold tracking-tight mt-1">
               {treatment.name}
@@ -265,7 +229,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Métricas */}
+      {/* Metricas */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
@@ -274,7 +238,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
               <span className="text-sm text-muted-foreground">Precio</span>
             </div>
             <p className="text-2xl font-bold mt-1">
-              RD${treatment.price.toLocaleString('es-MX')}
+              RD${treatment.price.toLocaleString('es-DO')}
             </p>
           </CardContent>
         </Card>
@@ -282,7 +246,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Duración</span>
+              <span className="text-sm text-muted-foreground">Duracion</span>
             </div>
             <p className="text-2xl font-bold mt-1">
               {treatment.durationMinutes} min
@@ -301,7 +265,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
               <span className="text-sm text-muted-foreground">Costo</span>
             </div>
             <p className="text-2xl font-bold mt-1">
-              RD${treatment.cost.toLocaleString('es-MX')}
+              RD${treatment.cost.toLocaleString('es-DO')}
             </p>
           </CardContent>
         </Card>
@@ -315,7 +279,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
               {marginPercent}%
             </p>
             <p className="text-xs text-muted-foreground">
-              RD${margin.toLocaleString('es-MX')} por sesión
+              RD${margin.toLocaleString('es-DO')} por sesion
             </p>
           </CardContent>
         </Card>
@@ -377,14 +341,14 @@ export default function TreatmentDetailPage({ params }: PageProps) {
             <TabsContent value="details" className="mt-4 space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Descripción Interna</CardTitle>
+                  <CardTitle>Descripcion Interna</CardTitle>
                   <CardDescription>
-                    Solo visible para el personal de la clínica
+                    Solo visible para el personal de la clinica
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm">
-                    {treatment.descriptionInternal || 'Sin descripción interna'}
+                    {treatment.descriptionInternal || 'Sin descripcion interna'}
                   </p>
                 </CardContent>
               </Card>
@@ -395,7 +359,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm">
-                    {treatment.aftercareInstructions || 'Sin indicaciones específicas'}
+                    {treatment.aftercareInstructions || 'Sin indicaciones especificas'}
                   </p>
                 </CardContent>
               </Card>
@@ -415,7 +379,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                         <Separator orientation="vertical" className="h-12" />
                         <div>
                           <p className="text-2xl font-bold">{treatment.sessionIntervalDays}</p>
-                          <p className="text-sm text-muted-foreground">días entre sesiones</p>
+                          <p className="text-sm text-muted-foreground">dias entre sesiones</p>
                         </div>
                       </>
                     )}
@@ -432,7 +396,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                     Productos Consumibles
                   </CardTitle>
                   <CardDescription>
-                    Productos utilizados en cada sesión
+                    Productos utilizados en cada sesion
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -446,7 +410,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                           <div>
                             <p className="font-medium">Producto #{item.productId}</p>
                             <p className="text-sm text-muted-foreground">
-                              Se usa en cada sesión
+                              Se usa en cada sesion
                             </p>
                           </div>
                           <Badge variant="outline">x{item.quantity}</Badge>
@@ -467,9 +431,9 @@ export default function TreatmentDetailPage({ params }: PageProps) {
         {/* Columna lateral */}
         <div className="space-y-6">
           {/* Contraindicaciones */}
-          <Card className="border-amber-200 bg-amber-50">
+          <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-amber-700">
+              <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="h-5 w-5" />
                 Contraindicaciones
               </CardTitle>
@@ -480,7 +444,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                   {treatment.contraindications.map((item, index) => (
                     <li
                       key={index}
-                      className="flex items-start gap-2 text-sm text-amber-700"
+                      className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400"
                     >
                       <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
                       {item}
@@ -488,7 +452,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-amber-700">Sin contraindicaciones registradas</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400">Sin contraindicaciones registradas</p>
               )}
             </CardContent>
           </Card>
@@ -516,10 +480,10 @@ export default function TreatmentDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Acciones rápidas */}
+          {/* Acciones rapidas */}
           <Card>
             <CardHeader>
-              <CardTitle>Acciones Rápidas</CardTitle>
+              <CardTitle>Acciones Rapidas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <Button className="w-full" asChild>

@@ -11,6 +11,11 @@ import {
   Calendar,
   Download,
   Filter,
+  Pencil,
+  Trash2,
+  Plus,
+  Save,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +43,27 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 // Mock data
 const mockComisiones = [
@@ -114,12 +140,100 @@ const mockProfessionals = [
   { id: '3', name: 'Dra. Pamela Moquete', rate: 0.10 },
 ]
 
+interface Comision {
+  id: string
+  professionalId: string
+  professionalName: string
+  professionalAvatar: string | null
+  period: string
+  totalSales: number
+  commissionRate: number
+  commissionAmount: number
+  sessionsCount: number
+  status: string
+  paidAt: string | null
+}
+
 export default function ComisionesPage() {
   const [periodFilter, setPeriodFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [professionalFilter, setProfessionalFilter] = useState('all')
+  const [comisiones, setComisiones] = useState<Comision[]>(mockComisiones)
+  const [editingComision, setEditingComision] = useState<Comision | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [deleteComisionId, setDeleteComisionId] = useState<string | null>(null)
+  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false)
+  const [newComision, setNewComision] = useState({
+    professionalId: '',
+    period: '',
+    totalSales: '',
+    commissionRate: '',
+    sessionsCount: '',
+  })
 
-  const filteredComisiones = mockComisiones.filter((com) => {
+  const handleEditComision = (comision: Comision) => {
+    setEditingComision({ ...comision })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingComision) return
+
+    setComisiones(prev =>
+      prev.map(c => c.id === editingComision.id ? {
+        ...editingComision,
+        commissionAmount: editingComision.totalSales * editingComision.commissionRate
+      } : c)
+    )
+    setIsEditDialogOpen(false)
+    setEditingComision(null)
+    toast.success('Comision actualizada exitosamente')
+  }
+
+  const handleDeleteComision = (id: string) => {
+    setComisiones(prev => prev.filter(c => c.id !== id))
+    setDeleteComisionId(null)
+    toast.success('Comision eliminada exitosamente')
+  }
+
+  const handlePayComision = (id: string) => {
+    setComisiones(prev =>
+      prev.map(c => c.id === id ? { ...c, status: 'paid', paidAt: new Date().toISOString().split('T')[0] } : c)
+    )
+    toast.success('Comision marcada como pagada')
+  }
+
+  const handleCreateComision = () => {
+    const professional = mockProfessionals.find(p => p.id === newComision.professionalId)
+    if (!professional) {
+      toast.error('Seleccione un profesional')
+      return
+    }
+
+    const totalSales = parseFloat(newComision.totalSales) || 0
+    const commissionRate = parseFloat(newComision.commissionRate) / 100 || professional.rate
+
+    const newEntry: Comision = {
+      id: Date.now().toString(),
+      professionalId: newComision.professionalId,
+      professionalName: professional.name,
+      professionalAvatar: null,
+      period: newComision.period || new Date().toISOString().slice(0, 7),
+      totalSales,
+      commissionRate,
+      commissionAmount: totalSales * commissionRate,
+      sessionsCount: parseInt(newComision.sessionsCount) || 0,
+      status: 'pending',
+      paidAt: null,
+    }
+
+    setComisiones(prev => [newEntry, ...prev])
+    setIsNewDialogOpen(false)
+    setNewComision({ professionalId: '', period: '', totalSales: '', commissionRate: '', sessionsCount: '' })
+    toast.success('Comision creada exitosamente')
+  }
+
+  const filteredComisiones = comisiones.filter((com) => {
     if (periodFilter !== 'all' && com.period !== periodFilter) return false
     if (statusFilter !== 'all' && com.status !== statusFilter) return false
     if (professionalFilter !== 'all' && com.professionalId !== professionalFilter) return false
@@ -153,13 +267,14 @@ export default function ComisionesPage() {
   }
 
   // Stats
-  const totalPending = mockComisiones
+  const totalPending = comisiones
     .filter((c) => c.status === 'pending')
     .reduce((acc, c) => acc + c.commissionAmount, 0)
-  const totalPaid = mockComisiones
+  const totalPaid = comisiones
     .filter((c) => c.status === 'paid')
     .reduce((acc, c) => acc + c.commissionAmount, 0)
-  const pendingCount = mockComisiones.filter((c) => c.status === 'pending').length
+  const pendingCount = comisiones.filter((c) => c.status === 'pending').length
+  const totalSales = comisiones.reduce((acc, c) => acc + c.totalSales, 0)
 
   return (
     <div className="space-y-6">
@@ -182,6 +297,10 @@ export default function ComisionesPage() {
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Exportar
+          </Button>
+          <Button variant="outline" onClick={() => setIsNewDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Comision
           </Button>
           <Button>
             <CheckCircle className="mr-2 h-4 w-4" />
@@ -240,7 +359,7 @@ export default function ComisionesPage() {
               <DollarSign className="h-4 w-4" />
               Total Generado
             </CardDescription>
-            <CardTitle className="text-3xl">{formatPrice(457000)}</CardTitle>
+            <CardTitle className="text-3xl">{formatPrice(totalSales)}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">en ventas del equipo</p>
@@ -346,16 +465,24 @@ export default function ComisionesPage() {
                       </TableCell>
                       <TableCell>{getStatusBadge(comision.status)}</TableCell>
                       <TableCell>
-                        {comision.status === 'pending' && (
-                          <Button size="sm" variant="outline">
-                            Pagar
+                        <div className="flex items-center gap-1">
+                          {comision.status === 'pending' && (
+                            <Button size="sm" variant="outline" onClick={() => handlePayComision(comision.id)}>
+                              Pagar
+                            </Button>
+                          )}
+                          {comision.status === 'paid' && comision.paidAt && (
+                            <span className="text-xs text-muted-foreground mr-2">
+                              {new Date(comision.paidAt).toLocaleDateString('es-MX')}
+                            </span>
+                          )}
+                          <Button size="sm" variant="ghost" onClick={() => handleEditComision(comision)}>
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                        )}
-                        {comision.status === 'paid' && comision.paidAt && (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(comision.paidAt).toLocaleDateString('es-MX')}
-                          </span>
-                        )}
+                          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setDeleteComisionId(comision.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -375,7 +502,7 @@ export default function ComisionesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockComisiones
+                {comisiones
                   .filter((c) => c.status === 'pending')
                   .map((comision) => (
                     <div
@@ -435,7 +562,7 @@ export default function ComisionesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockComisiones
+                  {comisiones
                     .filter((c) => c.status === 'paid')
                     .map((comision) => (
                       <TableRow key={comision.id}>
@@ -458,6 +585,191 @@ export default function ComisionesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog para Nueva Comision */}
+      <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Comision</DialogTitle>
+            <DialogDescription>
+              Crear una nueva comision para un profesional
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Profesional</Label>
+              <Select
+                value={newComision.professionalId}
+                onValueChange={(value) => setNewComision(prev => ({ ...prev, professionalId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar profesional" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockProfessionals.map((prof) => (
+                    <SelectItem key={prof.id} value={prof.id}>
+                      {prof.name} ({(prof.rate * 100)}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Periodo</Label>
+                <Input
+                  type="month"
+                  value={newComision.period}
+                  onChange={(e) => setNewComision(prev => ({ ...prev, period: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Sesiones</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={newComision.sessionsCount}
+                  onChange={(e) => setNewComision(prev => ({ ...prev, sessionsCount: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Ventas Totales (RD$)</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={newComision.totalSales}
+                  onChange={(e) => setNewComision(prev => ({ ...prev, totalSales: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tasa de Comision (%)</Label>
+                <Input
+                  type="number"
+                  placeholder="15"
+                  value={newComision.commissionRate}
+                  onChange={(e) => setNewComision(prev => ({ ...prev, commissionRate: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateComision}>
+              <Save className="h-4 w-4 mr-2" />
+              Crear Comision
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Editar Comision */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Comision</DialogTitle>
+            <DialogDescription>
+              Modificar los datos de la comision de {editingComision?.professionalName}
+            </DialogDescription>
+          </DialogHeader>
+          {editingComision && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Periodo</Label>
+                  <Input
+                    type="month"
+                    value={editingComision.period}
+                    onChange={(e) => setEditingComision(prev => prev ? { ...prev, period: e.target.value } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sesiones</Label>
+                  <Input
+                    type="number"
+                    value={editingComision.sessionsCount}
+                    onChange={(e) => setEditingComision(prev => prev ? { ...prev, sessionsCount: parseInt(e.target.value) || 0 } : null)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Ventas Totales (RD$)</Label>
+                  <Input
+                    type="number"
+                    value={editingComision.totalSales}
+                    onChange={(e) => setEditingComision(prev => prev ? { ...prev, totalSales: parseFloat(e.target.value) || 0 } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tasa de Comision (%)</Label>
+                  <Input
+                    type="number"
+                    value={(editingComision.commissionRate * 100).toFixed(0)}
+                    onChange={(e) => setEditingComision(prev => prev ? { ...prev, commissionRate: (parseFloat(e.target.value) || 0) / 100 } : null)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select
+                  value={editingComision.status}
+                  onValueChange={(value) => setEditingComision(prev => prev ? { ...prev, status: value } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendiente</SelectItem>
+                    <SelectItem value="paid">Pagada</SelectItem>
+                    <SelectItem value="processing">Procesando</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Comision calculada:</p>
+                <p className="text-xl font-bold">
+                  {formatPrice(editingComision.totalSales * editingComision.commissionRate)}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              <Save className="h-4 w-4 mr-2" />
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog para Eliminar */}
+      <AlertDialog open={!!deleteComisionId} onOpenChange={() => setDeleteComisionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Comision</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Esta seguro que desea eliminar esta comision? Esta accion no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => deleteComisionId && handleDeleteComision(deleteComisionId)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
