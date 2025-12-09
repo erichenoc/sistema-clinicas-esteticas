@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Stethoscope } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,6 +18,7 @@ import {
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth'
 import { signup } from '@/actions/auth'
 import { toast } from 'sonner'
+import { MedLuxeLogo } from '@/components/shared/medluxe-logo'
 
 export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -51,18 +52,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Mobile Logo */}
-      <div className="flex items-center justify-center gap-2 lg:hidden">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-          <Stethoscope className="h-6 w-6 text-primary-foreground" />
-        </div>
-        <span className="text-xl font-bold">Clínica Estética</span>
+      <div className="flex justify-center lg:hidden">
+        <MedLuxeLogo variant="compact" />
       </div>
 
       <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Crear Cuenta</h1>
-        <p className="text-muted-foreground">
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-[#3d3d3d]">
+          Crear Cuenta
+        </h1>
+        <p className="text-[#998577]">
           Completa el formulario para registrarte
         </p>
       </div>
@@ -169,16 +169,16 @@ export default function RegisterPage() {
             )}
           />
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" variant="luxury" className="w-full h-12 text-base" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Crear Cuenta
           </Button>
         </form>
       </Form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center text-sm text-[#998577]">
         ¿Ya tienes una cuenta?{' '}
-        <Link href="/login" className="text-primary hover:underline">
+        <Link href="/login" className="text-[#A67C52] font-medium hover:text-[#8a6543] transition-colors">
           Inicia sesión
         </Link>
       </p>

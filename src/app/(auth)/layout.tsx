@@ -1,4 +1,4 @@
-import { Stethoscope } from 'lucide-react'
+import { MedLuxeLogoSimple } from '@/components/shared/medluxe-logo'
 
 export default function AuthLayout({
   children,
@@ -8,34 +8,35 @@ export default function AuthLayout({
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 lg:flex-col lg:justify-between bg-primary p-12 text-primary-foreground">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground">
-            <Stethoscope className="h-6 w-6 text-primary" />
-          </div>
-          <span className="text-xl font-bold">Clínica Estética</span>
+      <div className="hidden lg:flex lg:w-1/2 lg:flex-col lg:justify-between bg-gradient-to-br from-[#A67C52] via-[#8a6543] to-[#6d5035] p-12 text-white relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+        <div className="relative z-10">
+          <MedLuxeLogoSimple inverted />
         </div>
 
-        <div className="space-y-6">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
+        <div className="space-y-6 relative z-10">
+          <blockquote className="space-y-4">
+            <p className="text-xl font-light leading-relaxed italic">
               &ldquo;Este sistema ha transformado la manera en que gestionamos
               nuestra clínica. La eficiencia ha aumentado un 40% y nuestros
               pacientes están más satisfechos que nunca.&rdquo;
             </p>
-            <footer className="text-sm opacity-80">
+            <footer className="text-sm opacity-80 font-medium">
               — Dra. María González, Directora Médica
             </footer>
           </blockquote>
         </div>
 
-        <p className="text-sm opacity-60">
-          Sistema de Gestión para Clínicas Estéticas
+        <p className="text-sm opacity-60 relative z-10 tracking-wider uppercase">
+          Aesthetics & Wellness Management System
         </p>
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
+      <div className="flex w-full items-center justify-center p-8 lg:w-1/2 bg-gradient-to-br from-[#FDFCFA] to-white">
         <div className="w-full max-w-md">{children}</div>
       </div>
     </div>
