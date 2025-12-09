@@ -308,7 +308,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <Calendar className="h-5 w-5" />
                 Citas de Hoy
               </CardTitle>
@@ -362,7 +362,7 @@ export default function DashboardPage() {
         {/* Alerts */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <AlertTriangle className="h-5 w-5" />
               Alertas
             </CardTitle>
@@ -399,7 +399,7 @@ export default function DashboardPage() {
         {/* Top Treatments */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <Sparkles className="h-5 w-5" />
               Top Tratamientos del Mes
             </CardTitle>
@@ -451,7 +451,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <ShoppingCart className="h-5 w-5" />
                 Ventas Recientes
               </CardTitle>
@@ -497,7 +497,7 @@ export default function DashboardPage() {
       {/* Top Professionals */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Users className="h-5 w-5" />
             Top Profesionales del Mes
           </CardTitle>
