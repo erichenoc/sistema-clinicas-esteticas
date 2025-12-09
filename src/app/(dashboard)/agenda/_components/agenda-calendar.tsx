@@ -70,11 +70,12 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
   const [selectedProfessional, setSelectedProfessional] = useState<string>('all')
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentListItemData | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState<Date | null>(null)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
+    setCurrentDate(new Date())
     setMounted(true)
   }, [])
 
@@ -138,6 +139,7 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
   }
 
   const formatCurrentDate = () => {
+    if (!currentDate) return ''
     const options: Intl.DateTimeFormatOptions =
       view === 'dayGridMonth'
         ? { month: 'long', year: 'numeric' }
