@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { type UserRole, canAccessRoute } from '@/lib/auth/roles'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -38,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Define public routes that don't require authentication
-  const publicRoutes = ['/login', '/register', '/forgot-password']
+  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password']
   const isPublicRoute = publicRoutes.some(route =>
     request.nextUrl.pathname.startsWith(route)
   )
@@ -55,6 +56,43 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // RBAC: Verificar permisos de ruta si el usuario está autenticado
+  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api')) {
+    // Obtener el rol del usuario desde la tabla users
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+
+    // Si el usuario no tiene registro en la tabla users, usar rol por defecto
+    const userRole: UserRole = (userData?.role as UserRole) || 'receptionist'
+    const isActive = userData?.is_active ?? true
+
+    // Verificar si el usuario está activo
+    if (!isActive) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('error', 'account_disabled')
+      await supabase.auth.signOut()
+      return NextResponse.redirect(url)
+    }
+
+    // Verificar permisos de ruta
+    const pathname = request.nextUrl.pathname
+    if (!canAccessRoute(userRole, pathname)) {
+      // Usuario no tiene permisos - redirigir a dashboard con mensaje
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      url.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(url)
+    }
+
+    // Agregar headers con información del usuario para uso en server components
+    supabaseResponse.headers.set('x-user-role', userRole)
+    supabaseResponse.headers.set('x-user-id', user.id)
   }
 
   return supabaseResponse

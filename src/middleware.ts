@@ -1,10 +1,9 @@
-import { type NextRequest, NextResponse } from 'next/server'
-// import { updateSession } from '@/lib/supabase/middleware'
+import { type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  // TODO: Reactivar autenticación cuando Supabase esté configurado
-  // return await updateSession(request)
-  return NextResponse.next()
+  // Autenticación y RBAC habilitados
+  return await updateSession(request)
 }
 
 export const config = {

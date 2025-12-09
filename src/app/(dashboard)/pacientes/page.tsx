@@ -14,7 +14,7 @@ import { PatientCard } from './_components/patient-card'
 import { PatientTable } from './_components/patient-table'
 import { PatientsHeader } from './_components/patients-header'
 import { PatientsFilters } from './_components/patients-filters'
-import { getPatients } from '@/actions/medical-history'
+import { getPatients, getPatientStats } from '@/actions/patients'
 import type { PatientListItem } from '@/types/patients'
 
 const statusOptions = [
@@ -26,7 +26,10 @@ const statusOptions = [
 ]
 
 export default async function PacientesPage() {
-  const dbPatients = await getPatients()
+  const [dbPatients, stats] = await Promise.all([
+    getPatients(),
+    getPatientStats(),
+  ])
 
   // Transform database patients to PatientListItem format
   const patients: PatientListItem[] = dbPatients.map((p) => ({
@@ -39,15 +42,12 @@ export default async function PacientesPage() {
     status: p.status as 'active' | 'inactive' | 'vip' | 'blocked',
     tags: p.tags || [],
     avatarUrl: p.avatar_url,
-    totalAppointments: 0, // TODO: Add relationship query
-    lastAppointmentAt: null,
-    totalSpent: 0, // TODO: Add relationship query
+    totalAppointments: p.visit_count || 0,
+    lastAppointmentAt: p.last_visit_at || null,
+    totalSpent: p.total_spent || 0,
   }))
 
-  const activeCount = patients.filter((p) => p.status === 'active').length
-  const vipCount = patients.filter((p) => p.status === 'vip').length
-  const inactiveCount = patients.filter((p) => p.status === 'inactive').length
-  const blockedCount = patients.filter((p) => p.status === 'blocked').length
+  const { total, active: activeCount, vip: vipCount, inactive: inactiveCount } = stats
 
   return (
     <div className="space-y-6">
