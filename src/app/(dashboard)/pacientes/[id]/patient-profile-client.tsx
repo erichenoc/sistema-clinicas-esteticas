@@ -24,6 +24,10 @@ import {
   ChevronRight,
   MessageSquare,
   ClipboardEdit,
+  ExternalLink,
+  Shield,
+  Zap,
+  Cigarette,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -471,43 +475,51 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
                 Informacion medica importante para tratamientos esteticos
               </p>
             </div>
-            <MedicalHistoryDialog
-              patientId={patient.id}
-              patientName={`${patient.first_name} ${patient.last_name}`}
-              initialData={medicalHistoryForForm}
-              onSave={handleSaveMedicalHistory}
-              trigger={
-                <Button disabled={isPending}>
-                  <ClipboardEdit className="mr-2 h-4 w-4" />
-                  {isPending ? 'Guardando...' : 'Editar Historial'}
-                </Button>
-              }
-            />
+            <div className="flex gap-2">
+              <MedicalHistoryDialog
+                patientId={patient.id}
+                patientName={`${patient.first_name} ${patient.last_name}`}
+                initialData={medicalHistoryForForm}
+                onSave={handleSaveMedicalHistory}
+                trigger={
+                  <Button variant="outline" disabled={isPending}>
+                    <ClipboardEdit className="mr-2 h-4 w-4" />
+                    Edicion Rapida
+                  </Button>
+                }
+              />
+              <Button asChild>
+                <Link href={`/pacientes/${patient.id}/historial`}>
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Formulario Completo
+                </Link>
+              </Button>
+            </div>
           </div>
 
+          {/* Critical Alerts Banner */}
           {displayMedicalHistory && (displayMedicalHistory.allergies.length > 0 ||
             displayMedicalHistory.isPregnant ||
             displayMedicalHistory.isBreastfeeding) && (
-            <Card className="border-red-200 bg-red-50">
-              <CardContent className="pt-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                  <div className="space-y-2">
-                    <p className="font-semibold text-red-700">Alertas Importantes</p>
-                    {displayMedicalHistory.allergies.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-sm text-red-600 font-medium">Alergias:</span>
-                        {displayMedicalHistory.allergies.map((allergy) => (
-                          <Badge key={allergy} variant="destructive">{allergy}</Badge>
-                        ))}
-                      </div>
-                    )}
-                    {displayMedicalHistory.isPregnant && (
-                      <Badge className="bg-pink-100 text-pink-700">Embarazada</Badge>
-                    )}
-                    {displayMedicalHistory.isBreastfeeding && (
-                      <Badge className="bg-pink-100 text-pink-700">Lactando</Badge>
-                    )}
+            <Card className="border-red-300 bg-gradient-to-r from-red-50 to-orange-50">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-red-100 rounded-full">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-700 mb-2">Alertas Importantes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {displayMedicalHistory.allergies.map((allergy) => (
+                        <Badge key={allergy} variant="destructive">Alergia: {allergy}</Badge>
+                      ))}
+                      {displayMedicalHistory.isPregnant && (
+                        <Badge className="bg-pink-500 text-white">Embarazada</Badge>
+                      )}
+                      {displayMedicalHistory.isBreastfeeding && (
+                        <Badge className="bg-pink-500 text-white">Lactando</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -515,118 +527,187 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
           )}
 
           {!displayMedicalHistory && (
-            <Card>
+            <Card className="border-dashed">
               <CardContent className="pt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No hay historial medico registrado</p>
-                  <p className="text-sm">Haz clic en Editar Historial para agregar informacion</p>
+                <div className="text-center py-8">
+                  <Heart className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <p className="font-medium mb-1">No hay historial medico registrado</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Completa el historial medico para una mejor atencion
+                  </p>
+                  <Button asChild>
+                    <Link href={`/pacientes/${patient.id}/historial`}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Completar Historial
+                    </Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           )}
 
           {displayMedicalHistory && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="h-5 w-5 text-pink-500" />
-                    Condiciones Cronicas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {displayMedicalHistory.chronicConditions.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {displayMedicalHistory.chronicConditions.map((condition) => (
-                        <Badge key={condition} variant="secondary">{condition}</Badge>
-                      ))}
+            <>
+              {/* Quick Stats Row */}
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+                <Card className="bg-gradient-to-br from-pink-50 to-pink-100/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Heart className="h-5 w-5 text-pink-600" />
+                      <div>
+                        <p className="text-2xl font-bold text-pink-700">
+                          {displayMedicalHistory.chronicConditions.length}
+                        </p>
+                        <p className="text-xs text-pink-600">Condiciones</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground">Sin condiciones cronicas</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Pill className="h-5 w-5 text-blue-500" />
-                    Medicamentos Actuales
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {displayMedicalHistory.currentMedications.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {displayMedicalHistory.currentMedications.map((med) => (
-                        <Badge key={med} variant="outline">{med}</Badge>
-                      ))}
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Pill className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="text-2xl font-bold text-blue-700">
+                          {displayMedicalHistory.currentMedications.length}
+                        </p>
+                        <p className="text-xs text-blue-600">Medicamentos</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground">Sin medicamentos</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-purple-500" />
-                    Tratamientos Esteticos Previos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {displayMedicalHistory.previousAestheticTreatments.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {displayMedicalHistory.previousAestheticTreatments.map((treatment) => (
-                        <Badge key={treatment} variant="outline" className="bg-purple-50">{treatment}</Badge>
-                      ))}
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Activity className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <p className="text-2xl font-bold text-purple-700">
+                          {displayMedicalHistory.previousAestheticTreatments.length}
+                        </p>
+                        <p className="text-xs text-purple-600">Tratamientos</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground">Sin tratamientos previos</p>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Shield className="h-5 w-5 text-yellow-600" />
+                      <div>
+                        <p className="text-2xl font-bold text-yellow-700">
+                          {displayMedicalHistory.skinType || '-'}
+                        </p>
+                        <p className="text-xs text-yellow-600">Fototipo</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Informacion Dermatologica
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Fototipo de Piel (Fitzpatrick)</p>
-                    <p className="font-medium">{displayMedicalHistory.skinType ? `Tipo ${displayMedicalHistory.skinType}` : 'No especificado'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Usa Retinoides</p>
-                    <p className="font-medium">{displayMedicalHistory.usesRetinoids ? 'Si' : 'No'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Exposicion Solar</p>
-                    <p className="font-medium capitalize">{displayMedicalHistory.sunExposureLevel || 'No especificado'}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+              {/* Main Content Grid */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Heart className="h-5 w-5 text-pink-500" />
+                      Condiciones Cronicas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {displayMedicalHistory.chronicConditions.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {displayMedicalHistory.chronicConditions.map((condition) => (
+                          <Badge key={condition} variant="secondary">{condition}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin condiciones cronicas registradas</p>
+                    )}
+                  </CardContent>
+                </Card>
 
-          {displayMedicalHistory?.additionalNotes && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Notas Adicionales
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground whitespace-pre-wrap">
-                  {displayMedicalHistory.additionalNotes}
-                </p>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Pill className="h-5 w-5 text-blue-500" />
+                      Medicamentos Actuales
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {displayMedicalHistory.currentMedications.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {displayMedicalHistory.currentMedications.map((med) => (
+                          <Badge key={med} variant="outline">{med}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin medicamentos registrados</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Activity className="h-5 w-5 text-purple-500" />
+                      Tratamientos Esteticos Previos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {displayMedicalHistory.previousAestheticTreatments.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {displayMedicalHistory.previousAestheticTreatments.map((treatment) => (
+                          <Badge key={treatment} variant="outline" className="bg-purple-50">{treatment}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin tratamientos previos registrados</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Shield className="h-5 w-5 text-yellow-500" />
+                      Informacion Dermatologica
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Fototipo</p>
+                        <p className="font-medium">{displayMedicalHistory.skinType ? `Tipo ${displayMedicalHistory.skinType}` : '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Retinoides</p>
+                        <p className="font-medium">{displayMedicalHistory.usesRetinoids ? 'Si' : 'No'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Sol</p>
+                        <p className="font-medium capitalize">{displayMedicalHistory.sunExposureLevel || '-'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {displayMedicalHistory.additionalNotes && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <FileText className="h-5 w-5" />
+                      Notas Adicionales
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {displayMedicalHistory.additionalNotes}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
 

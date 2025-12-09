@@ -22,6 +22,24 @@ export async function getPatients(): Promise<Patient[]> {
   return (data || []) as Patient[]
 }
 
+// Get a single patient by ID
+export async function getPatientById(patientId: string): Promise<Patient | null> {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('id', patientId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching patient:', error)
+    return null
+  }
+
+  return data as Patient
+}
+
 export interface MedicalHistoryData {
   id?: string
   patient_id: string
@@ -35,9 +53,28 @@ export interface MedicalHistoryData {
   uses_retinoids: boolean
   sun_exposure_level: string
   additional_notes: string
+  skin_type_fitzpatrick?: string
 }
 
-export async function getMedicalHistory(patientId: string) {
+export interface MedicalHistoryRecord {
+  id: string
+  patient_id: string
+  allergies: string[] | null
+  current_medications: string[] | null
+  chronic_conditions: string[] | null
+  previous_surgeries: string[] | null
+  previous_aesthetic_treatments: string[] | null
+  is_pregnant: boolean | null
+  is_breastfeeding: boolean | null
+  uses_retinoids: boolean | null
+  sun_exposure_level: string | null
+  additional_notes: string | null
+  skin_type_fitzpatrick: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function getMedicalHistory(patientId: string): Promise<MedicalHistoryRecord | null> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -51,7 +88,7 @@ export async function getMedicalHistory(patientId: string) {
     return null
   }
 
-  return data
+  return data as MedicalHistoryRecord | null
 }
 
 export async function saveMedicalHistory(data: MedicalHistoryData) {
@@ -77,6 +114,7 @@ export async function saveMedicalHistory(data: MedicalHistoryData) {
     uses_retinoids: data.uses_retinoids,
     sun_exposure_level: data.sun_exposure_level,
     additional_notes: data.additional_notes,
+    skin_type_fitzpatrick: data.skin_type_fitzpatrick,
     updated_at: new Date().toISOString(),
   }
 
