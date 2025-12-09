@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -12,12 +12,10 @@ import {
   DollarSign,
   Settings,
   BarChart3,
-  Tag,
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -42,24 +40,44 @@ import {
 import {
   PRODUCT_STATUS_OPTIONS,
   UNIT_OPTIONS,
-  PRODUCT_CATEGORY_OPTIONS,
   generateSKU,
   formatCurrency,
 } from '@/types/inventory'
 import { productSchema, ProductFormData } from '@/lib/validations/inventory'
+import { toast } from 'sonner'
+import { getProductCategories, createProduct, type ProductCategoryData } from '@/actions/inventory'
 
-// Mock categories
-const mockCategories = [
-  { id: 'cat-1', name: 'Consumibles' },
-  { id: 'cat-2', name: 'Cosméticos' },
-  { id: 'cat-3', name: 'Equipamiento' },
-  { id: 'cat-4', name: 'Suplementos' },
-]
+interface CategoryOption {
+  id: string
+  name: string
+}
 
 export default function NuevoProductoPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('general')
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+
+  // Cargar categorías de la base de datos
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoadingCategories(true)
+      try {
+        const categoriesData = await getProductCategories()
+        setCategories(categoriesData.map((c: ProductCategoryData) => ({
+          id: c.id,
+          name: c.name,
+        })))
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        toast.error('Error al cargar las categorías')
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+    loadCategories()
+  }, [])
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -98,7 +116,7 @@ export default function NuevoProductoPage() {
   const handleGenerateSKU = () => {
     const name = form.getValues('name')
     const categoryId = form.getValues('categoryId')
-    const category = mockCategories.find(c => c.id === categoryId)
+    const category = categories.find(c => c.id === categoryId)
     if (name && category) {
       const sku = generateSKU(name, category.name)
       form.setValue('sku', sku)
@@ -107,13 +125,44 @@ export default function NuevoProductoPage() {
 
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true)
+    toast.loading('Creando producto...', { id: 'create-product' })
+
     try {
-      console.log('Producto a crear:', data)
-      // Simular creación
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      router.push('/inventario')
+      // Mapear campos del formulario a CreateProductInput
+      const result = await createProduct({
+        category_id: data.categoryId || undefined,
+        sku: data.sku || undefined,
+        barcode: data.barcode || undefined,
+        name: data.name,
+        description: data.description || undefined,
+        type: data.isConsumable ? 'consumable' : 'retail',
+        unit: data.unit,
+        cost_price: data.costPrice,
+        sell_price: data.sellingPrice,
+        tax_rate: data.taxRate,
+        track_stock: true,
+        min_stock: data.minStock,
+        max_stock: data.maxStock || undefined,
+        reorder_point: data.reorderPoint,
+        reorder_quantity: data.reorderQuantity,
+        requires_lot_tracking: data.trackLots,
+        is_active: data.status === 'active',
+        is_sellable: data.forSale,
+        notes: data.notes || undefined,
+      })
+
+      toast.dismiss('create-product')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Producto creado exitosamente')
+        router.push('/inventario')
+      }
     } catch (error) {
+      toast.dismiss('create-product')
       console.error('Error al crear producto:', error)
+      toast.error('Error al crear el producto')
     } finally {
       setIsSubmitting(false)
     }
@@ -245,11 +294,21 @@ export default function NuevoProductoPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {mockCategories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name}
+                              {isLoadingCategories ? (
+                                <SelectItem value="loading" disabled>
+                                  Cargando categorías...
                                 </SelectItem>
-                              ))}
+                              ) : categories.length === 0 ? (
+                                <SelectItem value="none" disabled>
+                                  No hay categorías disponibles
+                                </SelectItem>
+                              ) : (
+                                categories.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

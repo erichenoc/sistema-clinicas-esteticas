@@ -23,7 +23,6 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -43,54 +42,139 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { sessionSchema, type SessionFormData } from '@/lib/validations/sessions'
 import { BODY_ZONES } from '@/types/patients'
-import {
-  LASER_PARAMETERS,
-  INJECTABLE_PARAMETERS,
-  getParametersForTreatmentType,
-} from '@/types/sessions'
+import { getParametersForTreatmentType } from '@/types/sessions'
 
-// Mock data
-const mockPatients = [
-  { id: '1', name: 'María García López', phone: '8095551234' },
-  { id: '2', name: 'Ana Martínez Ruiz', phone: '8295552345' },
-  { id: '3', name: 'Laura Hernández', phone: '8095553456' },
-]
+// Actions
+import { getPatients, type PatientData } from '@/actions/patients'
+import { getProfessionals, type ProfessionalSummaryData } from '@/actions/professionals'
+import { getTreatments, type TreatmentListItemData } from '@/actions/treatments'
+import { getProducts, type ProductListItemData } from '@/actions/inventory'
+import { createSession } from '@/actions/sessions'
 
-const mockProfessionals = [
-  { id: '1', name: 'Dra. Pamela Moquete', specialty: 'Medicina Estética' },
-]
+// Tipos para datos transformados
+interface PatientOption {
+  id: string
+  name: string
+  phone: string
+}
 
-const mockTreatments = [
-  { id: '1', name: 'Limpieza Facial Profunda', category: 'Facial', categoryColor: '#ec4899', type: 'facial' },
-  { id: '2', name: 'Botox - Frente', category: 'Inyectables', categoryColor: '#06b6d4', type: 'injectable' },
-  { id: '3', name: 'Depilación Láser - Axilas', category: 'Láser', categoryColor: '#ef4444', type: 'laser' },
-  { id: '4', name: 'Hidratación Facial', category: 'Facial', categoryColor: '#ec4899', type: 'facial' },
-  { id: '5', name: 'Radiofrecuencia Corporal', category: 'Corporal', categoryColor: '#8b5cf6', type: 'rf' },
-]
+interface ProfessionalOption {
+  id: string
+  name: string
+  specialty: string | null
+}
 
-const mockProducts = [
-  { id: '1', name: 'Gel conductor', unit: 'ml', stock: 500 },
-  { id: '2', name: 'Crema hidratante', unit: 'ml', stock: 200 },
-  { id: '3', name: 'Botox 100U', unit: 'units', stock: 50 },
-  { id: '4', name: 'Ácido Hialurónico 1ml', unit: 'ml', stock: 20 },
-]
+interface TreatmentOption {
+  id: string
+  name: string
+  category: string | null
+  categoryColor: string | null
+  type: string
+}
+
+interface ProductOption {
+  id: string
+  name: string
+  unit: string
+  stock: number
+}
 
 function NuevaSesionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // Estados para datos cargados de la BD
+  const [patients, setPatients] = useState<PatientOption[]>([])
+  const [professionals, setProfessionals] = useState<ProfessionalOption[]>([])
+  const [treatments, setTreatments] = useState<TreatmentOption[]>([])
+  const [products, setProducts] = useState<ProductOption[]>([])
+  const [isLoadingData, setIsLoadingData] = useState(true)
+
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedTreatment, setSelectedTreatment] = useState<typeof mockTreatments[0] | null>(null)
+  const [selectedTreatment, setSelectedTreatment] = useState<TreatmentOption | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [treatmentParameters, setTreatmentParameters] = useState<any[]>([])
 
   const appointmentId = searchParams.get('cita')
   const patientId = searchParams.get('paciente')
+
+  // Cargar datos de la BD al montar
+  useEffect(() => {
+    async function loadData() {
+      setIsLoadingData(true)
+      try {
+        const [patientsData, professionalsData, treatmentsData, productsData] = await Promise.all([
+          getPatients(),
+          getProfessionals({ status: 'active' }),
+          getTreatments({ isActive: true }),
+          getProducts({ isActive: true }),
+        ])
+
+        // Transformar pacientes
+        setPatients(patientsData.map((p: PatientData) => ({
+          id: p.id,
+          name: `${p.first_name} ${p.last_name}`,
+          phone: p.phone,
+        })))
+
+        // Transformar profesionales
+        setProfessionals(professionalsData.map((p: ProfessionalSummaryData) => ({
+          id: p.id,
+          name: p.full_name || `${p.first_name} ${p.last_name}`,
+          specialty: p.title || null,
+        })))
+
+        // Transformar tratamientos con tipo inferido
+        setTreatments(treatmentsData.map((t: TreatmentListItemData) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category_name,
+          categoryColor: t.category_color,
+          type: inferTreatmentType(t.name, t.category_name),
+        })))
+
+        // Transformar productos
+        setProducts(productsData.map((p: ProductListItemData) => ({
+          id: p.id,
+          name: p.name,
+          unit: p.unit || 'units',
+          stock: p.current_stock,
+        })))
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Error al cargar los datos')
+      } finally {
+        setIsLoadingData(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Inferir tipo de tratamiento basado en nombre y categoría
+  function inferTreatmentType(name: string, category: string | null): string {
+    const lowerName = name.toLowerCase()
+    const lowerCat = (category || '').toLowerCase()
+
+    if (lowerName.includes('láser') || lowerName.includes('laser') || lowerCat.includes('láser')) {
+      return 'laser'
+    }
+    if (lowerName.includes('botox') || lowerName.includes('inyect') || lowerCat.includes('inyect')) {
+      return 'injectable'
+    }
+    if (lowerName.includes('radiofrecuencia') || lowerName.includes('rf')) {
+      return 'rf'
+    }
+    if (lowerCat.includes('facial') || lowerName.includes('facial')) {
+      return 'facial'
+    }
+    return 'general'
+  }
 
   const form = useForm<SessionFormData>({
     resolver: zodResolver(sessionSchema),
@@ -118,14 +202,14 @@ function NuevaSesionContent() {
   // Actualizar tratamiento seleccionado y parámetros
   useEffect(() => {
     if (watchTreatment) {
-      const treatment = mockTreatments.find((t) => t.id === watchTreatment)
+      const treatment = treatments.find((t) => t.id === watchTreatment)
       if (treatment) {
         setSelectedTreatment(treatment)
         form.setValue('treatmentName', treatment.name)
         setTreatmentParameters(getParametersForTreatmentType(treatment.type))
       }
     }
-  }, [watchTreatment, form])
+  }, [watchTreatment, form, treatments])
 
   const handleAddZone = () => {
     appendZone({ zone: '', notes: '' })
@@ -133,18 +217,44 @@ function NuevaSesionContent() {
 
   async function onSubmit(data: SessionFormData) {
     setIsLoading(true)
+    toast.loading('Iniciando sesión...', { id: 'create-session' })
 
     try {
-      // TODO: Llamar a Server Action para crear sesión
-      console.log('Session data:', data)
+      const result = await createSession({
+        appointment_id: data.appointmentId || undefined,
+        patient_id: data.patientId,
+        professional_id: data.professionalId,
+        treatment_id: data.treatmentId || undefined,
+        treatment_name: data.treatmentName,
+        observations: data.observations || undefined,
+        treated_zones: data.treatedZones,
+        technical_parameters: data.technicalParameters,
+      })
 
-      toast.success('Sesión iniciada correctamente')
-      router.push('/sesiones')
+      toast.dismiss('create-session')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Sesión iniciada correctamente')
+        router.push('/sesiones')
+      }
     } catch (error) {
+      toast.dismiss('create-session')
+      console.error('Error creating session:', error)
       toast.error('Error al iniciar la sesión')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Cargando datos...</span>
+      </div>
+    )
   }
 
   return (
@@ -191,7 +301,7 @@ function NuevaSesionContent() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockPatients.map((patient) => (
+                            {patients.map((patient) => (
                               <SelectItem key={patient.id} value={patient.id}>
                                 <div className="flex items-center gap-2">
                                   <Avatar className="h-6 w-6">
@@ -223,9 +333,9 @@ function NuevaSesionContent() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockProfessionals.map((prof) => (
+                            {professionals.map((prof) => (
                               <SelectItem key={prof.id} value={prof.id}>
-                                {prof.name} - {prof.specialty}
+                                {prof.name}{prof.specialty ? ` - ${prof.specialty}` : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -259,13 +369,15 @@ function NuevaSesionContent() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockTreatments.map((treatment) => (
+                            {treatments.map((treatment) => (
                               <SelectItem key={treatment.id} value={treatment.id}>
                                 <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-2 w-2 rounded-full"
-                                    style={{ backgroundColor: treatment.categoryColor }}
-                                  />
+                                  {treatment.categoryColor && (
+                                    <span
+                                      className="h-2 w-2 rounded-full"
+                                      style={{ backgroundColor: treatment.categoryColor }}
+                                    />
+                                  )}
                                   {treatment.name}
                                 </div>
                               </SelectItem>
@@ -277,12 +389,12 @@ function NuevaSesionContent() {
                     )}
                   />
 
-                  {selectedTreatment && (
+                  {selectedTreatment && selectedTreatment.category && (
                     <div className="p-3 rounded-lg bg-muted/50">
                       <Badge
                         style={{
-                          backgroundColor: selectedTreatment.categoryColor + '20',
-                          color: selectedTreatment.categoryColor,
+                          backgroundColor: (selectedTreatment.categoryColor || '#888') + '20',
+                          color: selectedTreatment.categoryColor || '#888',
                         }}
                       >
                         {selectedTreatment.category}

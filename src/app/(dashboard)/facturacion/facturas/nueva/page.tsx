@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -16,13 +16,13 @@ import {
   Save,
   Send,
   Calculator,
-  AlertCircle,
   Building2,
-  CreditCard,
   Receipt,
   Info,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -82,37 +82,46 @@ import {
   type PaymentTerms,
 } from '@/types/billing'
 
-// Mock data - clientes
-const mockClients = [
-  { id: '1', name: 'María García López', email: 'maria@email.com', phone: '809-555-0101', rncCedula: '001-1234567-8', isBusiness: false },
-  { id: '2', name: 'Juan Rodríguez', email: 'juan@email.com', phone: '809-555-0102', rncCedula: '002-9876543-2', isBusiness: false },
-  { id: '3', name: 'Ana Martínez', email: 'ana@email.com', phone: '809-555-0103', isBusiness: false },
-  { id: '4', name: 'Empresa ABC, SRL', email: 'contacto@abc.com', phone: '809-555-0104', rncCedula: '130123456', isBusiness: true, businessName: 'ABC Distribuciones, SRL' },
-  { id: '5', name: 'Comercial XYZ', email: 'info@xyz.com', phone: '809-555-0105', rncCedula: '131987654', isBusiness: true, businessName: 'Comercial XYZ, SAS' },
-]
+import { getPatients, type PatientData } from '@/actions/patients'
+import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
+import { getProducts, type ProductListItemData } from '@/actions/inventory'
+import { createSale } from '@/actions/pos'
+import { createInvoice } from '@/actions/billing'
 
-// Mock data - tratamientos
-const mockTreatments = [
-  { id: 't1', name: 'Limpieza Facial Profunda', price: 2500, category: 'Facial', taxable: true },
-  { id: 't2', name: 'Botox - Zona Frontal', price: 8500, category: 'Facial', taxable: true },
-  { id: 't3', name: 'Ácido Hialurónico - Labios', price: 12000, category: 'Facial', taxable: true },
-  { id: 't4', name: 'Mesoterapia Corporal', price: 4500, category: 'Corporal', taxable: true },
-  { id: 't5', name: 'Radiofrecuencia Facial', price: 3500, category: 'Facial', taxable: true },
-  { id: 't6', name: 'Depilación Láser - Axilas', price: 2000, category: 'Corporal', taxable: true },
-]
+// Tipos para los datos transformados
+interface ClientData {
+  id: string
+  name: string
+  email: string | null
+  phone: string
+  rncCedula: string | null
+  isBusiness: boolean
+  businessName?: string
+}
 
-// Mock data - productos
-const mockProducts = [
-  { id: 'p1', name: 'Crema Hidratante Premium', price: 1800, stock: 25, taxable: true },
-  { id: 'p2', name: 'Sérum Vitamina C', price: 2500, stock: 18, taxable: true },
-  { id: 'p3', name: 'Protector Solar SPF 50', price: 950, stock: 42, taxable: true },
-]
+interface TreatmentItem {
+  id: string
+  name: string
+  price: number
+  category: string | null
+  taxable: boolean
+}
 
-// Mock data - paquetes
-const mockPackages = [
-  { id: 'pk1', name: 'Paquete Rejuvenecimiento Facial', price: 25000, sessions: 5, taxable: true },
-  { id: 'pk2', name: 'Paquete Corporal Completo', price: 35000, sessions: 8, taxable: true },
-]
+interface ProductItem {
+  id: string
+  name: string
+  price: number
+  stock: number
+  taxable: boolean
+}
+
+interface PackageItem {
+  id: string
+  name: string
+  price: number
+  sessions: number
+  taxable: boolean
+}
 
 type ItemType = 'treatment' | 'product' | 'package' | 'custom'
 
@@ -132,7 +141,16 @@ interface InvoiceItem {
 
 export default function NuevaFacturaPage() {
   const router = useRouter()
-  const [selectedClient, setSelectedClient] = useState<typeof mockClients[0] | null>(null)
+
+  // Estados para datos cargados de la BD
+  const [clients, setClients] = useState<ClientData[]>([])
+  const [treatments, setTreatments] = useState<TreatmentItem[]>([])
+  const [products, setProducts] = useState<ProductItem[]>([])
+  const [packages, setPackages] = useState<PackageItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [selectedClient, setSelectedClient] = useState<ClientData | null>(null)
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [itemSearchOpen, setItemSearchOpen] = useState(false)
@@ -149,6 +167,64 @@ export default function NuevaFacturaPage() {
   const [customPaymentDays, setCustomPaymentDays] = useState(30)
 
   const defaultTaxRate = 18 // ITBIS
+
+  // Cargar datos de la BD al montar
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true)
+      try {
+        const [patientsData, treatmentsData, productsData, packagesData] = await Promise.all([
+          getPatients(),
+          getTreatments({ isActive: true }),
+          getProducts({ isActive: true }),
+          getPackages(),
+        ])
+
+        // Transformar pacientes a formato de clientes
+        setClients(patientsData.map((p: PatientData) => ({
+          id: p.id,
+          name: `${p.first_name} ${p.last_name}`,
+          email: p.email,
+          phone: p.phone,
+          rncCedula: p.document_number,
+          isBusiness: false,
+        })))
+
+        // Transformar tratamientos
+        setTreatments(treatmentsData.map((t: TreatmentListItemData) => ({
+          id: t.id,
+          name: t.name,
+          price: t.price,
+          category: t.category_name,
+          taxable: true,
+        })))
+
+        // Transformar productos
+        setProducts(productsData.map((p: ProductListItemData) => ({
+          id: p.id,
+          name: p.name,
+          price: p.sell_price || 0,
+          stock: p.current_stock,
+          taxable: true,
+        })))
+
+        // Transformar paquetes
+        setPackages(packagesData.map((pk: PackageData) => ({
+          id: pk.id,
+          name: pk.name,
+          price: pk.salePrice,
+          sessions: pk.items.reduce((sum, item) => sum + item.quantity, 0),
+          taxable: true,
+        })))
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Error al cargar los datos')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   // Calcular totales
   const calculateItemSubtotal = (item: InvoiceItem) => {
@@ -246,52 +322,75 @@ export default function NuevaFacturaPage() {
   }
 
   // Guardar factura
-  const handleSave = (sendToClient: boolean = false) => {
+  const handleSave = async (sendToClient: boolean = false) => {
     const validationError = validateInvoice()
     if (validationError) {
-      alert(validationError)
+      toast.error(validationError)
       return
     }
 
-    const invoiceData = {
-      clientId: selectedClient!.id,
-      hasFiscalReceipt,
-      ncfType: hasFiscalReceipt ? ncfType : undefined,
-      items: items.map(item => ({
-        type: item.type,
-        referenceId: item.referenceId,
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount,
-        discountType: item.discountType,
-        taxable: item.taxable,
-        taxRate: item.taxRate,
-        notes: item.notes,
-      })),
-      currency,
-      paymentTerms,
-      customPaymentDays: paymentTerms === 'custom' ? customPaymentDays : undefined,
-      dueDate: format(getDueDate(), 'yyyy-MM-dd'),
-      notes,
-      internalNotes,
-      subtotal,
-      discountTotal,
-      taxableAmount,
-      exemptAmount,
-      taxAmount,
-      total,
-      status: sendToClient ? 'pending' : 'draft',
+    setIsSubmitting(true)
+    toast.loading('Guardando factura...', { id: 'save-invoice' })
+
+    try {
+      // Crear la venta primero
+      const saleResult = await createSale({
+        patient_id: selectedClient!.id,
+        customer_name: selectedClient!.name,
+        items: items.map(item => ({
+          item_type: item.type === 'custom' ? 'treatment' : item.type as 'treatment' | 'package' | 'product',
+          item_id: item.referenceId || item.id,
+          item_name: item.description,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          discount_amount: item.discountType === 'percentage'
+            ? (item.quantity * item.unitPrice * item.discount / 100)
+            : item.discount,
+        })),
+        subtotal,
+        discount_total: discountTotal,
+        tax_amount: taxAmount,
+        total,
+        payment_method: 'pending',
+        notes,
+      })
+
+      if (saleResult.error) {
+        toast.dismiss('save-invoice')
+        toast.error(saleResult.error)
+        setIsSubmitting(false)
+        return
+      }
+
+      // Si tiene comprobante fiscal, crear la factura
+      if (hasFiscalReceipt && saleResult.data) {
+        const invoiceResult = await createInvoice(saleResult.data.id, {
+          customer_tax_id: selectedClient!.rncCedula || undefined,
+          customer_legal_name: selectedClient!.businessName || selectedClient!.name,
+          customer_email: selectedClient!.email || undefined,
+          invoice_series: ncfType || undefined,
+        })
+
+        if (invoiceResult.error) {
+          toast.dismiss('save-invoice')
+          toast.warning(`Venta creada pero hubo un error al generar factura: ${invoiceResult.error}`)
+        } else {
+          toast.dismiss('save-invoice')
+          toast.success(`Factura ${invoiceResult.data?.invoice_number} emitida exitosamente`)
+        }
+      } else {
+        toast.dismiss('save-invoice')
+        toast.success(`Venta ${saleResult.data?.sale_number} creada exitosamente`)
+      }
+
+      router.push('/facturacion')
+    } catch (error) {
+      toast.dismiss('save-invoice')
+      console.error('Error saving invoice:', error)
+      toast.error('Error al guardar la factura')
+    } finally {
+      setIsSubmitting(false)
     }
-
-    console.log('Guardando factura:', invoiceData)
-
-    // Simular guardado
-    const message = hasFiscalReceipt
-      ? `Factura con NCF ${ncfType} ${sendToClient ? 'emitida' : 'guardada como borrador'}`
-      : `Factura ${sendToClient ? 'emitida' : 'guardada como borrador'}`
-    alert(message)
-    router.push('/facturacion')
   }
 
   const getItemTypeIcon = (type: ItemType) => {
@@ -339,16 +438,25 @@ export default function NuevaFacturaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave(false)}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={isSubmitting || isLoading}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Borrador
           </Button>
-          <Button onClick={() => handleSave(true)}>
-            <Send className="mr-2 h-4 w-4" />
+          <Button onClick={() => handleSave(true)} disabled={isSubmitting || isLoading}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Emitir Factura
           </Button>
         </div>
       </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Cargando datos...</span>
+        </div>
+      )}
+
+      {!isLoading && (
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Columna principal */}
@@ -396,7 +504,7 @@ export default function NuevaFacturaPage() {
                     <CommandList>
                       <CommandEmpty>No se encontraron clientes</CommandEmpty>
                       <CommandGroup>
-                        {mockClients.map((client) => (
+                        {clients.map((client) => (
                           <CommandItem
                             key={client.id}
                             onSelect={() => {
@@ -582,7 +690,7 @@ export default function NuevaFacturaPage() {
                         <CommandList>
                           <CommandEmpty>No se encontraron resultados</CommandEmpty>
                           <CommandGroup heading="Tratamientos">
-                            {mockTreatments.map((t) => (
+                            {treatments.map((t) => (
                               <CommandItem
                                 key={t.id}
                                 onSelect={() => addItem('treatment', { id: t.id, name: t.name, price: t.price, taxable: t.taxable })}
@@ -590,14 +698,14 @@ export default function NuevaFacturaPage() {
                                 <Stethoscope className="mr-2 h-4 w-4 text-blue-500" />
                                 <div className="flex-1">
                                   <span>{t.name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">({t.category})</span>
+                                  {t.category && <span className="text-xs text-muted-foreground ml-2">({t.category})</span>}
                                 </div>
                                 <span className="font-medium">{formatCurrency(t.price, currency)}</span>
                               </CommandItem>
                             ))}
                           </CommandGroup>
                           <CommandGroup heading="Productos">
-                            {mockProducts.map((p) => (
+                            {products.map((p) => (
                               <CommandItem
                                 key={p.id}
                                 onSelect={() => addItem('product', { id: p.id, name: p.name, price: p.price, taxable: p.taxable })}
@@ -612,7 +720,7 @@ export default function NuevaFacturaPage() {
                             ))}
                           </CommandGroup>
                           <CommandGroup heading="Paquetes">
-                            {mockPackages.map((pk) => (
+                            {packages.map((pk) => (
                               <CommandItem
                                 key={pk.id}
                                 onSelect={() => addItem('package', { id: pk.id, name: pk.name, price: pk.price, taxable: pk.taxable })}
@@ -916,6 +1024,7 @@ export default function NuevaFacturaPage() {
           </Card>
         </div>
       </div>
+      )}
     </div>
   )
 }

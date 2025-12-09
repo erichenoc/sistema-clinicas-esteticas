@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   DollarSign,
@@ -13,15 +13,16 @@ import {
   MoreHorizontal,
   TrendingUp,
   Calculator,
-  Clock,
   CheckCircle,
-  AlertCircle,
   Briefcase,
   CreditCard,
   FileText,
   Printer,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import { getProfessionals, type ProfessionalSummaryData } from '@/actions/professionals'
 import {
   Card,
   CardContent,
@@ -67,181 +68,99 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 
-// Mock data para empleados
-const mockEmpleados = [
-  {
-    id: '1',
-    name: 'Dra. Pamela Moquete',
-    cedula: '001-1234567-8',
-    position: 'Directora Médica',
-    department: 'Medicina Estética',
-    type: 'fijo',
-    salary: 150000,
-    startDate: '2020-01-15',
-    status: 'active',
-    bankAccount: '****4567',
-    afp: 'AFP Popular',
-    ars: 'Humano',
-    avatar: null,
-  },
-  {
-    id: '2',
-    name: 'María Recepción',
-    cedula: '001-9876543-2',
-    position: 'Recepcionista',
-    department: 'Administración',
-    type: 'fijo',
-    salary: 35000,
-    startDate: '2022-03-01',
-    status: 'active',
-    bankAccount: '****1234',
-    afp: 'AFP Reservas',
-    ars: 'Senasa',
-    avatar: null,
-  },
-  {
-    id: '3',
-    name: 'Carmen Asistente',
-    cedula: '001-5555555-5',
-    position: 'Asistente Médica',
-    department: 'Medicina Estética',
-    type: 'fijo',
-    salary: 40000,
-    startDate: '2021-06-15',
-    status: 'active',
-    bankAccount: '****7890',
-    afp: 'AFP Popular',
-    ars: 'ARS Palic',
-    avatar: null,
-  },
-  {
-    id: '4',
-    name: 'Juan Limpieza',
-    cedula: '001-3333333-3',
-    position: 'Personal de Limpieza',
-    department: 'Servicios Generales',
-    type: 'fijo',
-    salary: 25000,
-    startDate: '2023-01-10',
-    status: 'active',
-    bankAccount: '****4321',
-    afp: 'AFP Reservas',
-    ars: 'Senasa',
-    avatar: null,
-  },
-  {
-    id: '5',
-    name: 'Ana Marketing',
-    cedula: '001-2222222-2',
-    position: 'Coordinadora de Marketing',
-    department: 'Administración',
-    type: 'fijo',
-    salary: 55000,
-    startDate: '2022-09-01',
-    status: 'active',
-    bankAccount: '****9999',
-    afp: 'AFP Popular',
-    ars: 'Humano',
-    avatar: null,
-  },
-]
+// Interfaces para datos
+interface EmpleadoData {
+  id: string
+  name: string
+  cedula: string
+  position: string
+  department: string
+  type: string
+  salary: number
+  startDate: string
+  status: string
+  bankAccount: string
+  afp: string
+  ars: string
+  avatar: string | null
+}
 
-// Mock data para nómina
-const mockNomina = [
-  {
-    id: '1',
-    employeeId: '1',
-    employeeName: 'Dra. Pamela Moquete',
-    period: '2024-12',
-    baseSalary: 150000,
-    commissions: 45000,
-    bonuses: 0,
-    overtime: 0,
-    grossSalary: 195000,
-    afpEmployee: 5655, // 2.87%
-    arsEmployee: 6045, // 3.04%
-    isrWithholding: 23500,
-    otherDeductions: 0,
-    totalDeductions: 35200,
-    netSalary: 159800,
-    status: 'pending',
-  },
-  {
-    id: '2',
-    employeeId: '2',
-    employeeName: 'María Recepción',
-    period: '2024-12',
-    baseSalary: 35000,
-    commissions: 0,
-    bonuses: 2000,
-    overtime: 3500,
-    grossSalary: 40500,
-    afpEmployee: 1162,
-    arsEmployee: 1231,
-    isrWithholding: 0,
-    otherDeductions: 0,
-    totalDeductions: 2393,
-    netSalary: 38107,
-    status: 'pending',
-  },
-  {
-    id: '3',
-    employeeId: '3',
-    employeeName: 'Carmen Asistente',
-    period: '2024-12',
-    baseSalary: 40000,
-    commissions: 0,
-    bonuses: 0,
-    overtime: 5000,
-    grossSalary: 45000,
-    afpEmployee: 1292,
-    arsEmployee: 1368,
-    isrWithholding: 0,
-    otherDeductions: 0,
-    totalDeductions: 2660,
-    netSalary: 42340,
-    status: 'pending',
-  },
-  {
-    id: '4',
-    employeeId: '4',
-    employeeName: 'Juan Limpieza',
-    period: '2024-12',
-    baseSalary: 25000,
-    commissions: 0,
-    bonuses: 0,
-    overtime: 0,
-    grossSalary: 25000,
-    afpEmployee: 718,
-    arsEmployee: 760,
-    isrWithholding: 0,
-    otherDeductions: 0,
-    totalDeductions: 1478,
-    netSalary: 23522,
-    status: 'pending',
-  },
-  {
-    id: '5',
-    employeeId: '5',
-    employeeName: 'Ana Marketing',
-    period: '2024-12',
-    baseSalary: 55000,
-    commissions: 0,
-    bonuses: 5000,
-    overtime: 0,
-    grossSalary: 60000,
-    afpEmployee: 1722,
-    arsEmployee: 1824,
-    isrWithholding: 1500,
-    otherDeductions: 0,
-    totalDeductions: 5046,
-    netSalary: 54954,
-    status: 'pending',
-  },
-]
+interface NominaData {
+  id: string
+  employeeId: string
+  employeeName: string
+  period: string
+  baseSalary: number
+  commissions: number
+  bonuses: number
+  overtime: number
+  grossSalary: number
+  afpEmployee: number
+  arsEmployee: number
+  isrWithholding: number
+  otherDeductions: number
+  totalDeductions: number
+  netSalary: number
+  status: string
+}
 
-// Historial de nóminas
-const mockHistorialNomina = [
+interface HistorialNominaData {
+  period: string
+  totalGross: number
+  totalNet: number
+  employeeCount: number
+  status: string
+  paidDate: string
+}
+
+// Función para calcular ISR según tabla DGII 2024
+function calculateISR(annualSalary: number): number {
+  if (annualSalary <= 416220) return 0
+  if (annualSalary <= 624329) return (annualSalary - 416220) * 0.15
+  if (annualSalary <= 867123) return 31216 + (annualSalary - 624329) * 0.20
+  return 79776 + (annualSalary - 867123) * 0.25
+}
+
+// Función para generar nómina desde empleados
+function generateNominaFromEmployees(employees: EmpleadoData[], period: string): NominaData[] {
+  return employees.map(emp => {
+    const baseSalary = emp.salary
+    const commissions = 0 // TODO: Calcular desde comisiones reales
+    const bonuses = 0
+    const overtime = 0
+    const grossSalary = baseSalary + commissions + bonuses + overtime
+
+    // Deducciones
+    const afpEmployee = grossSalary * 0.0287
+    const arsEmployee = grossSalary * 0.0304
+    const annualGross = grossSalary * 12
+    const isrWithholding = calculateISR(annualGross) / 12
+    const totalDeductions = afpEmployee + arsEmployee + isrWithholding
+    const netSalary = grossSalary - totalDeductions
+
+    return {
+      id: `nom-${emp.id}`,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      period,
+      baseSalary,
+      commissions,
+      bonuses,
+      overtime,
+      grossSalary,
+      afpEmployee: Math.round(afpEmployee),
+      arsEmployee: Math.round(arsEmployee),
+      isrWithholding: Math.round(isrWithholding),
+      otherDeductions: 0,
+      totalDeductions: Math.round(totalDeductions),
+      netSalary: Math.round(netSalary),
+      status: 'pending',
+    }
+  })
+}
+
+// Historial de nóminas (mock por ahora - TODO: crear tabla en BD)
+const mockHistorialNomina: HistorialNominaData[] = [
   { period: '2024-11', totalGross: 365500, totalNet: 318723, employeeCount: 5, status: 'paid', paidDate: '2024-11-30' },
   { period: '2024-10', totalGross: 358000, totalNet: 311890, employeeCount: 5, status: 'paid', paidDate: '2024-10-31' },
   { period: '2024-09', totalGross: 362000, totalNet: 315200, employeeCount: 5, status: 'paid', paidDate: '2024-09-30' },
@@ -251,13 +170,55 @@ export default function NominaPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('2024-12')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('nomina')
+  const [empleados, setEmpleados] = useState<EmpleadoData[]>([])
+  const [nomina, setNomina] = useState<NominaData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredEmpleados = mockEmpleados.filter((emp) => {
+  // Cargar profesionales como empleados
+  useEffect(() => {
+    async function loadEmployees() {
+      setIsLoading(true)
+      try {
+        const professionalsData = await getProfessionals({ status: 'active' })
+
+        // Convertir profesionales a formato de empleados
+        const employeesList: EmpleadoData[] = professionalsData.map((p: ProfessionalSummaryData) => ({
+          id: p.id,
+          name: p.full_name || `${p.first_name} ${p.last_name}`,
+          cedula: p.license_number || 'Sin cédula',
+          position: p.title || 'Profesional',
+          department: 'Medicina Estética',
+          type: p.employment_type || 'fijo',
+          salary: p.base_salary || 50000, // Salario base por defecto
+          startDate: p.hire_date || '2024-01-01',
+          status: p.status || 'active',
+          bankAccount: '****0000',
+          afp: 'AFP Popular',
+          ars: 'Humano',
+          avatar: p.profile_image_url || null,
+        }))
+
+        setEmpleados(employeesList)
+
+        // Generar nómina desde empleados
+        const nominaList = generateNominaFromEmployees(employeesList, selectedPeriod)
+        setNomina(nominaList)
+      } catch (error) {
+        console.error('Error loading employees:', error)
+        toast.error('Error al cargar los empleados')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadEmployees()
+  }, [selectedPeriod])
+
+  const filteredEmpleados = empleados.filter((emp) => {
     if (searchTerm && !emp.name.toLowerCase().includes(searchTerm.toLowerCase())) return false
     return true
   })
 
-  const filteredNomina = mockNomina.filter((nom) => {
+  const filteredNomina = nomina.filter((nom) => {
     if (nom.period !== selectedPeriod) return false
     if (searchTerm && !nom.employeeName.toLowerCase().includes(searchTerm.toLowerCase())) return false
     return true

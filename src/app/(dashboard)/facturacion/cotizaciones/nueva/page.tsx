@@ -1,9 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, useFieldArray } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -18,6 +16,7 @@ import {
   Save,
   Send,
   Calculator,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -63,40 +62,42 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
 
-import { quoteSchema, type QuoteFormData } from '@/lib/validations/billing'
 import { formatCurrency } from '@/types/billing'
+import { getPatients, type PatientData } from '@/actions/patients'
+import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
+import { getProducts, type ProductListItemData } from '@/actions/inventory'
 
-// Mock data - clientes
-const mockClients = [
-  { id: '1', name: 'María García López', email: 'maria@email.com', phone: '809-555-0101', rncCedula: '001-1234567-8' },
-  { id: '2', name: 'Juan Rodríguez', email: 'juan@email.com', phone: '809-555-0102', rncCedula: '002-9876543-2' },
-  { id: '3', name: 'Ana Martínez', email: 'ana@email.com', phone: '809-555-0103' },
-  { id: '4', name: 'Empresa ABC, SRL', email: 'contacto@abc.com', phone: '809-555-0104', rncCedula: '130123456', isBusiness: true },
-]
+// Tipos para datos UI
+interface ClientData {
+  id: string
+  name: string
+  email: string | null
+  phone: string
+  rncCedula?: string | null
+}
 
-// Mock data - tratamientos
-const mockTreatments = [
-  { id: 't1', name: 'Limpieza Facial Profunda', price: 2500, category: 'Facial' },
-  { id: 't2', name: 'Botox - Zona Frontal', price: 8500, category: 'Facial' },
-  { id: 't3', name: 'Ácido Hialurónico - Labios', price: 12000, category: 'Facial' },
-  { id: 't4', name: 'Mesoterapia Corporal', price: 4500, category: 'Corporal' },
-  { id: 't5', name: 'Radiofrecuencia Facial', price: 3500, category: 'Facial' },
-  { id: 't6', name: 'Depilación Láser - Axilas', price: 2000, category: 'Corporal' },
-]
+interface TreatmentItem {
+  id: string
+  name: string
+  price: number
+  category: string | null
+}
 
-// Mock data - productos
-const mockProducts = [
-  { id: 'p1', name: 'Crema Hidratante Premium', price: 1800, stock: 25 },
-  { id: 'p2', name: 'Sérum Vitamina C', price: 2500, stock: 18 },
-  { id: 'p3', name: 'Protector Solar SPF 50', price: 950, stock: 42 },
-]
+interface ProductItem {
+  id: string
+  name: string
+  price: number
+  stock: number
+}
 
-// Mock data - paquetes
-const mockPackages = [
-  { id: 'pk1', name: 'Paquete Rejuvenecimiento Facial', price: 25000, sessions: 5 },
-  { id: 'pk2', name: 'Paquete Corporal Completo', price: 35000, sessions: 8 },
-]
+interface PackageItem {
+  id: string
+  name: string
+  price: number
+  sessions: number
+}
 
 type ItemType = 'treatment' | 'product' | 'package' | 'custom'
 
@@ -114,7 +115,7 @@ interface QuoteItem {
 
 export default function NuevaCotizacionPage() {
   const router = useRouter()
-  const [selectedClient, setSelectedClient] = useState<typeof mockClients[0] | null>(null)
+  const [selectedClient, setSelectedClient] = useState<ClientData | null>(null)
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [items, setItems] = useState<QuoteItem[]>([])
   const [itemSearchOpen, setItemSearchOpen] = useState(false)
@@ -123,6 +124,68 @@ export default function NuevaCotizacionPage() {
   const [notes, setNotes] = useState('')
   const [terms, setTerms] = useState('• Cotización válida por 30 días\n• Precios sujetos a cambio sin previo aviso\n• Se requiere 50% de anticipo para reservar cita')
   const [validDays, setValidDays] = useState(30)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Estados para datos cargados de la base de datos
+  const [clients, setClients] = useState<ClientData[]>([])
+  const [treatments, setTreatments] = useState<TreatmentItem[]>([])
+  const [products, setProducts] = useState<ProductItem[]>([])
+  const [packages, setPackages] = useState<PackageItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Cargar datos de la base de datos
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true)
+      try {
+        const [patientsData, treatmentsData, packagesData, productsData] = await Promise.all([
+          getPatients(),
+          getTreatments({ isActive: true }),
+          getPackages(),
+          getProducts({ isActive: true }),
+        ])
+
+        // Transformar pacientes a clientes
+        setClients(patientsData.map((p: PatientData) => ({
+          id: p.id,
+          name: `${p.first_name} ${p.last_name}`,
+          email: p.email,
+          phone: p.phone,
+          rncCedula: p.document_number || null,
+        })))
+
+        // Transformar tratamientos
+        setTreatments(treatmentsData.map((t: TreatmentListItemData) => ({
+          id: t.id,
+          name: t.name,
+          price: t.price || 0,
+          category: t.category_name || null,
+        })))
+
+        // Transformar productos
+        setProducts(productsData.map((p: ProductListItemData) => ({
+          id: p.id,
+          name: p.name,
+          price: p.sell_price || 0,
+          stock: p.current_stock || 0,
+        })))
+
+        // Transformar paquetes
+        setPackages(packagesData.map((pk: PackageData) => ({
+          id: pk.id,
+          name: pk.name,
+          price: pk.salePrice || pk.regularPrice || 0,
+          sessions: pk.items?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1,
+        })))
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Error al cargar los datos')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   // Calcular totales
   const calculateItemSubtotal = (item: QuoteItem) => {
@@ -187,15 +250,18 @@ export default function NuevaCotizacionPage() {
   }
 
   // Guardar cotización
-  const handleSave = (sendToClient: boolean = false) => {
+  const handleSave = async (sendToClient: boolean = false) => {
     if (!selectedClient) {
-      alert('Selecciona un cliente')
+      toast.error('Selecciona un cliente')
       return
     }
     if (items.length === 0) {
-      alert('Agrega al menos un item')
+      toast.error('Agrega al menos un item')
       return
     }
+
+    setIsSubmitting(true)
+    toast.loading('Guardando cotización...', { id: 'save-quote' })
 
     const quoteData = {
       clientId: selectedClient.id,
@@ -223,8 +289,13 @@ export default function NuevaCotizacionPage() {
 
     console.log('Guardando cotización:', quoteData)
 
-    // Simular guardado
-    alert(sendToClient ? 'Cotización enviada al cliente' : 'Cotización guardada como borrador')
+    // TODO: Implementar acción de servidor para guardar cotización
+    // Por ahora simular guardado
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    toast.dismiss('save-quote')
+    toast.success(sendToClient ? 'Cotización enviada al cliente' : 'Cotización guardada como borrador')
+    setIsSubmitting(false)
     router.push('/facturacion')
   }
 
@@ -265,12 +336,20 @@ export default function NuevaCotizacionPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave(false)}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
             Guardar Borrador
           </Button>
-          <Button onClick={() => handleSave(true)}>
-            <Send className="mr-2 h-4 w-4" />
+          <Button onClick={() => handleSave(true)} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             Guardar y Enviar
           </Button>
         </div>
@@ -314,23 +393,34 @@ export default function NuevaCotizacionPage() {
                     <CommandList>
                       <CommandEmpty>No se encontraron clientes</CommandEmpty>
                       <CommandGroup>
-                        {mockClients.map((client) => (
-                          <CommandItem
-                            key={client.id}
-                            onSelect={() => {
-                              setSelectedClient(client)
-                              setClientSearchOpen(false)
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{client.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {client.email} • {client.phone}
-                                {client.rncCedula && ` • ${client.rncCedula}`}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
+                        {isLoading ? (
+                          <div className="py-6 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground mt-2">Cargando clientes...</p>
+                          </div>
+                        ) : clients.length === 0 ? (
+                          <div className="py-6 text-center text-muted-foreground">
+                            No hay clientes registrados
+                          </div>
+                        ) : (
+                          clients.map((client) => (
+                            <CommandItem
+                              key={client.id}
+                              onSelect={() => {
+                                setSelectedClient(client)
+                                setClientSearchOpen(false)
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{client.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {client.email} • {client.phone}
+                                  {client.rncCedula && ` • ${client.rncCedula}`}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))
+                        )}
                       </CommandGroup>
                     </CommandList>
                   </Command>
@@ -381,51 +471,80 @@ export default function NuevaCotizacionPage() {
                         <CommandInput placeholder="Buscar tratamiento, producto o paquete..." />
                         <CommandList>
                           <CommandEmpty>No se encontraron resultados</CommandEmpty>
-                          <CommandGroup heading="Tratamientos">
-                            {mockTreatments.map((t) => (
-                              <CommandItem
-                                key={t.id}
-                                onSelect={() => addItem('treatment', { id: t.id, name: t.name, price: t.price })}
-                              >
-                                <Stethoscope className="mr-2 h-4 w-4 text-blue-500" />
-                                <div className="flex-1">
-                                  <span>{t.name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">({t.category})</span>
-                                </div>
-                                <span className="font-medium">{formatCurrency(t.price, currency)}</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                          <CommandGroup heading="Productos">
-                            {mockProducts.map((p) => (
-                              <CommandItem
-                                key={p.id}
-                                onSelect={() => addItem('product', { id: p.id, name: p.name, price: p.price })}
-                              >
-                                <Package className="mr-2 h-4 w-4 text-green-500" />
-                                <div className="flex-1">
-                                  <span>{p.name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">(Stock: {p.stock})</span>
-                                </div>
-                                <span className="font-medium">{formatCurrency(p.price, currency)}</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                          <CommandGroup heading="Paquetes">
-                            {mockPackages.map((pk) => (
-                              <CommandItem
-                                key={pk.id}
-                                onSelect={() => addItem('package', { id: pk.id, name: pk.name, price: pk.price })}
-                              >
-                                <Gift className="mr-2 h-4 w-4 text-purple-500" />
-                                <div className="flex-1">
-                                  <span>{pk.name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">({pk.sessions} sesiones)</span>
-                                </div>
-                                <span className="font-medium">{formatCurrency(pk.price, currency)}</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                          {isLoading ? (
+                            <div className="py-6 text-center">
+                              <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground mt-2">Cargando items...</p>
+                            </div>
+                          ) : (
+                            <>
+                              <CommandGroup heading="Tratamientos">
+                                {treatments.length === 0 ? (
+                                  <div className="py-2 text-center text-sm text-muted-foreground">
+                                    No hay tratamientos disponibles
+                                  </div>
+                                ) : (
+                                  treatments.map((t) => (
+                                    <CommandItem
+                                      key={t.id}
+                                      onSelect={() => addItem('treatment', { id: t.id, name: t.name, price: t.price })}
+                                    >
+                                      <Stethoscope className="mr-2 h-4 w-4 text-blue-500" />
+                                      <div className="flex-1">
+                                        <span>{t.name}</span>
+                                        {t.category && (
+                                          <span className="text-xs text-muted-foreground ml-2">({t.category})</span>
+                                        )}
+                                      </div>
+                                      <span className="font-medium">{formatCurrency(t.price, currency)}</span>
+                                    </CommandItem>
+                                  ))
+                                )}
+                              </CommandGroup>
+                              <CommandGroup heading="Productos">
+                                {products.length === 0 ? (
+                                  <div className="py-2 text-center text-sm text-muted-foreground">
+                                    No hay productos disponibles
+                                  </div>
+                                ) : (
+                                  products.map((p) => (
+                                    <CommandItem
+                                      key={p.id}
+                                      onSelect={() => addItem('product', { id: p.id, name: p.name, price: p.price })}
+                                    >
+                                      <Package className="mr-2 h-4 w-4 text-green-500" />
+                                      <div className="flex-1">
+                                        <span>{p.name}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">(Stock: {p.stock})</span>
+                                      </div>
+                                      <span className="font-medium">{formatCurrency(p.price, currency)}</span>
+                                    </CommandItem>
+                                  ))
+                                )}
+                              </CommandGroup>
+                              <CommandGroup heading="Paquetes">
+                                {packages.length === 0 ? (
+                                  <div className="py-2 text-center text-sm text-muted-foreground">
+                                    No hay paquetes disponibles
+                                  </div>
+                                ) : (
+                                  packages.map((pk) => (
+                                    <CommandItem
+                                      key={pk.id}
+                                      onSelect={() => addItem('package', { id: pk.id, name: pk.name, price: pk.price })}
+                                    >
+                                      <Gift className="mr-2 h-4 w-4 text-purple-500" />
+                                      <div className="flex-1">
+                                        <span>{pk.name}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">({pk.sessions} sesiones)</span>
+                                      </div>
+                                      <span className="font-medium">{formatCurrency(pk.price, currency)}</span>
+                                    </CommandItem>
+                                  ))
+                                )}
+                              </CommandGroup>
+                            </>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
