@@ -60,16 +60,23 @@ export async function updateSession(request: NextRequest) {
 
   // RBAC: Verificar permisos de ruta si el usuario está autenticado
   if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api')) {
-    // Obtener el rol del usuario desde la tabla users
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role, is_active')
+    // Obtener el rol del usuario desde user_metadata o profiles
+    const userMetaRole = user.user_metadata?.role as string | undefined
+
+    // Verificar si hay perfil del usuario
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('is_active')
       .eq('id', user.id)
       .single()
 
-    // Si el usuario no tiene registro en la tabla users, usar rol por defecto
-    const userRole: UserRole = (userData?.role as UserRole) || 'receptionist'
-    const isActive = userData?.is_active ?? true
+    // Determinar el rol - priorizar user_metadata ya que es donde se configura el admin
+    let userRole: UserRole = 'receptionist'
+    if (userMetaRole === 'admin' || userMetaRole === 'owner' || userMetaRole === 'doctor' || userMetaRole === 'nurse') {
+      userRole = userMetaRole as UserRole
+    }
+
+    const isActive = profileData?.is_active ?? true
 
     // Verificar si el usuario está activo
     if (!isActive) {
