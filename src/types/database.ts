@@ -17,15 +17,22 @@ export interface Database {
         Row: {
           id: string
           name: string
+          legal_name: string | null
           logo_url: string | null
           primary_color: string | null
           timezone: string
           currency: string
           tax_id: string | null
           address: string | null
+          city: string | null
+          state: string | null
+          postal_code: string | null
+          country: string | null
           phone: string | null
           email: string | null
           website: string | null
+          instagram: string | null
+          facebook: string | null
           settings: Json | null
           created_at: string
           updated_at: string
@@ -33,15 +40,22 @@ export interface Database {
         Insert: {
           id?: string
           name: string
+          legal_name?: string | null
           logo_url?: string | null
           primary_color?: string | null
           timezone?: string
           currency?: string
           tax_id?: string | null
           address?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          country?: string | null
           phone?: string | null
           email?: string | null
           website?: string | null
+          instagram?: string | null
+          facebook?: string | null
           settings?: Json | null
           created_at?: string
           updated_at?: string
@@ -49,15 +63,22 @@ export interface Database {
         Update: {
           id?: string
           name?: string
+          legal_name?: string | null
           logo_url?: string | null
           primary_color?: string | null
           timezone?: string
           currency?: string
           tax_id?: string | null
           address?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          country?: string | null
           phone?: string | null
           email?: string | null
           website?: string | null
+          instagram?: string | null
+          facebook?: string | null
           settings?: Json | null
           created_at?: string
           updated_at?: string
@@ -71,6 +92,8 @@ export interface Database {
           address: string | null
           phone: string | null
           email: string | null
+          manager_id: string | null
+          rooms_count: number
           is_active: boolean
           created_at: string
           updated_at: string
@@ -82,6 +105,8 @@ export interface Database {
           address?: string | null
           phone?: string | null
           email?: string | null
+          manager_id?: string | null
+          rooms_count?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -93,6 +118,8 @@ export interface Database {
           address?: string | null
           phone?: string | null
           email?: string | null
+          manager_id?: string | null
+          rooms_count?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string

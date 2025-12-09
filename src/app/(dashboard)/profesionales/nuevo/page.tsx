@@ -35,6 +35,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
+import { createProfessional } from '@/actions/professionals'
 
 export default function NuevoProfesionalPage() {
   const router = useRouter()
@@ -81,16 +82,51 @@ export default function NuevoProfesionalPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.firstName || !formData.lastName || !formData.email) {
+      toast.error('Por favor complete los campos requeridos')
+      return
+    }
+
     setIsLoading(true)
+    toast.loading('Creando profesional...', { id: 'create-professional' })
 
     try {
-      // Aquí iría la lógica para guardar en Supabase
-      // Por ahora simulamos el guardado
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const result = await createProfessional({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        title: formData.title || undefined,
+        licenseNumber: formData.licenseNumber || undefined,
+        specialties: formData.specialties,
+        bio: formData.bio || undefined,
+        employmentType: formData.employmentType,
+        hireDate: formData.hireDate || undefined,
+        baseSalary: formData.baseSalary ? parseFloat(formData.baseSalary) : undefined,
+        salaryType: formData.salaryType,
+        commissionRate: parseFloat(formData.commissionRate),
+        commissionType: formData.commissionType,
+        maxDailyAppointments: parseInt(formData.maxDailyAppointments),
+        appointmentBufferMinutes: parseInt(formData.appointmentBufferMinutes),
+        acceptsWalkIns: formData.acceptsWalkIns,
+        canViewAllPatients: formData.canViewAllPatients,
+        canModifyPrices: formData.canModifyPrices,
+        canGiveDiscounts: formData.canGiveDiscounts,
+        maxDiscountPercent: parseFloat(formData.maxDiscountPercent),
+        showOnBooking: formData.showOnBooking,
+      })
 
-      toast.success('Profesional creado exitosamente')
-      router.push('/profesionales')
+      toast.dismiss('create-professional')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Profesional creado exitosamente')
+        router.push('/profesionales')
+      }
     } catch (error) {
+      toast.dismiss('create-professional')
       console.error('Error creating professional:', error)
       toast.error('Error al crear el profesional')
     } finally {

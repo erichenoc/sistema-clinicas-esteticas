@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -42,19 +42,30 @@ import {
   generateSlug,
 } from '@/lib/validations/treatments'
 import { toast } from 'sonner'
-
-// Mock categories
-const mockCategories = [
-  { id: '1', name: 'Facial', color: '#ec4899' },
-  { id: '2', name: 'Corporal', color: '#8b5cf6' },
-  { id: '3', name: 'Láser', color: '#ef4444' },
-  { id: '4', name: 'Inyectables', color: '#06b6d4' },
-]
+import { getCategories, createTreatment, type CategoryWithCountData } from '@/actions/treatments'
 
 export default function NuevoTratamientoPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [contraindication, setContraindication] = useState('')
+  const [categories, setCategories] = useState<CategoryWithCountData[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
+
+  // Cargar categorias al montar el componente
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const data = await getCategories()
+        setCategories(data)
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        toast.error('Error al cargar las categorias')
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    loadCategories()
+  }, [])
 
   const form = useForm<TreatmentFormData>({
     resolver: zodResolver(treatmentSchema),
@@ -106,14 +117,39 @@ export default function NuevoTratamientoPage() {
 
   async function onSubmit(data: TreatmentFormData) {
     setIsLoading(true)
+    toast.loading('Creando tratamiento...', { id: 'create-treatment' })
 
     try {
-      // TODO: Llamar a Server Action para crear tratamiento
-      console.log('Datos del tratamiento:', data)
+      const result = await createTreatment({
+        name: data.name,
+        slug: data.slug,
+        category_id: data.categoryId || undefined,
+        description: data.description || undefined,
+        description_internal: data.descriptionInternal || undefined,
+        duration_minutes: data.durationMinutes,
+        buffer_minutes: data.bufferMinutes || 0,
+        price: data.price,
+        price_from: data.priceFrom || undefined,
+        cost: data.cost || 0,
+        recommended_sessions: data.recommendedSessions || 1,
+        session_interval_days: data.sessionIntervalDays || undefined,
+        contraindications: data.contraindications || [],
+        aftercare_instructions: data.aftercareInstructions || undefined,
+        is_public: data.isPublic ?? true,
+        is_active: data.isActive ?? true,
+      })
 
-      toast.success('Tratamiento creado exitosamente')
-      router.push('/tratamientos')
+      toast.dismiss('create-treatment')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Tratamiento creado exitosamente')
+        router.push('/tratamientos')
+      }
     } catch (error) {
+      toast.dismiss('create-treatment')
+      console.error('Error creating treatment:', error)
       toast.error('Error al crear el tratamiento')
     } finally {
       setIsLoading(false)
@@ -192,17 +228,27 @@ export default function NuevoTratamientoPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {mockCategories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className="h-2 w-2 rounded-full"
-                                      style={{ backgroundColor: cat.color }}
-                                    />
-                                    {cat.name}
-                                  </div>
+                              {loadingCategories ? (
+                                <SelectItem value="loading" disabled>
+                                  Cargando categorias...
                                 </SelectItem>
-                              ))}
+                              ) : categories.length === 0 ? (
+                                <SelectItem value="empty" disabled>
+                                  No hay categorias
+                                </SelectItem>
+                              ) : (
+                                categories.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: cat.color || '#6b7280' }}
+                                      />
+                                      {cat.name}
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

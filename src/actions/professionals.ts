@@ -205,6 +205,213 @@ export async function getProfessionalById(id: string): Promise<ProfessionalSumma
 }
 
 // =============================================
+// CREAR/ACTUALIZAR PROFESIONAL
+// =============================================
+
+export interface CreateProfessionalInput {
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  title?: string
+  licenseNumber?: string
+  specialties?: string[]
+  bio?: string
+  employmentType?: string
+  hireDate?: string
+  baseSalary?: number
+  salaryType?: string
+  commissionRate?: number
+  commissionType?: string
+  maxDailyAppointments?: number
+  appointmentBufferMinutes?: number
+  acceptsWalkIns?: boolean
+  canViewAllPatients?: boolean
+  canModifyPrices?: boolean
+  canGiveDiscounts?: boolean
+  maxDiscountPercent?: number
+  showOnBooking?: boolean
+}
+
+const DEFAULT_CLINIC_ID = '00000000-0000-0000-0000-000000000001'
+
+export async function createProfessional(
+  input: CreateProfessionalInput
+): Promise<{ data: ProfessionalSummaryData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    // 1. Primero crear el usuario
+    const userId = crypto.randomUUID()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: userError } = await (supabase as any)
+      .from('users')
+      .insert({
+        id: userId,
+        clinic_id: DEFAULT_CLINIC_ID,
+        email: input.email,
+        first_name: input.firstName,
+        last_name: input.lastName,
+        phone: input.phone || null,
+        role: 'professional',
+        is_active: true,
+      })
+
+    if (userError) {
+      console.error('Error creating user:', userError)
+      return { data: null, error: 'Error al crear el usuario' }
+    }
+
+    // 2. Luego crear el perfil profesional
+    const professionalId = crypto.randomUUID()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: professional, error: profError } = await (supabase as any)
+      .from('professional_profiles')
+      .insert({
+        id: professionalId,
+        clinic_id: DEFAULT_CLINIC_ID,
+        user_id: userId,
+        title: input.title || null,
+        license_number: input.licenseNumber || null,
+        specialties: input.specialties || [],
+        bio: input.bio || null,
+        employment_type: input.employmentType || 'employee',
+        hire_date: input.hireDate || null,
+        base_salary: input.baseSalary || null,
+        salary_type: input.salaryType || 'monthly',
+        default_commission_rate: input.commissionRate ? parseFloat(String(input.commissionRate)) : 15,
+        commission_type: input.commissionType || 'percentage',
+        max_daily_appointments: input.maxDailyAppointments || 20,
+        appointment_buffer_minutes: input.appointmentBufferMinutes || 15,
+        accepts_walk_ins: input.acceptsWalkIns ?? true,
+        can_view_all_patients: input.canViewAllPatients ?? false,
+        can_modify_prices: input.canModifyPrices ?? false,
+        can_give_discounts: input.canGiveDiscounts ?? false,
+        max_discount_percent: input.maxDiscountPercent || 0,
+        show_on_booking: input.showOnBooking ?? true,
+        status: 'active',
+        display_order: 0,
+      })
+      .select()
+      .single()
+
+    if (profError) {
+      console.error('Error creating professional profile:', profError)
+      // Si falla, intentar eliminar el usuario creado
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('users').delete().eq('id', userId)
+      return { data: null, error: 'Error al crear el perfil profesional' }
+    }
+
+    revalidatePath('/profesionales')
+
+    return {
+      data: {
+        ...professional,
+        first_name: input.firstName,
+        last_name: input.lastName,
+        email: input.email,
+        phone: input.phone || null,
+        full_name: input.title
+          ? `${input.title} ${input.firstName} ${input.lastName}`
+          : `${input.firstName} ${input.lastName}`,
+        appointments_this_month: 0,
+        revenue_this_month: 0,
+        average_rating: 0,
+        total_ratings: 0,
+        treatments_count: 0,
+      },
+      error: null,
+    }
+  } catch (error) {
+    console.error('Error in createProfessional:', error)
+    return { data: null, error: 'Error inesperado al crear el profesional' }
+  }
+}
+
+export async function updateProfessional(
+  id: string,
+  input: Partial<CreateProfessionalInput>
+): Promise<{ data: ProfessionalSummaryData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    // Obtener el profesional actual para saber el user_id
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: currentProf, error: fetchError } = await (supabase as any)
+      .from('professional_profiles')
+      .select('user_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !currentProf) {
+      return { data: null, error: 'Profesional no encontrado' }
+    }
+
+    // Actualizar usuario si hay datos de usuario
+    if (input.firstName || input.lastName || input.email || input.phone) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('users')
+        .update({
+          ...(input.firstName && { first_name: input.firstName }),
+          ...(input.lastName && { last_name: input.lastName }),
+          ...(input.email && { email: input.email }),
+          ...(input.phone !== undefined && { phone: input.phone || null }),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentProf.user_id)
+    }
+
+    // Actualizar perfil profesional
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (input.title !== undefined) updateData.title = input.title || null
+    if (input.licenseNumber !== undefined) updateData.license_number = input.licenseNumber || null
+    if (input.specialties !== undefined) updateData.specialties = input.specialties
+    if (input.bio !== undefined) updateData.bio = input.bio || null
+    if (input.employmentType !== undefined) updateData.employment_type = input.employmentType
+    if (input.hireDate !== undefined) updateData.hire_date = input.hireDate || null
+    if (input.baseSalary !== undefined) updateData.base_salary = input.baseSalary || null
+    if (input.salaryType !== undefined) updateData.salary_type = input.salaryType
+    if (input.commissionRate !== undefined) updateData.default_commission_rate = input.commissionRate
+    if (input.commissionType !== undefined) updateData.commission_type = input.commissionType
+    if (input.maxDailyAppointments !== undefined) updateData.max_daily_appointments = input.maxDailyAppointments
+    if (input.appointmentBufferMinutes !== undefined) updateData.appointment_buffer_minutes = input.appointmentBufferMinutes
+    if (input.acceptsWalkIns !== undefined) updateData.accepts_walk_ins = input.acceptsWalkIns
+    if (input.canViewAllPatients !== undefined) updateData.can_view_all_patients = input.canViewAllPatients
+    if (input.canModifyPrices !== undefined) updateData.can_modify_prices = input.canModifyPrices
+    if (input.canGiveDiscounts !== undefined) updateData.can_give_discounts = input.canGiveDiscounts
+    if (input.maxDiscountPercent !== undefined) updateData.max_discount_percent = input.maxDiscountPercent
+    if (input.showOnBooking !== undefined) updateData.show_on_booking = input.showOnBooking
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
+      .from('professional_profiles')
+      .update(updateData)
+      .eq('id', id)
+
+    if (updateError) {
+      console.error('Error updating professional:', updateError)
+      return { data: null, error: 'Error al actualizar el profesional' }
+    }
+
+    // Obtener el profesional actualizado
+    const updatedProfessional = await getProfessionalById(id)
+
+    revalidatePath('/profesionales')
+    revalidatePath(`/profesionales/${id}`)
+
+    return { data: updatedProfessional, error: null }
+  } catch (error) {
+    console.error('Error in updateProfessional:', error)
+    return { data: null, error: 'Error inesperado al actualizar el profesional' }
+  }
+}
+
+// =============================================
 // COMISIONES
 // =============================================
 
