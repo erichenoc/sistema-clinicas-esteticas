@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   Building2,
   Loader2,
+  Calculator,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -288,6 +289,12 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
           <p className="text-muted-foreground">Cotizaciones, facturas y comprobantes fiscales</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/facturacion/contabilidad">
+              <Calculator className="mr-2 h-4 w-4" />
+              Contabilidad DGII
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href="/facturacion/cotizaciones/nueva">
               <FileText className="mr-2 h-4 w-4" />

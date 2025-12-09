@@ -67,11 +67,11 @@ import { cn } from '@/lib/utils'
 
 // Mock data
 const mockPatients = [
-  { id: '1', name: 'María García López', phone: '5512345678', email: 'maria@email.com' },
-  { id: '2', name: 'Ana Martínez Ruiz', phone: '5598765432', email: 'ana@email.com' },
-  { id: '3', name: 'Laura Hernández', phone: '5511223344', email: 'laura@email.com' },
-  { id: '4', name: 'Carmen Rodríguez Soto', phone: '5544332211', email: 'carmen@email.com' },
-  { id: '5', name: 'Patricia Morales', phone: '5566778899', email: 'paty@email.com' },
+  { id: '1', name: 'María García López', phone: '8095551234', email: 'maria@email.com' },
+  { id: '2', name: 'Ana Martínez Ruiz', phone: '8295552345', email: 'ana@email.com' },
+  { id: '3', name: 'Laura Hernández', phone: '8095553456', email: 'laura@email.com' },
+  { id: '4', name: 'Carmen Rodríguez Soto', phone: '8295554567', email: 'carmen@email.com' },
+  { id: '5', name: 'Patricia Morales', phone: '8095555678', email: 'paty@email.com' },
 ]
 
 const mockProfessionals = [

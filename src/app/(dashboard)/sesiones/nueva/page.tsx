@@ -58,9 +58,9 @@ import {
 
 // Mock data
 const mockPatients = [
-  { id: '1', name: 'María García López', phone: '5512345678' },
-  { id: '2', name: 'Ana Martínez Ruiz', phone: '5598765432' },
-  { id: '3', name: 'Laura Hernández', phone: '5511223344' },
+  { id: '1', name: 'María García López', phone: '8095551234' },
+  { id: '2', name: 'Ana Martínez Ruiz', phone: '8295552345' },
+  { id: '3', name: 'Laura Hernández', phone: '8095553456' },
 ]
 
 const mockProfessionals = [

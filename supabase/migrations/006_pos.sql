@@ -445,7 +445,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     invoice_series VARCHAR(10),
 
     -- Datos fiscales del cliente
-    customer_tax_id VARCHAR(20), -- RFC, CURP, etc.
+    customer_tax_id VARCHAR(20), -- RNC o Cédula
     customer_legal_name VARCHAR(200),
     customer_address TEXT,
     customer_email VARCHAR(200),

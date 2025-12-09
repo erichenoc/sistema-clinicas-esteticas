@@ -1,0 +1,12 @@
+REPORTE DE VENTAS - Este Mes
+Fecha: 8/12/2025
+
+Ingresos Totales: RD$458,750
+Gastos: RD$125,430
+Utilidad Neta: RD$333,320
+
+DETALLE POR CATEGORIA:
+- Tratamientos Faciales: RD$185,400 (40%)
+- Tratamientos Corporales: RD$138,200 (30%)
+- Depilación Láser: RD$92,000 (20%)
+- Productos Retail: RD$43,150 (10%)

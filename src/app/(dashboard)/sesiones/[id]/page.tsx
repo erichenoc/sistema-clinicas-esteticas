@@ -81,7 +81,7 @@ const mockSession = {
     id: '1',
     firstName: 'María',
     lastName: 'García López',
-    phone: '5512345678',
+    phone: '8095551234',
     email: 'maria.garcia@email.com',
     avatar: null,
   },

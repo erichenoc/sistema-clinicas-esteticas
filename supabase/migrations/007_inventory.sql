@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     code VARCHAR(20),
     name VARCHAR(200) NOT NULL,
     legal_name VARCHAR(200),
-    tax_id VARCHAR(20), -- RFC
+    tax_id VARCHAR(20), -- RNC
 
     -- Contacto
     contact_name VARCHAR(200),

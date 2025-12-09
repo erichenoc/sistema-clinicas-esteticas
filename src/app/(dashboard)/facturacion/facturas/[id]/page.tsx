@@ -76,6 +76,8 @@ import {
   PAYMENT_METHOD_OPTIONS,
   formatCurrency,
 } from '@/types/billing'
+import { useUser, RequirePermission } from '@/contexts/user-context'
+import { Pencil } from 'lucide-react'
 
 // Mock invoice data
 const mockInvoice: Invoice = {
@@ -316,7 +318,11 @@ export default function InvoiceDetailPage({
 }) {
   const { id } = use(params)
   const router = useRouter()
+  const { hasPermission } = useUser()
+  const canEditInvoice = hasPermission('billing:edit')
+  const canVoidInvoice = hasPermission('billing:void')
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<string>('')
@@ -572,7 +578,15 @@ export default function InvoiceDetailPage({
               {(invoice.client?.patientId || invoice.appointmentId || invoice.quoteId) && (
                 <DropdownMenuSeparator />
               )}
-              {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+              {canEditInvoice && invoice.status !== 'cancelled' && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/facturacion/facturas/${invoice.id}/editar`}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar factura
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canVoidInvoice && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
                 <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
                   <DialogTrigger asChild>
                     <DropdownMenuItem

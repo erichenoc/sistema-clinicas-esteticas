@@ -71,13 +71,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
         })
       } else {
         // Usuario autenticado pero sin registro en tabla users
+        // Usar user_metadata.role si está disponible (configurado en Supabase Auth)
+        const metaRole = authUser.user_metadata?.role as string | undefined
+        let userRole: UserRole = 'receptionist'
+        if (metaRole === 'admin' || metaRole === 'owner' || metaRole === 'doctor' || metaRole === 'nurse') {
+          userRole = metaRole as UserRole
+        }
+
         setUser({
           id: authUser.id,
           email: authUser.email || '',
           firstName: authUser.user_metadata?.first_name || 'Usuario',
           lastName: authUser.user_metadata?.last_name || '',
           fullName: `${authUser.user_metadata?.first_name || 'Usuario'} ${authUser.user_metadata?.last_name || ''}`.trim(),
-          role: 'receptionist',
+          role: userRole,
           clinicId: '',
           avatarUrl: null,
         })

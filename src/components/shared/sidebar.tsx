@@ -93,9 +93,9 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-72 flex-col bg-[#3d3632]">
+    <div className="flex h-full w-72 flex-col bg-sidebar">
       {/* Logo Section */}
-      <div className="flex h-20 items-center justify-center border-b border-[#524b46] px-6">
+      <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
         <Link href="/" className="transition-opacity hover:opacity-80">
           <MedLuxeLogoSimple inverted />
         </Link>
@@ -116,8 +116,8 @@ export function Sidebar() {
                 className={cn(
                   'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-[#A67C52] text-white shadow-lg shadow-[#A67C52]/20'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-sidebar-primary/20'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
                 <item.icon
@@ -128,7 +128,7 @@ export function Sidebar() {
                 />
                 <span className="tracking-wide">{item.name}</span>
                 {isActive && (
-                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-white/80" />
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/80" />
                 )}
               </Link>
             )
@@ -137,7 +137,7 @@ export function Sidebar() {
       </ScrollArea>
 
       {/* Bottom Navigation */}
-      <div className="border-t border-[#524b46] px-4 py-4">
+      <div className="border-t border-sidebar-border px-4 py-4">
         <nav className="flex flex-col gap-1">
           {bottomNavigation.map((item) => {
             const isActive = pathname.startsWith(item.href)
@@ -149,8 +149,8 @@ export function Sidebar() {
                 className={cn(
                   'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-[#A67C52] text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -159,18 +159,18 @@ export function Sidebar() {
             )
           })}
 
-          <Separator className="my-3 bg-[#524b46]" />
+          <Separator className="my-3 bg-sidebar-border" />
 
           {/* User Profile Section */}
-          <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#A67C52] text-sm font-medium text-white">
+          <div className="mb-2 flex items-center gap-3 rounded-xl bg-sidebar-accent px-4 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-primary text-sm font-medium text-sidebar-primary-foreground">
               ML
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">
                 Med Luxe Admin
               </p>
-              <p className="text-xs text-white/50 truncate">
+              <p className="text-xs text-sidebar-foreground/50 truncate">
                 Administrador
               </p>
             </div>

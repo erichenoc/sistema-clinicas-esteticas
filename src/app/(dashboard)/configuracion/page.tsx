@@ -58,22 +58,23 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 // Mock data
 const clinicData = {
-  name: 'Clínica Estética Bella Vida',
-  legalName: 'Bella Vida Estética S.A. de C.V.',
-  rfc: 'BVE201015ABC',
-  email: 'contacto@bellavida.com',
-  phone: '+52 55 1234 5678',
-  website: 'www.bellavida.com',
-  instagram: '@bellavidaestetica',
-  facebook: 'bellavidaestetica',
-  address: 'Av. Reforma 123, Col. Juárez',
-  city: 'Ciudad de México',
-  state: 'CDMX',
-  zipCode: '06600',
-  country: 'México',
+  name: 'MED LUXE Aesthetics & Wellness',
+  legalName: 'MED LUXE SRL',
+  rnc: '131456789',
+  email: 'contacto@medluxe.com.do',
+  phone: '1-809-555-1234',
+  website: 'www.medluxe.com.do',
+  instagram: '@medluxeaesthetics',
+  facebook: 'medluxeaesthetics',
+  address: 'Av. Abraham Lincoln 456, Piantini',
+  city: 'Santo Domingo',
+  state: 'Distrito Nacional',
+  zipCode: '10147',
+  country: 'República Dominicana',
   timezone: 'America/Santo_Domingo',
   currency: 'DOP',
   logo: null,
@@ -82,30 +83,30 @@ const clinicData = {
 const branches = [
   {
     id: '1',
-    name: 'Sucursal Polanco',
-    address: 'Av. Presidente Masaryk 456',
-    phone: '+52 55 1111 2222',
-    email: 'polanco@bellavida.com',
+    name: 'Sucursal Piantini',
+    address: 'Av. Abraham Lincoln 456',
+    phone: '1-809-555-1111',
+    email: 'piantini@medluxe.com.do',
     manager: 'Dra. Ana López',
     status: 'active',
     rooms: 5,
   },
   {
     id: '2',
-    name: 'Sucursal Santa Fe',
-    address: 'Centro Comercial Santa Fe Local 234',
-    phone: '+52 55 3333 4444',
-    email: 'santafe@bellavida.com',
+    name: 'Sucursal Naco',
+    address: 'Av. Tiradentes 123, Plaza Naco',
+    phone: '1-829-555-2222',
+    email: 'naco@medluxe.com.do',
     manager: 'Dr. Carlos Méndez',
     status: 'active',
     rooms: 3,
   },
   {
     id: '3',
-    name: 'Sucursal Coyoacán',
-    address: 'Av. Universidad 789',
-    phone: '+52 55 5555 6666',
-    email: 'coyoacan@bellavida.com',
+    name: 'Sucursal Santiago',
+    address: 'Av. 27 de Febrero 789',
+    phone: '1-809-555-3333',
+    email: 'santiago@medluxe.com.do',
     manager: 'Lic. María Torres',
     status: 'inactive',
     rooms: 4,
@@ -236,7 +237,7 @@ const integrations = [
     description: 'Envío de mensajes y recordatorios',
     icon: Smartphone,
     status: 'connected',
-    config: { phone: '+52 55 1234 5678' },
+    config: { phone: '1-809-555-1234' },
   },
   {
     id: 'stripe',
@@ -372,8 +373,8 @@ export default function ConfiguracionPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="rfc">RFC</Label>
-                  <Input id="rfc" defaultValue={clinicData.rfc} />
+                  <Label htmlFor="rnc">RNC</Label>
+                  <Input id="rnc" defaultValue={clinicData.rnc} placeholder="Ej: 131456789" />
                 </div>
               </CardContent>
             </Card>
@@ -513,13 +514,7 @@ export default function ConfiguracionPage() {
                     </div>
                     <Switch defaultChecked />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Modo oscuro</Label>
-                      <p className="text-xs text-muted-foreground">Usar tema oscuro en la interfaz</p>
-                    </div>
-                    <Switch />
-                  </div>
+                  <ThemeToggle />
                 </div>
               </CardContent>
             </Card>
@@ -558,7 +553,7 @@ export default function ConfiguracionPage() {
                     <div className="grid gap-4 grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="branch-phone">Teléfono</Label>
-                        <Input id="branch-phone" placeholder="+52 55 1234 5678" />
+                        <Input id="branch-phone" placeholder="1-809-555-0000" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="branch-email">Email</Label>
