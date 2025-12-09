@@ -162,8 +162,9 @@ export async function updateClinicSettings(
 ): Promise<{ data: ClinicSettings | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Primero intentar actualizar
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data: updateData, error: updateError } = await (supabase as any)
     .from('clinics')
     .update({
       ...input,
@@ -173,14 +174,56 @@ export async function updateClinicSettings(
     .select()
     .single()
 
-  if (error) {
-    console.error('Error updating clinic settings:', error)
-    return { data: null, error: 'Error al guardar la configuracion' }
+  // Si el registro no existe, crear uno nuevo
+  if (updateError?.code === 'PGRST116') {
+    console.log('Clinic not found, creating new one...')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: insertData, error: insertError } = await (supabase as any)
+      .from('clinics')
+      .insert({
+        id: DEFAULT_CLINIC_ID,
+        name: input.name || 'Mi Clinica',
+        legal_name: input.legal_name || null,
+        logo_url: null,
+        tax_id: input.tax_id || null,
+        email: input.email || null,
+        phone: input.phone || null,
+        website: input.website || null,
+        instagram: input.instagram || null,
+        facebook: input.facebook || null,
+        address: input.address || null,
+        city: input.city || 'Santo Domingo',
+        state: input.state || 'Distrito Nacional',
+        postal_code: input.postal_code || null,
+        country: input.country || 'Republica Dominicana',
+        timezone: input.timezone || 'America/Santo_Domingo',
+        currency: input.currency || 'DOP',
+        settings: input.settings || {
+          allow_online_booking: true,
+          auto_reminders: true,
+        },
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('Error creating clinic settings:', insertError)
+      return { data: null, error: `Error al crear la configuracion: ${insertError.message}` }
+    }
+
+    revalidatePath('/configuracion')
+    revalidatePath('/')
+    return { data: insertData as ClinicSettings, error: null }
+  }
+
+  if (updateError) {
+    console.error('Error updating clinic settings:', updateError)
+    return { data: null, error: `Error al guardar la configuracion: ${updateError.message}` }
   }
 
   revalidatePath('/configuracion')
   revalidatePath('/')
-  return { data: data as ClinicSettings, error: null }
+  return { data: updateData as ClinicSettings, error: null }
 }
 
 // =============================================
