@@ -3,93 +3,49 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Tipos
-export type SaleStatus = 'pending' | 'paid' | 'partial' | 'cancelled' | 'refunded'
-export type InvoiceStatus = 'draft' | 'issued' | 'sent' | 'cancelled'
-export type PaymentMethod = 'cash' | 'card_debit' | 'card_credit' | 'transfer' | 'check' | 'patient_credit' | 'other'
-
-export interface SaleData {
-  id: string
-  clinic_id: string
-  branch_id: string | null
-  cash_session_id: string | null
-  sale_number: string
-  sale_type: string
-  patient_id: string | null
-  customer_name: string | null
-  customer_email: string | null
-  customer_phone: string | null
-  sold_by: string
-  professional_id: string | null
-  subtotal: number
-  discount_amount: number
-  discount_reason: string | null
-  tax_amount: number
-  total: number
-  coupon_id: string | null
-  coupon_discount: number
-  credit_used: number
-  status: SaleStatus
-  paid_at: string | null
-  notes: string | null
-  internal_notes: string | null
-  created_at: string
-  updated_at: string
-  cancelled_at: string | null
-  cancelled_by: string | null
-  cancellation_reason: string | null
-}
-
-export interface SaleListItemData extends SaleData {
-  patient_name: string | null
-  sold_by_name: string
-  items_count: number
-  paid_amount: number
-}
+// Tipos - Aligned with actual database schema
+export type InvoiceStatus = 'pending' | 'paid' | 'partial' | 'cancelled' | 'overdue'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'check' | 'other'
 
 export interface InvoiceData {
   id: string
   clinic_id: string
-  sale_id: string
+  branch_id: string | null
+  patient_id: string | null
   invoice_number: string
-  invoice_series: string | null
-  customer_tax_id: string | null
-  customer_legal_name: string | null
-  customer_address: string | null
-  customer_email: string | null
+  ncf: string | null
+  ncf_type: string | null
+  issue_date: string
+  due_date: string | null
   subtotal: number
   tax_amount: number
+  discount_amount: number
   total: number
-  pdf_url: string | null
-  xml_url: string | null
+  currency: string
   status: InvoiceStatus
+  notes: string | null
+  internal_notes: string | null
+  created_by: string | null
   created_at: string
-  cancelled_at: string | null
-  cancellation_reason: string | null
+  updated_at: string
 }
 
 export interface InvoiceListItemData extends InvoiceData {
-  sale_number: string
   patient_name: string | null
+  paid_amount: number
   amount_due: number
 }
 
 export interface PaymentData {
   id: string
-  sale_id: string
-  cash_session_id: string | null
-  payment_method: PaymentMethod
+  invoice_id: string
   amount: number
-  amount_received: number | null
-  change_given: number | null
-  reference_number: string | null
-  card_last_four: string | null
-  card_brand: string | null
-  bank_name: string | null
-  status: string
+  payment_method: PaymentMethod
+  reference: string | null
+  payment_date: string
   notes: string | null
+  created_by: string | null
   created_at: string
-  created_by: string
 }
 
 export interface BillingStats {
@@ -102,37 +58,45 @@ export interface BillingStats {
   overdue_count: number
 }
 
+export interface CreateInvoiceInput {
+  patient_id?: string
+  invoice_number?: string
+  ncf?: string
+  ncf_type?: string
+  issue_date?: string
+  due_date?: string
+  subtotal: number
+  tax_amount?: number
+  discount_amount?: number
+  total: number
+  currency?: string
+  notes?: string
+}
+
 // =============================================
-// VENTAS
+// FACTURAS (INVOICES)
 // =============================================
 
-// Obtener ventas con datos expandidos
-export async function getSales(options?: {
+// Obtener facturas con datos expandidos
+export async function getInvoices(options?: {
   startDate?: string
   endDate?: string
-  status?: SaleStatus
+  status?: InvoiceStatus
   patientId?: string
-}): Promise<SaleListItemData[]> {
+}): Promise<InvoiceListItemData[]> {
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
-    .from('sales')
+    .from('invoices')
     .select(`
       *,
       patients (
         first_name,
         last_name
       ),
-      users!sales_sold_by_fkey (
-        full_name
-      ),
-      sale_items (
-        id
-      ),
       payments (
-        amount,
-        status
+        amount
       )
     `)
     .order('created_at', { ascending: false })
@@ -153,147 +117,22 @@ export async function getSales(options?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching sales:', error)
-    return []
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((sale: any) => {
-    const paidAmount = sale.payments
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ?.filter((p: any) => p.status === 'completed')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
-
-    return {
-      ...sale,
-      patient_name: sale.patients
-        ? `${sale.patients.first_name || ''} ${sale.patients.last_name || ''}`.trim()
-        : sale.customer_name,
-      sold_by_name: sale.users?.full_name || 'Usuario',
-      items_count: sale.sale_items?.length || 0,
-      paid_amount: paidAmount,
-    }
-  })
-}
-
-// Obtener venta por ID
-export async function getSaleById(id: string): Promise<SaleListItemData | null> {
-  const supabase = createAdminClient()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('sales')
-    .select(`
-      *,
-      patients (
-        first_name,
-        last_name,
-        phone,
-        email
-      ),
-      users!sales_sold_by_fkey (
-        full_name
-      ),
-      sale_items (
-        *,
-        treatments (name),
-        products (name)
-      ),
-      payments (*)
-    `)
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    console.error('Error fetching sale:', error)
-    return null
-  }
-
-  const sale = data
-  const paidAmount = sale.payments
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ?.filter((p: any) => p.status === 'completed')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
-
-  return {
-    ...sale,
-    patient_name: sale.patients
-      ? `${sale.patients.first_name || ''} ${sale.patients.last_name || ''}`.trim()
-      : sale.customer_name,
-    sold_by_name: sale.users?.full_name || 'Usuario',
-    items_count: sale.sale_items?.length || 0,
-    paid_amount: paidAmount,
-  }
-}
-
-// =============================================
-// FACTURAS
-// =============================================
-
-// Obtener facturas
-export async function getInvoices(options?: {
-  startDate?: string
-  endDate?: string
-  status?: InvoiceStatus
-}): Promise<InvoiceListItemData[]> {
-  const supabase = createAdminClient()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
-    .from('invoices')
-    .select(`
-      *,
-      sales (
-        sale_number,
-        patient_id,
-        customer_name,
-        total,
-        status,
-        patients (
-          first_name,
-          last_name
-        ),
-        payments (
-          amount,
-          status
-        )
-      )
-    `)
-    .order('created_at', { ascending: false })
-
-  if (options?.startDate) {
-    query = query.gte('created_at', options.startDate)
-  }
-  if (options?.endDate) {
-    query = query.lte('created_at', options.endDate)
-  }
-  if (options?.status) {
-    query = query.eq('status', options.status)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
     console.error('Error fetching invoices:', error)
     return []
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((inv: any) => {
-    const paidAmount = inv.sales?.payments
+    const paidAmount = inv.payments
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ?.filter((p: any) => p.status === 'completed')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
+      ?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
 
     return {
       ...inv,
-      sale_number: inv.sales?.sale_number || '',
-      patient_name: inv.sales?.patients
-        ? `${inv.sales.patients.first_name || ''} ${inv.sales.patients.last_name || ''}`.trim()
-        : inv.sales?.customer_name || inv.customer_legal_name,
+      patient_name: inv.patients
+        ? `${inv.patients.first_name || ''} ${inv.patients.last_name || ''}`.trim()
+        : null,
+      paid_amount: paidAmount,
       amount_due: inv.total - paidAmount,
     }
   })
@@ -308,17 +147,13 @@ export async function getInvoiceById(id: string): Promise<InvoiceListItemData | 
     .from('invoices')
     .select(`
       *,
-      sales (
-        *,
-        patients (
-          first_name,
-          last_name,
-          phone,
-          email
-        ),
-        sale_items (*),
-        payments (*)
-      )
+      patients (
+        first_name,
+        last_name,
+        phone,
+        email
+      ),
+      payments (*)
     `)
     .eq('id', id)
     .single()
@@ -329,113 +164,144 @@ export async function getInvoiceById(id: string): Promise<InvoiceListItemData | 
   }
 
   const inv = data
-  const paidAmount = inv.sales?.payments
+  const paidAmount = inv.payments
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ?.filter((p: any) => p.status === 'completed')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
+    ?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
 
   return {
     ...inv,
-    sale_number: inv.sales?.sale_number || '',
-    patient_name: inv.sales?.patients
-      ? `${inv.sales.patients.first_name || ''} ${inv.sales.patients.last_name || ''}`.trim()
-      : inv.sales?.customer_name || inv.customer_legal_name,
+    patient_name: inv.patients
+      ? `${inv.patients.first_name || ''} ${inv.patients.last_name || ''}`.trim()
+      : null,
+    paid_amount: paidAmount,
     amount_due: inv.total - paidAmount,
   }
 }
 
 // Crear factura
 export async function createInvoice(
-  saleId: string,
-  invoiceData: {
-    customer_tax_id?: string
-    customer_legal_name?: string
-    customer_address?: string
-    customer_email?: string
-    invoice_series?: string
-  }
+  input: CreateInvoiceInput
 ): Promise<{ data: InvoiceData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Obtener datos de la venta
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: sale } = await (supabase as any)
-    .from('sales')
-    .select('*')
-    .eq('id', saleId)
-    .single()
+  // Generar numero de factura si no se proporciona
+  let invoiceNumber = input.invoice_number
+  if (!invoiceNumber) {
+    const year = new Date().getFullYear()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: lastInvoice } = await (supabase as any)
+      .from('invoices')
+      .select('invoice_number')
+      .ilike('invoice_number', `FAC-${year}-%`)
+      .order('invoice_number', { ascending: false })
+      .limit(1)
+      .single()
 
-  if (!sale) {
-    return { data: null, error: 'Venta no encontrada' }
-  }
-
-  // Generar numero de factura
-  const year = new Date().getFullYear()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lastInvoice } = await (supabase as any)
-    .from('invoices')
-    .select('invoice_number')
-    .eq('clinic_id', sale.clinic_id)
-    .ilike('invoice_number', `FAC-${year}-%`)
-    .order('invoice_number', { ascending: false })
-    .limit(1)
-    .single()
-
-  let sequence = 1
-  if (lastInvoice) {
-    const match = lastInvoice.invoice_number.match(/FAC-\d{4}-(\d+)/)
-    if (match) {
-      sequence = parseInt(match[1]) + 1
+    let sequence = 1
+    if (lastInvoice) {
+      const match = lastInvoice.invoice_number.match(/FAC-\d{4}-(\d+)/)
+      if (match) {
+        sequence = parseInt(match[1]) + 1
+      }
     }
+    invoiceNumber = `FAC-${year}-${sequence.toString().padStart(5, '0')}`
   }
 
-  const invoiceNumber = `FAC-${year}-${sequence.toString().padStart(5, '0')}`
+  const invoiceData = {
+    clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Get from current user
+    patient_id: input.patient_id || null,
+    invoice_number: invoiceNumber,
+    ncf: input.ncf || null,
+    ncf_type: input.ncf_type || null,
+    issue_date: input.issue_date || new Date().toISOString().split('T')[0],
+    due_date: input.due_date || null,
+    subtotal: input.subtotal,
+    tax_amount: input.tax_amount || 0,
+    discount_amount: input.discount_amount || 0,
+    total: input.total,
+    currency: input.currency || 'DOP',
+    status: 'pending' as InvoiceStatus,
+    notes: input.notes || null,
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('invoices')
-    .insert({
-      clinic_id: sale.clinic_id,
-      sale_id: saleId,
-      invoice_number: invoiceNumber,
-      invoice_series: invoiceData.invoice_series,
-      customer_tax_id: invoiceData.customer_tax_id,
-      customer_legal_name: invoiceData.customer_legal_name,
-      customer_address: invoiceData.customer_address,
-      customer_email: invoiceData.customer_email,
-      subtotal: sale.subtotal,
-      tax_amount: sale.tax_amount,
-      total: sale.total,
-      status: 'issued',
-    })
+    .insert(invoiceData)
     .select()
     .single()
 
   if (error) {
     console.error('Error creating invoice:', error)
-    return { data: null, error: 'Error al crear la factura' }
+    return { data: null, error: `Error al crear la factura: ${error.message}` }
   }
 
   revalidatePath('/facturacion')
   return { data: data as InvoiceData, error: null }
 }
 
+// Actualizar factura
+export async function updateInvoice(
+  id: string,
+  input: Partial<CreateInvoiceInput> & { status?: InvoiceStatus }
+): Promise<{ data: InvoiceData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.patient_id !== undefined) updateData.patient_id = input.patient_id
+  if (input.ncf !== undefined) updateData.ncf = input.ncf
+  if (input.ncf_type !== undefined) updateData.ncf_type = input.ncf_type
+  if (input.issue_date !== undefined) updateData.issue_date = input.issue_date
+  if (input.due_date !== undefined) updateData.due_date = input.due_date
+  if (input.subtotal !== undefined) updateData.subtotal = input.subtotal
+  if (input.tax_amount !== undefined) updateData.tax_amount = input.tax_amount
+  if (input.discount_amount !== undefined) updateData.discount_amount = input.discount_amount
+  if (input.total !== undefined) updateData.total = input.total
+  if (input.currency !== undefined) updateData.currency = input.currency
+  if (input.status !== undefined) updateData.status = input.status
+  if (input.notes !== undefined) updateData.notes = input.notes
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('invoices')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating invoice:', error)
+    return { data: null, error: 'Error al actualizar la factura' }
+  }
+
+  revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${id}`)
+  return { data: data as InvoiceData, error: null }
+}
+
 // Cancelar factura
 export async function cancelInvoice(
   id: string,
-  reason: string
+  reason?: string
 ): Promise<{ success: boolean; error: string | null }> {
   const supabase = createAdminClient()
+
+  const updateData: Record<string, unknown> = {
+    status: 'cancelled',
+    updated_at: new Date().toISOString(),
+  }
+
+  if (reason) {
+    updateData.internal_notes = reason
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('invoices')
-    .update({
-      status: 'cancelled',
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: reason,
-    })
+    .update(updateData)
     .eq('id', id)
 
   if (error) {
@@ -448,46 +314,51 @@ export async function cancelInvoice(
 }
 
 // =============================================
-// PAGOS
+// PAGOS (PAYMENTS)
 // =============================================
+
+// Obtener pagos de una factura
+export async function getPaymentsByInvoice(invoiceId: string): Promise<PaymentData[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .order('payment_date', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching payments:', error)
+    return []
+  }
+
+  return (data || []) as PaymentData[]
+}
 
 // Registrar pago
 export async function registerPayment(
-  saleId: string,
+  invoiceId: string,
   paymentData: {
     payment_method: PaymentMethod
     amount: number
-    amount_received?: number
-    reference_number?: string
-    card_last_four?: string
-    card_brand?: string
-    bank_name?: string
+    reference?: string
     notes?: string
   },
-  userId: string
+  userId?: string
 ): Promise<{ data: PaymentData | null; error: string | null }> {
   const supabase = createAdminClient()
-
-  const changeGiven = paymentData.amount_received
-    ? paymentData.amount_received - paymentData.amount
-    : null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('payments')
     .insert({
-      sale_id: saleId,
+      invoice_id: invoiceId,
       payment_method: paymentData.payment_method,
       amount: paymentData.amount,
-      amount_received: paymentData.amount_received,
-      change_given: changeGiven,
-      reference_number: paymentData.reference_number,
-      card_last_four: paymentData.card_last_four,
-      card_brand: paymentData.card_brand,
-      bank_name: paymentData.bank_name,
-      notes: paymentData.notes,
-      status: 'completed',
-      created_by: userId,
+      reference: paymentData.reference || null,
+      notes: paymentData.notes || null,
+      created_by: userId || null,
     })
     .select()
     .single()
@@ -497,39 +368,40 @@ export async function registerPayment(
     return { data: null, error: 'Error al registrar el pago' }
   }
 
-  // Actualizar estado de la venta
+  // Obtener total de la factura y pagos
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: sale } = await (supabase as any)
-    .from('sales')
+  const { data: invoice } = await (supabase as any)
+    .from('invoices')
     .select('total')
-    .eq('id', saleId)
+    .eq('id', invoiceId)
     .single()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: payments } = await (supabase as any)
     .from('payments')
     .select('amount')
-    .eq('sale_id', saleId)
-    .eq('status', 'completed')
+    .eq('invoice_id', invoiceId)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalPaid = payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0
 
-  let newStatus: SaleStatus = 'partial'
-  if (totalPaid >= sale.total) {
+  // Actualizar estado de la factura
+  let newStatus: InvoiceStatus = 'partial'
+  if (totalPaid >= invoice.total) {
     newStatus = 'paid'
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase as any)
-    .from('sales')
+    .from('invoices')
     .update({
       status: newStatus,
-      paid_at: newStatus === 'paid' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
     })
-    .eq('id', saleId)
+    .eq('id', invoiceId)
 
   revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${invoiceId}`)
   return { data: data as PaymentData, error: null }
 }
 
@@ -544,22 +416,22 @@ export async function getBillingStats(): Promise<BillingStats> {
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  // Obtener todas las ventas
+  // Obtener todas las facturas
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: sales } = await (supabase as any)
-    .from('sales')
+  const { data: invoices } = await (supabase as any)
+    .from('invoices')
     .select(`
       id,
       total,
       status,
       created_at,
+      due_date,
       payments (
-        amount,
-        status
+        amount
       )
     `)
 
-  if (!sales) {
+  if (!invoices) {
     return {
       total_invoiced: 0,
       invoiced_this_month: 0,
@@ -580,28 +452,34 @@ export async function getBillingStats(): Promise<BillingStats> {
   let overdueCount = 0
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sales.forEach((sale: any) => {
-    totalInvoiced += sale.total || 0
+  invoices.forEach((inv: any) => {
+    totalInvoiced += inv.total || 0
 
-    const saleDate = new Date(sale.created_at)
-    if (saleDate >= startOfMonth) {
-      invoicedThisMonth += sale.total || 0
+    const invDate = new Date(inv.created_at)
+    if (invDate >= startOfMonth) {
+      invoicedThisMonth += inv.total || 0
     }
 
-    const paidAmount = sale.payments
+    const paidAmount = inv.payments
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ?.filter((p: any) => p.status === 'completed')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
+      ?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
 
-    const pending = sale.total - paidAmount
+    const pending = inv.total - paidAmount
 
-    if (sale.status === 'paid') {
+    if (inv.status === 'paid') {
       paidCount++
-    } else if (sale.status === 'pending' || sale.status === 'partial') {
+    } else if (inv.status === 'pending' || inv.status === 'partial') {
       pendingCollection += pending
       pendingCount++
-      // TODO: Check due date for overdue calculation
+
+      // Check if overdue
+      if (inv.due_date && new Date(inv.due_date) < now) {
+        overdueAmount += pending
+        overdueCount++
+      }
+    } else if (inv.status === 'overdue') {
+      overdueAmount += pending
+      overdueCount++
     }
   })
 
@@ -614,4 +492,125 @@ export async function getBillingStats(): Promise<BillingStats> {
     pending_count: pendingCount,
     overdue_count: overdueCount,
   }
+}
+
+// =============================================
+// ITEMS DE FACTURA
+// =============================================
+
+export interface InvoiceItemData {
+  id: string
+  invoice_id: string
+  description: string
+  quantity: number
+  unit_price: number
+  discount: number
+  tax_rate: number
+  total: number
+  treatment_id: string | null
+  product_id: string | null
+  created_at: string
+}
+
+// Obtener items de una factura
+export async function getInvoiceItems(invoiceId: string): Promise<InvoiceItemData[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('invoice_items')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching invoice items:', error)
+    return []
+  }
+
+  return (data || []) as InvoiceItemData[]
+}
+
+// Agregar item a factura
+export async function addInvoiceItem(
+  invoiceId: string,
+  item: {
+    description: string
+    quantity: number
+    unit_price: number
+    discount?: number
+    tax_rate?: number
+    treatment_id?: string
+    product_id?: string
+  }
+): Promise<{ data: InvoiceItemData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  const total = item.quantity * item.unit_price * (1 - (item.discount || 0) / 100) * (1 + (item.tax_rate || 0) / 100)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('invoice_items')
+    .insert({
+      invoice_id: invoiceId,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      discount: item.discount || 0,
+      tax_rate: item.tax_rate || 0,
+      total: total,
+      treatment_id: item.treatment_id || null,
+      product_id: item.product_id || null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error adding invoice item:', error)
+    return { data: null, error: 'Error al agregar el item' }
+  }
+
+  // Recalcular totales de la factura
+  await recalculateInvoiceTotals(invoiceId)
+
+  revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${invoiceId}`)
+  return { data: data as InvoiceItemData, error: null }
+}
+
+// Recalcular totales de factura
+async function recalculateInvoiceTotals(invoiceId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: items } = await (supabase as any)
+    .from('invoice_items')
+    .select('total, tax_rate, unit_price, quantity, discount')
+    .eq('invoice_id', invoiceId)
+
+  if (!items || items.length === 0) return
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subtotal = items.reduce((sum: number, item: any) => {
+    return sum + (item.quantity * item.unit_price * (1 - (item.discount || 0) / 100))
+  }, 0)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const taxAmount = items.reduce((sum: number, item: any) => {
+    const itemSubtotal = item.quantity * item.unit_price * (1 - (item.discount || 0) / 100)
+    return sum + (itemSubtotal * (item.tax_rate || 0) / 100)
+  }, 0)
+
+  const total = subtotal + taxAmount
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('invoices')
+    .update({
+      subtotal,
+      tax_amount: taxAmount,
+      total,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId)
 }

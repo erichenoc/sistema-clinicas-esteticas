@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { getSales, getInvoices, getBillingStats } from '@/actions/billing'
+import { getInvoices, getBillingStats } from '@/actions/billing'
 import { FacturacionClient } from './_components/facturacion-client'
 import type { InvoiceStatus } from '@/types/billing'
 
@@ -33,14 +33,13 @@ const mockQuotes = [
 ]
 
 export default async function FacturacionPage() {
-  const [dbSales, dbInvoices, dbStats] = await Promise.all([
-    getSales(),
+  const [dbInvoices, dbStats] = await Promise.all([
     getInvoices(),
     getBillingStats(),
   ])
 
-  // Map sales status to invoice status for display
-  const mapSaleStatusToInvoiceStatus = (status: string): InvoiceStatus => {
+  // Map invoice status for display
+  const mapInvoiceStatus = (status: string): InvoiceStatus => {
     switch (status) {
       case 'paid':
         return 'paid'
@@ -48,47 +47,28 @@ export default async function FacturacionPage() {
         return 'partial'
       case 'cancelled':
         return 'cancelled'
-      case 'refunded':
-        return 'cancelled'
+      case 'overdue':
+        return 'overdue'
       default:
         return 'pending'
     }
   }
 
-  // Transform sales data to invoice format for display
-  const invoicesFromSales = dbSales.map((sale) => ({
-    id: sale.id,
-    invoiceNumber: sale.sale_number,
-    ncfNumber: null, // NCF comes from the invoice table
-    clientName: sale.patient_name || sale.customer_name || 'Cliente',
-    clientRnc: null,
-    total: sale.total,
-    amountDue: sale.total - (sale.paid_amount || 0),
-    currency: 'DOP' as const,
-    status: mapSaleStatusToInvoiceStatus(sale.status),
-    issueDate: sale.created_at,
-    dueDate: sale.created_at, // TODO: Add due date to sales
-    hasFiscalReceipt: false,
-  }))
-
   // Transform invoices data
-  const invoicesFromInvoices = dbInvoices.map((inv) => ({
+  const invoices = dbInvoices.map((inv) => ({
     id: inv.id,
     invoiceNumber: inv.invoice_number,
-    ncfNumber: inv.invoice_series || null,
-    clientName: inv.patient_name || inv.customer_legal_name || 'Cliente',
-    clientRnc: inv.customer_tax_id || null,
+    ncfNumber: inv.ncf || null,
+    clientName: inv.patient_name || 'Cliente',
+    clientRnc: null, // NCF type would be used for RNC
     total: inv.total,
     amountDue: inv.amount_due || 0,
-    currency: 'DOP' as const,
-    status: mapSaleStatusToInvoiceStatus(inv.status),
-    issueDate: inv.created_at,
-    dueDate: inv.created_at,
-    hasFiscalReceipt: !!inv.invoice_series,
+    currency: (inv.currency || 'DOP') as 'DOP' | 'USD',
+    status: mapInvoiceStatus(inv.status),
+    issueDate: inv.issue_date || inv.created_at,
+    dueDate: inv.due_date || inv.created_at,
+    hasFiscalReceipt: !!inv.ncf,
   }))
-
-  // Combine invoices, prioritizing formal invoices over sales
-  const allInvoices = invoicesFromInvoices.length > 0 ? invoicesFromInvoices : invoicesFromSales
 
   // Transform stats
   const stats = {
@@ -102,7 +82,7 @@ export default async function FacturacionPage() {
 
   return (
     <FacturacionClient
-      invoices={allInvoices}
+      invoices={invoices}
       quotes={mockQuotes}
       stats={stats}
     />

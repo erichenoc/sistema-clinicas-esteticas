@@ -85,8 +85,7 @@ import {
 import { getPatients, type PatientData } from '@/actions/patients'
 import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
 import { getProducts, type ProductListItemData } from '@/actions/inventory'
-import { createSale } from '@/actions/pos'
-import { createInvoice } from '@/actions/billing'
+import { createInvoice, addInvoiceItem } from '@/actions/billing'
 
 // Tipos para los datos transformados
 interface ClientData {
@@ -333,54 +332,45 @@ export default function NuevaFacturaPage() {
     toast.loading('Guardando factura...', { id: 'save-invoice' })
 
     try {
-      // Crear la venta primero
-      const saleResult = await createSale({
-        patient_id: selectedClient!.id,
-        customer_name: selectedClient!.name,
-        items: items.map(item => ({
-          item_type: item.type === 'custom' ? 'treatment' : item.type as 'treatment' | 'package' | 'product',
-          item_id: item.referenceId || item.id,
-          item_name: item.description,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          discount_amount: item.discountType === 'percentage'
-            ? (item.quantity * item.unitPrice * item.discount / 100)
-            : item.discount,
-        })),
+      // Crear la factura directamente
+      const invoiceResult = await createInvoice({
+        patient_id: selectedClient?.id,
+        ncf: hasFiscalReceipt ? ncfType : undefined,
+        ncf_type: hasFiscalReceipt ? ncfType : undefined,
         subtotal,
-        discount_total: discountTotal,
         tax_amount: taxAmount,
+        discount_amount: discountTotal,
         total,
-        payment_method: 'pending',
         notes,
       })
 
-      if (saleResult.error) {
+      if (invoiceResult.error) {
         toast.dismiss('save-invoice')
-        toast.error(saleResult.error)
+        toast.error(invoiceResult.error)
         setIsSubmitting(false)
         return
       }
 
-      // Si tiene comprobante fiscal, crear la factura
-      if (hasFiscalReceipt && saleResult.data) {
-        const invoiceResult = await createInvoice(saleResult.data.id, {
-          customer_tax_id: selectedClient!.rncCedula || undefined,
-          customer_legal_name: selectedClient!.businessName || selectedClient!.name,
-          customer_email: selectedClient!.email || undefined,
-          invoice_series: ncfType || undefined,
-        })
+      // Agregar los items a la factura
+      if (invoiceResult.data) {
+        for (const item of items) {
+          const discountAmount = item.discountType === 'percentage'
+            ? (item.quantity * item.unitPrice * item.discount / 100)
+            : item.discount
 
-        if (invoiceResult.error) {
-          toast.dismiss('save-invoice')
-          toast.warning(`Venta creada pero hubo un error al generar factura: ${invoiceResult.error}`)
-        } else {
-          toast.dismiss('save-invoice')
-          toast.success(`Factura ${invoiceResult.data?.invoice_number} emitida exitosamente`)
+          await addInvoiceItem(invoiceResult.data.id, {
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unitPrice,
+            discount: item.discountType === 'percentage' ? item.discount : (discountAmount / (item.quantity * item.unitPrice) * 100),
+            tax_rate: item.taxable ? item.taxRate : 0,
+            treatment_id: item.type === 'treatment' ? item.referenceId : undefined,
+            product_id: item.type === 'product' ? item.referenceId : undefined,
+          })
         }
-      } else {
+
         toast.dismiss('save-invoice')
-        toast.success(`Venta ${saleResult.data?.sale_number} creada exitosamente`)
+        toast.success(`Factura ${invoiceResult.data.invoice_number} creada exitosamente`)
       }
 
       router.push('/facturacion')

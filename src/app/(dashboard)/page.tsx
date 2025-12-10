@@ -44,7 +44,7 @@ import {
   type InventoryAlert,
 } from '@/actions/reports'
 import { getTodayAppointments, type AppointmentListItemData } from '@/actions/appointments'
-import { getSales, type SaleListItemData } from '@/actions/billing'
+import { getInvoices, type InvoiceListItemData } from '@/actions/billing'
 
 // Interfaces para datos procesados
 interface MainStat {
@@ -163,7 +163,7 @@ export default function DashboardPage() {
           getTopTreatments(),
           getProfessionalPerformance(),
           getInventoryAlerts(),
-          getSales({ startDate: new Date().toISOString().split('T')[0] }),
+          getInvoices({ startDate: new Date().toISOString().split('T')[0] }),
         ])
 
         // Build main stats
@@ -257,13 +257,13 @@ export default function DashboardPage() {
 
         setAlerts(alertsList.slice(0, 4))
 
-        // Transform sales for display
-        setRecentSales(salesData.slice(0, 4).map((sale: SaleListItemData) => ({
-          id: sale.id,
-          patient: sale.patient_name || sale.customer_name || 'Cliente',
-          amount: sale.total,
-          type: sale.sale_type === 'treatment' ? 'Tratamiento' : sale.sale_type === 'product' ? 'Producto' : 'Venta',
-          time: new Date(sale.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
+        // Transform invoices for display as recent sales
+        setRecentSales(salesData.slice(0, 4).map((invoice: InvoiceListItemData) => ({
+          id: invoice.id,
+          patient: invoice.patient_name || 'Cliente',
+          amount: invoice.total,
+          type: 'Factura',
+          time: new Date(invoice.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
         })))
 
         // Transform professionals
