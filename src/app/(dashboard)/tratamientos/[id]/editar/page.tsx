@@ -35,7 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { getTreatments, getCategories } from '@/actions/treatments'
+import { getTreatmentById, getCategories, updateTreatment } from '@/actions/treatments'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -80,50 +80,43 @@ export default function EditTreatmentPage({ params }: PageProps) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [treatmentsData, categoriesData] = await Promise.all([
-          getTreatments(),
+        const [treatmentData, categoriesData] = await Promise.all([
+          getTreatmentById(id),
           getCategories(),
         ])
 
         setCategories(categoriesData)
 
-        const foundTreatment = treatmentsData.find(t => t.id === id)
-        if (!foundTreatment) {
+        if (!treatmentData) {
           notFound()
         }
 
-        setTreatment(foundTreatment)
+        setTreatment(treatmentData)
 
-        // Find the category by name to get the ID
-        const category = categoriesData.find(c => c.name === foundTreatment.category_name)
-
-        // Populate form with treatment data (use available fields)
+        // Populate form with treatment data from database
         setFormData({
-          name: foundTreatment.name || '',
-          categoryId: category?.id || '',
-          description: `Tratamiento profesional de ${foundTreatment.name}. Resultados visibles desde la primera sesion.`,
-          descriptionInternal: 'Seguir protocolo estandar de la clinica.',
-          durationMinutes: foundTreatment.duration_minutes || 60,
-          bufferMinutes: 10,
-          price: foundTreatment.price || 0,
-          cost: Math.round(foundTreatment.price * 0.35),
-          recommendedSessions: 4,
-          sessionIntervalDays: 30,
-          aftercareInstructions: 'Evitar exposicion solar directa por 24-48 horas. Usar protector solar SPF 50+.',
-          isActive: foundTreatment.is_active ?? true,
-          isPublic: true,
+          name: treatmentData.name || '',
+          categoryId: treatmentData.category_id || '',
+          description: treatmentData.description || '',
+          descriptionInternal: treatmentData.description_internal || '',
+          durationMinutes: treatmentData.duration_minutes || 60,
+          bufferMinutes: treatmentData.buffer_minutes || 0,
+          price: treatmentData.price || 0,
+          cost: treatmentData.cost || 0,
+          recommendedSessions: treatmentData.recommended_sessions || 1,
+          sessionIntervalDays: treatmentData.session_interval_days || 30,
+          aftercareInstructions: treatmentData.aftercare_instructions || '',
+          isActive: treatmentData.is_active ?? true,
+          isPublic: treatmentData.is_public ?? true,
         })
 
-        setContraindications([
-          'Embarazo o lactancia',
-          'Infeccion activa en la zona',
-          'Enfermedades autoinmunes activas',
-        ])
-        setProtocolSteps([
-          { order: 1, title: 'Preparacion', description: 'Preparar area de tratamiento', durationMinutes: 5 },
-          { order: 2, title: 'Procedimiento', description: 'Realizar el tratamiento', durationMinutes: Math.max(foundTreatment.duration_minutes - 10, 30) },
-          { order: 3, title: 'Finalizacion', description: 'Limpiar y dar indicaciones', durationMinutes: 5 },
-        ])
+        setContraindications(treatmentData.contraindications || [])
+        setProtocolSteps(treatmentData.protocol_steps?.map((step: { order: number; title: string; description: string; duration_minutes?: number }) => ({
+          order: step.order,
+          title: step.title,
+          description: step.description,
+          durationMinutes: step.duration_minutes || 5,
+        })) || [])
 
         setIsLoading(false)
       } catch (error) {
@@ -182,12 +175,29 @@ export default function EditTreatmentPage({ params }: PageProps) {
     setIsSaving(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Build update data - only include fields that exist in the actual DB schema
+      const updateData = {
+        name: formData.name,
+        category_id: formData.categoryId || undefined,
+        description: formData.description || undefined,
+        duration_minutes: formData.durationMinutes,
+        price: formData.price,
+        cost: formData.cost,
+        is_active: formData.isActive,
+        contraindications: contraindications,
+      }
+
+      const { data, error } = await updateTreatment(id, updateData)
+
+      if (error) {
+        toast.error(error)
+        return
+      }
 
       toast.success('Tratamiento actualizado exitosamente')
       router.push(`/tratamientos/${id}`)
     } catch (error) {
+      console.error('Error updating treatment:', error)
       toast.error('Error al guardar el tratamiento')
     } finally {
       setIsSaving(false)

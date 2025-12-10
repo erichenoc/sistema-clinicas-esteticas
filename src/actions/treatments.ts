@@ -450,17 +450,18 @@ export async function createTreatment(
 ): Promise<{ data: TreatmentData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  const slug = input.slug || input.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-
+  // Build insert object with only valid DB columns
   const treatmentData = {
-    ...input,
-    slug,
     clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
-    buffer_minutes: input.buffer_minutes || 0,
+    name: input.name,
+    category_id: input.category_id || null,
+    description: input.description || null,
+    duration_minutes: input.duration_minutes,
+    price: input.price,
     cost: input.cost || 0,
-    recommended_sessions: input.recommended_sessions || 1,
-    is_public: input.is_public ?? true,
     is_active: input.is_active ?? true,
+    contraindications: input.contraindications || [],
+    image_url: input.image_url || null,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -472,7 +473,7 @@ export async function createTreatment(
 
   if (error) {
     console.error('Error creating treatment:', error)
-    return { data: null, error: 'Error al crear el tratamiento' }
+    return { data: null, error: `Error al crear el tratamiento: ${error.message}` }
   }
 
   revalidatePath('/tratamientos')
@@ -486,20 +487,34 @@ export async function updateTreatment(
 ): Promise<{ data: TreatmentData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Build update object with only valid DB columns
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  // Map input fields to actual DB columns
+  if (input.name !== undefined) updateData.name = input.name
+  if (input.category_id !== undefined) updateData.category_id = input.category_id
+  if (input.description !== undefined) updateData.description = input.description
+  if (input.duration_minutes !== undefined) updateData.duration_minutes = input.duration_minutes
+  if (input.price !== undefined) updateData.price = input.price
+  if (input.cost !== undefined) updateData.cost = input.cost
+  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (input.contraindications !== undefined) updateData.contraindications = input.contraindications
+  if (input.image_url !== undefined) updateData.image_url = input.image_url
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('treatments')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
 
   if (error) {
     console.error('Error updating treatment:', error)
-    return { data: null, error: 'Error al actualizar el tratamiento' }
+    return { data: null, error: `Error al actualizar el tratamiento: ${error.message}` }
   }
 
   revalidatePath('/tratamientos')
