@@ -326,12 +326,18 @@ export async function createAppointment(
 ): Promise<{ data: AppointmentData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Build insert object with only valid DB columns
   const appointmentData = {
-    ...input,
     clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
+    patient_id: input.patient_id,
+    professional_id: input.professional_id,
+    treatment_id: input.treatment_id || null,
+    room_id: input.room_id || null,
+    branch_id: input.branch_id || null,
+    scheduled_at: input.scheduled_at,
+    duration_minutes: input.duration_minutes,
     status: 'scheduled' as AppointmentStatus,
-    buffer_minutes: input.buffer_minutes || 0,
-    is_recurring: input.is_recurring || false,
+    notes: input.notes || null,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,7 +349,7 @@ export async function createAppointment(
 
   if (error) {
     console.error('Error creating appointment:', error)
-    return { data: null, error: 'Error al crear la cita' }
+    return { data: null, error: `Error al crear la cita: ${error.message}` }
   }
 
   revalidatePath('/agenda')
@@ -357,20 +363,33 @@ export async function updateAppointment(
 ): Promise<{ data: AppointmentData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Build update object with only valid DB columns
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.patient_id !== undefined) updateData.patient_id = input.patient_id
+  if (input.professional_id !== undefined) updateData.professional_id = input.professional_id
+  if (input.treatment_id !== undefined) updateData.treatment_id = input.treatment_id
+  if (input.scheduled_at !== undefined) updateData.scheduled_at = input.scheduled_at
+  if (input.duration_minutes !== undefined) updateData.duration_minutes = input.duration_minutes
+  if (input.room_id !== undefined) updateData.room_id = input.room_id
+  if (input.status !== undefined) updateData.status = input.status
+  if (input.notes !== undefined) updateData.notes = input.notes
+  if (input.cancellation_reason !== undefined) updateData.cancellation_reason = input.cancellation_reason
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('appointments')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
 
   if (error) {
     console.error('Error updating appointment:', error)
-    return { data: null, error: 'Error al actualizar la cita' }
+    return { data: null, error: `Error al actualizar la cita: ${error.message}` }
   }
 
   revalidatePath('/agenda')
@@ -388,11 +407,17 @@ export async function updateAppointmentStatus(
 
   const updateData: Record<string, unknown> = {
     status,
-    status_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
 
-  if (status === 'cancelled' && cancellationReason) {
+  // Set timestamp based on status change
+  if (status === 'confirmed') {
+    updateData.confirmed_at = new Date().toISOString()
+  } else if (status === 'in_progress') {
+    updateData.started_at = new Date().toISOString()
+  } else if (status === 'completed') {
+    updateData.completed_at = new Date().toISOString()
+  } else if (status === 'cancelled' && cancellationReason) {
     updateData.cancellation_reason = cancellationReason
   }
 
@@ -404,7 +429,7 @@ export async function updateAppointmentStatus(
 
   if (error) {
     console.error('Error updating appointment status:', error)
-    return { success: false, error: 'Error al actualizar el estado de la cita' }
+    return { success: false, error: `Error al actualizar el estado de la cita: ${error.message}` }
   }
 
   revalidatePath('/agenda')
