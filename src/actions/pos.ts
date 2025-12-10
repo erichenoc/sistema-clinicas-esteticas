@@ -140,7 +140,7 @@ export async function getPOSPatients(): Promise<POSPatient[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('patients')
-    .select('id, first_name, last_name, phone, email, credit_balance')
+    .select('id, first_name, last_name, phone, email')
     .eq('status', 'active')
     .order('first_name', { ascending: true })
     .limit(100)
@@ -156,7 +156,7 @@ export async function getPOSPatients(): Promise<POSPatient[]> {
     name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Paciente',
     phone: p.phone || '',
     email: p.email,
-    credit: p.credit_balance || 0,
+    credit: 0, // TODO: Add credit_balance column to patients table
   }))
 }
 
