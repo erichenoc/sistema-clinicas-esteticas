@@ -78,7 +78,6 @@ export async function getPatients(): Promise<PatientData[]> {
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('*')
-    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -97,7 +96,6 @@ export async function getPatientStats(): Promise<PatientStats> {
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('status, tags')
-    .is('deleted_at', null)
 
   if (error) {
     console.error('Error fetching patient stats:', error)
@@ -203,7 +201,7 @@ export async function updatePatient(id: string, input: UpdatePatientInput): Prom
   return { data: data as PatientData, error: null }
 }
 
-// Eliminar un paciente (soft delete)
+// Eliminar un paciente (set status to inactive since no deleted_at column exists)
 export async function deletePatient(id: string): Promise<{ success: boolean; error: string | null }> {
   const supabase = createAdminClient()
 
@@ -211,7 +209,6 @@ export async function deletePatient(id: string): Promise<{ success: boolean; err
   const { error } = await (supabase as any)
     .from('patients')
     .update({
-      deleted_at: new Date().toISOString(),
       status: 'inactive',
     })
     .eq('id', id)
@@ -233,7 +230,6 @@ export async function searchPatients(query: string): Promise<PatientData[]> {
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('*')
-    .is('deleted_at', null)
     .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
     .order('created_at', { ascending: false })
     .limit(20)
@@ -255,7 +251,6 @@ export async function getPatientsByStatus(status: string): Promise<PatientData[]
     .from('patients')
     .select('*')
     .eq('status', status)
-    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -275,7 +270,6 @@ export async function getVIPPatients(): Promise<PatientData[]> {
     .from('patients')
     .select('*')
     .contains('tags', ['VIP'])
-    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {
