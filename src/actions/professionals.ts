@@ -113,23 +113,19 @@ export async function getProfessionals(options?: {
 }): Promise<ProfessionalSummaryData[]> {
   const supabase = createAdminClient()
 
+  // Query from users table where is_professional = true
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
-    .from('professional_profiles')
-    .select(`
-      *,
-      users (
-        id,
-        full_name,
-        email,
-        phone,
-        avatar_url
-      )
-    `)
-    .order('display_order', { ascending: true })
+    .from('users')
+    .select('*')
+    .eq('is_professional', true)
+    .order('first_name', { ascending: true })
 
-  if (options?.status) {
-    query = query.eq('status', options.status)
+  // Filter by is_active if status is provided
+  if (options?.status === 'active') {
+    query = query.eq('is_active', true)
+  } else if (options?.status === 'inactive') {
+    query = query.eq('is_active', false)
   }
 
   const { data, error } = await query
@@ -139,20 +135,46 @@ export async function getProfessionals(options?: {
     return []
   }
 
-  // Transform data and add computed stats
+  // Transform users data to ProfessionalSummaryData format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((p: any) => {
-    const nameParts = p.users?.full_name?.split(' ') || ['', '']
+  return (data || []).map((user: any) => {
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
     return {
-      ...p,
-      first_name: nameParts[0] || '',
-      last_name: nameParts.slice(1).join(' ') || '',
-      email: p.users?.email || '',
-      phone: p.users?.phone || null,
-      full_name: p.title
-        ? `${p.title} ${p.users?.full_name || ''}`
-        : p.users?.full_name || 'Profesional',
-      // TODO: Calculate from real data
+      id: user.id,
+      clinic_id: user.clinic_id,
+      user_id: user.id,
+      professional_code: null,
+      license_number: user.license_number,
+      license_expiry: null,
+      specialties: user.specialty ? user.specialty.split(', ') : [],
+      title: null,
+      bio: null,
+      employment_type: 'employee',
+      hire_date: null,
+      termination_date: null,
+      base_salary: null,
+      salary_type: 'monthly',
+      default_commission_rate: 15,
+      commission_type: 'percentage',
+      max_daily_appointments: 20,
+      appointment_buffer_minutes: 15,
+      accepts_walk_ins: true,
+      can_view_all_patients: false,
+      can_modify_prices: false,
+      can_give_discounts: false,
+      max_discount_percent: 0,
+      status: user.is_active ? 'active' as ProfessionalStatus : 'inactive' as ProfessionalStatus,
+      profile_image_url: user.avatar_url,
+      signature_image_url: null,
+      display_order: 0,
+      show_on_booking: true,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      email: user.email || '',
+      phone: user.phone || null,
+      full_name: fullName || 'Profesional',
       appointments_this_month: 0,
       revenue_this_month: 0,
       average_rating: 0,
@@ -165,20 +187,13 @@ export async function getProfessionals(options?: {
 export async function getProfessionalById(id: string): Promise<ProfessionalSummaryData | null> {
   const supabase = createAdminClient()
 
+  // Query from users table where is_professional = true
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('professional_profiles')
-    .select(`
-      *,
-      users (
-        id,
-        full_name,
-        email,
-        phone,
-        avatar_url
-      )
-    `)
+  const { data: user, error } = await (supabase as any)
+    .from('users')
+    .select('*')
     .eq('id', id)
+    .eq('is_professional', true)
     .single()
 
   if (error) {
@@ -186,16 +201,43 @@ export async function getProfessionalById(id: string): Promise<ProfessionalSumma
     return null
   }
 
-  const nameParts = data.users?.full_name?.split(' ') || ['', '']
+  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
   return {
-    ...data,
-    first_name: nameParts[0] || '',
-    last_name: nameParts.slice(1).join(' ') || '',
-    email: data.users?.email || '',
-    phone: data.users?.phone || null,
-    full_name: data.title
-      ? `${data.title} ${data.users?.full_name || ''}`
-      : data.users?.full_name || 'Profesional',
+    id: user.id,
+    clinic_id: user.clinic_id,
+    user_id: user.id,
+    professional_code: null,
+    license_number: user.license_number,
+    license_expiry: null,
+    specialties: user.specialty ? user.specialty.split(', ') : [],
+    title: null,
+    bio: null,
+    employment_type: 'employee',
+    hire_date: null,
+    termination_date: null,
+    base_salary: null,
+    salary_type: 'monthly',
+    default_commission_rate: 15,
+    commission_type: 'percentage',
+    max_daily_appointments: 20,
+    appointment_buffer_minutes: 15,
+    accepts_walk_ins: true,
+    can_view_all_patients: false,
+    can_modify_prices: false,
+    can_give_discounts: false,
+    max_discount_percent: 0,
+    status: user.is_active ? 'active' as ProfessionalStatus : 'inactive' as ProfessionalStatus,
+    profile_image_url: user.avatar_url,
+    signature_image_url: null,
+    display_order: 0,
+    show_on_booking: true,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+    first_name: user.first_name || '',
+    last_name: user.last_name || '',
+    email: user.email || '',
+    phone: user.phone || null,
+    full_name: fullName || 'Profesional',
     appointments_this_month: 0,
     revenue_this_month: 0,
     average_rating: 0,
@@ -241,10 +283,12 @@ export async function createProfessional(
   const supabase = createAdminClient()
 
   try {
-    // 1. Primero crear el usuario
+    // Crear el usuario como profesional en la tabla users
     const userId = crypto.randomUUID()
+    const fullName = `${input.firstName} ${input.lastName}`.trim()
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: userError } = await (supabase as any)
+    const { data: user, error: userError } = await (supabase as any)
       .from('users')
       .insert({
         id: userId,
@@ -254,67 +298,61 @@ export async function createProfessional(
         last_name: input.lastName,
         phone: input.phone || null,
         role: 'professional',
+        is_professional: true,
         is_active: true,
-      })
-
-    if (userError) {
-      console.error('Error creating user:', userError)
-      return { data: null, error: 'Error al crear el usuario' }
-    }
-
-    // 2. Luego crear el perfil profesional
-    const professionalId = crypto.randomUUID()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: professional, error: profError } = await (supabase as any)
-      .from('professional_profiles')
-      .insert({
-        id: professionalId,
-        clinic_id: DEFAULT_CLINIC_ID,
-        user_id: userId,
-        title: input.title || null,
+        specialty: input.specialties?.join(', ') || null,
         license_number: input.licenseNumber || null,
-        specialties: input.specialties || [],
-        bio: input.bio || null,
-        employment_type: input.employmentType || 'employee',
-        hire_date: input.hireDate || null,
-        base_salary: input.baseSalary || null,
-        salary_type: input.salaryType || 'monthly',
-        default_commission_rate: input.commissionRate ? parseFloat(String(input.commissionRate)) : 15,
-        commission_type: input.commissionType || 'percentage',
-        max_daily_appointments: input.maxDailyAppointments || 20,
-        appointment_buffer_minutes: input.appointmentBufferMinutes || 15,
-        accepts_walk_ins: input.acceptsWalkIns ?? true,
-        can_view_all_patients: input.canViewAllPatients ?? false,
-        can_modify_prices: input.canModifyPrices ?? false,
-        can_give_discounts: input.canGiveDiscounts ?? false,
-        max_discount_percent: input.maxDiscountPercent || 0,
-        show_on_booking: input.showOnBooking ?? true,
-        status: 'active',
-        display_order: 0,
       })
       .select()
       .single()
 
-    if (profError) {
-      console.error('Error creating professional profile:', profError)
-      // Si falla, intentar eliminar el usuario creado
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('users').delete().eq('id', userId)
-      return { data: null, error: 'Error al crear el perfil profesional' }
+    if (userError) {
+      console.error('Error creating professional:', userError)
+      return { data: null, error: 'Error al crear el profesional' }
     }
 
     revalidatePath('/profesionales')
 
+    // Return a simplified professional data object
     return {
       data: {
-        ...professional,
+        id: user.id,
+        clinic_id: user.clinic_id,
+        user_id: user.id,
+        professional_code: null,
+        license_number: user.license_number,
+        license_expiry: null,
+        specialties: input.specialties || [],
+        title: input.title || null,
+        bio: input.bio || null,
+        employment_type: input.employmentType || 'employee',
+        hire_date: null,
+        termination_date: null,
+        base_salary: null,
+        salary_type: 'monthly',
+        default_commission_rate: 15,
+        commission_type: 'percentage',
+        max_daily_appointments: 20,
+        appointment_buffer_minutes: 15,
+        accepts_walk_ins: true,
+        can_view_all_patients: false,
+        can_modify_prices: false,
+        can_give_discounts: false,
+        max_discount_percent: 0,
+        status: 'active' as ProfessionalStatus,
+        profile_image_url: null,
+        signature_image_url: null,
+        display_order: 0,
+        show_on_booking: true,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
         first_name: input.firstName,
         last_name: input.lastName,
         email: input.email,
         phone: input.phone || null,
         full_name: input.title
-          ? `${input.title} ${input.firstName} ${input.lastName}`
-          : `${input.firstName} ${input.lastName}`,
+          ? `${input.title} ${fullName}`
+          : fullName,
         appointments_this_month: 0,
         revenue_this_month: 0,
         average_rating: 0,
@@ -336,62 +374,24 @@ export async function updateProfessional(
   const supabase = createAdminClient()
 
   try {
-    // Obtener el profesional actual para saber el user_id
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: currentProf, error: fetchError } = await (supabase as any)
-      .from('professional_profiles')
-      .select('user_id')
-      .eq('id', id)
-      .single()
-
-    if (fetchError || !currentProf) {
-      return { data: null, error: 'Profesional no encontrado' }
-    }
-
-    // Actualizar usuario si hay datos de usuario
-    if (input.firstName || input.lastName || input.email || input.phone) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('users')
-        .update({
-          ...(input.firstName && { first_name: input.firstName }),
-          ...(input.lastName && { last_name: input.lastName }),
-          ...(input.email && { email: input.email }),
-          ...(input.phone !== undefined && { phone: input.phone || null }),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', currentProf.user_id)
-    }
-
-    // Actualizar perfil profesional
+    // Build update data for users table
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
 
-    if (input.title !== undefined) updateData.title = input.title || null
+    if (input.firstName !== undefined) updateData.first_name = input.firstName
+    if (input.lastName !== undefined) updateData.last_name = input.lastName
+    if (input.email !== undefined) updateData.email = input.email
+    if (input.phone !== undefined) updateData.phone = input.phone || null
     if (input.licenseNumber !== undefined) updateData.license_number = input.licenseNumber || null
-    if (input.specialties !== undefined) updateData.specialties = input.specialties
-    if (input.bio !== undefined) updateData.bio = input.bio || null
-    if (input.employmentType !== undefined) updateData.employment_type = input.employmentType
-    if (input.hireDate !== undefined) updateData.hire_date = input.hireDate || null
-    if (input.baseSalary !== undefined) updateData.base_salary = input.baseSalary || null
-    if (input.salaryType !== undefined) updateData.salary_type = input.salaryType
-    if (input.commissionRate !== undefined) updateData.default_commission_rate = input.commissionRate
-    if (input.commissionType !== undefined) updateData.commission_type = input.commissionType
-    if (input.maxDailyAppointments !== undefined) updateData.max_daily_appointments = input.maxDailyAppointments
-    if (input.appointmentBufferMinutes !== undefined) updateData.appointment_buffer_minutes = input.appointmentBufferMinutes
-    if (input.acceptsWalkIns !== undefined) updateData.accepts_walk_ins = input.acceptsWalkIns
-    if (input.canViewAllPatients !== undefined) updateData.can_view_all_patients = input.canViewAllPatients
-    if (input.canModifyPrices !== undefined) updateData.can_modify_prices = input.canModifyPrices
-    if (input.canGiveDiscounts !== undefined) updateData.can_give_discounts = input.canGiveDiscounts
-    if (input.maxDiscountPercent !== undefined) updateData.max_discount_percent = input.maxDiscountPercent
-    if (input.showOnBooking !== undefined) updateData.show_on_booking = input.showOnBooking
+    if (input.specialties !== undefined) updateData.specialty = input.specialties?.join(', ') || null
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updateError } = await (supabase as any)
-      .from('professional_profiles')
+      .from('users')
       .update(updateData)
       .eq('id', id)
+      .eq('is_professional', true)
 
     if (updateError) {
       console.error('Error updating professional:', updateError)
@@ -423,49 +423,43 @@ export async function getCommissions(options?: {
 }): Promise<CommissionData[]> {
   const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
-    .from('professional_commissions')
-    .select(`
-      *,
-      professional_profiles (
-        id,
-        title,
-        users (full_name)
-      )
-    `)
-    .order('created_at', { ascending: false })
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any)
+      .from('professional_commissions')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-  if (options?.professionalId) {
-    query = query.eq('professional_id', options.professionalId)
-  }
-  if (options?.status) {
-    query = query.eq('status', options.status)
-  }
-  if (options?.startDate) {
-    query = query.gte('created_at', options.startDate)
-  }
-  if (options?.endDate) {
-    query = query.lte('created_at', options.endDate)
-  }
+    if (options?.professionalId) {
+      query = query.eq('professional_id', options.professionalId)
+    }
+    if (options?.status) {
+      query = query.eq('status', options.status)
+    }
+    if (options?.startDate) {
+      query = query.gte('created_at', options.startDate)
+    }
+    if (options?.endDate) {
+      query = query.lte('created_at', options.endDate)
+    }
 
-  const { data, error } = await query
+    const { data, error } = await query
 
-  if (error) {
-    console.error('Error fetching commissions:', error)
+    if (error) {
+      console.error('Error fetching commissions:', error)
+      return []
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data || []).map((c: any) => ({
+      ...c,
+      professional_name: 'Profesional',
+      reference_description: `${c.reference_type || 'N/A'} - ${c.reference_id || 'N/A'}`,
+    }))
+  } catch {
+    // Table doesn't exist
     return []
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((c: any) => {
-    const profName = c.professional_profiles?.users?.full_name || 'Profesional'
-    const title = c.professional_profiles?.title
-    return {
-      ...c,
-      professional_name: title ? `${title} ${profName}` : profName,
-      reference_description: `${c.reference_type} - ${c.reference_id}`,
-    }
-  })
 }
 
 export async function updateCommissionStatus(
@@ -515,51 +509,44 @@ export async function getAttendanceLogs(options?: {
 }): Promise<AttendanceData[]> {
   const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
-    .from('attendance_logs')
-    .select(`
-      *,
-      professional_profiles (
-        id,
-        title,
-        users (full_name)
-      ),
-      branches (name)
-    `)
-    .order('date', { ascending: false })
-    .order('clock_in', { ascending: false })
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any)
+      .from('attendance_logs')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('clock_in', { ascending: false })
 
-  if (options?.professionalId) {
-    query = query.eq('professional_id', options.professionalId)
-  }
-  if (options?.date) {
-    query = query.eq('date', options.date)
-  }
-  if (options?.startDate) {
-    query = query.gte('date', options.startDate)
-  }
-  if (options?.endDate) {
-    query = query.lte('date', options.endDate)
-  }
+    if (options?.professionalId) {
+      query = query.eq('professional_id', options.professionalId)
+    }
+    if (options?.date) {
+      query = query.eq('date', options.date)
+    }
+    if (options?.startDate) {
+      query = query.gte('date', options.startDate)
+    }
+    if (options?.endDate) {
+      query = query.lte('date', options.endDate)
+    }
 
-  const { data, error } = await query
+    const { data, error } = await query
 
-  if (error) {
-    console.error('Error fetching attendance logs:', error)
+    if (error) {
+      console.error('Error fetching attendance logs:', error)
+      return []
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data || []).map((a: any) => ({
+      ...a,
+      professional_name: 'Profesional',
+      branch_name: 'Sucursal Principal',
+    }))
+  } catch {
+    // Table doesn't exist
     return []
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((a: any) => {
-    const profName = a.professional_profiles?.users?.full_name || 'Profesional'
-    const title = a.professional_profiles?.title
-    return {
-      ...a,
-      professional_name: title ? `${title} ${profName}` : profName,
-      branch_name: a.branches?.name || 'Sucursal Principal',
-    }
-  })
 }
 
 export async function clockIn(
@@ -637,20 +624,29 @@ export async function getProfessionalStats(): Promise<{
 }> {
   const supabase = createAdminClient()
 
+  // Query professionals from users table
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: professionals } = await (supabase as any)
-    .from('professional_profiles')
-    .select('id, status')
+    .from('users')
+    .select('id, is_active')
+    .eq('is_professional', true)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: commissions } = await (supabase as any)
-    .from('professional_commissions')
-    .select('id, status, commission_amount')
-    .in('status', ['pending', 'approved'])
+  // Note: professional_commissions table may not exist, handle gracefully
+  let commissions: { id: string; status: string; commission_amount: number }[] = []
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
+      .from('professional_commissions')
+      .select('id, status, commission_amount')
+      .in('status', ['pending', 'approved'])
+    commissions = data || []
+  } catch {
+    // Table doesn't exist, use empty array
+  }
 
   const total = professionals?.length || 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const active = professionals?.filter((p: any) => p.status === 'active').length || 0
+  const active = professionals?.filter((p: any) => p.is_active === true).length || 0
 
   const pendingCommissions = commissions?.length || 0
   const pendingAmount = commissions?.reduce(
