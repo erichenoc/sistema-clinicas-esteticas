@@ -305,16 +305,21 @@ export async function createProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Map input fields to actual database columns
   const productData = {
-    ...input,
-    clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
-    type: input.type || 'consumable',
-    unit: input.unit || 'units',
-    tax_rate: input.tax_rate || 16,
-    track_stock: input.track_stock ?? true,
+    clinic_id: '00000000-0000-0000-0000-000000000001',
+    name: input.name,
+    code: input.sku || null,
+    description: input.description || null,
+    category: input.category_id || null,
+    cost: input.cost_price || 0,
+    price: input.sell_price || 0,
+    unit: input.unit || 'unit',
     min_stock: input.min_stock || 0,
+    is_consumable: input.type === 'consumable',
+    is_for_sale: input.is_sellable ?? true,
     is_active: input.is_active ?? true,
-    is_sellable: input.is_sellable ?? true,
+    image_url: input.image_url || null,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -339,13 +344,27 @@ export async function updateProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Map input fields to actual database columns
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (input.name !== undefined) updateData.name = input.name
+  if (input.sku !== undefined) updateData.code = input.sku
+  if (input.description !== undefined) updateData.description = input.description
+  if (input.category_id !== undefined) updateData.category = input.category_id
+  if (input.cost_price !== undefined) updateData.cost = input.cost_price
+  if (input.sell_price !== undefined) updateData.price = input.sell_price
+  if (input.unit !== undefined) updateData.unit = input.unit
+  if (input.min_stock !== undefined) updateData.min_stock = input.min_stock
+  if (input.type !== undefined) updateData.is_consumable = input.type === 'consumable'
+  if (input.is_sellable !== undefined) updateData.is_for_sale = input.is_sellable
+  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (input.image_url !== undefined) updateData.image_url = input.image_url
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('products')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
