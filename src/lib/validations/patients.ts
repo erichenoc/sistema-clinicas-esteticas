@@ -43,7 +43,7 @@ export const patientSchema = z.object({
   gender: z.enum(['male', 'female', 'other', 'prefer_not_say']).optional().nullable(),
 
   // Documento de identidad
-  documentType: z.enum(['ine', 'passport', 'curp', 'other']),
+  documentType: z.enum(['cedula', 'passport']),
   documentNumber: z.string().max(50).optional().nullable(),
 
   // Dirección

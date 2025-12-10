@@ -4,7 +4,7 @@
 
 // Tipos de enums
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_say'
-export type DocumentType = 'ine' | 'passport' | 'curp' | 'other'
+export type DocumentType = 'cedula' | 'passport'
 export type ContactMethod = 'whatsapp' | 'sms' | 'email' | 'phone'
 export type PatientStatus = 'active' | 'inactive' | 'vip' | 'blocked'
 export type FitzpatrickType = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI'
@@ -266,10 +266,8 @@ export const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 ]
 
 export const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
-  { value: 'ine', label: 'INE' },
+  { value: 'cedula', label: 'Cedula' },
   { value: 'passport', label: 'Pasaporte' },
-  { value: 'curp', label: 'CURP' },
-  { value: 'other', label: 'Otro' },
 ]
 
 export const CONTACT_METHOD_OPTIONS: { value: ContactMethod; label: string }[] = [
