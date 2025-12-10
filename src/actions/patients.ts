@@ -137,7 +137,7 @@ export async function getPatientById(id: string): Promise<PatientData | null> {
 export async function createPatient(input: CreatePatientInput): Promise<{ data: PatientData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Mapear nombres de la API a nombres de columna en la DB
+  // Mapear campos al esquema real de la tabla patients
   const patientData = {
     clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario actual
     first_name: input.first_name,
@@ -147,18 +147,15 @@ export async function createPatient(input: CreatePatientInput): Promise<{ data: 
     phone_secondary: input.phone_secondary || null,
     date_of_birth: input.date_of_birth || null,
     gender: input.gender || null,
-    document_type: input.document_type || null,
+    document_type: input.document_type || 'cedula',
     document_number: input.document_number || null,
-    // Mapeo de direccion: API usa address/city/state/postal_code, DB usa address_street/address_city/address_state/address_zip
-    address_street: input.address || null,
-    address_city: input.city || null,
-    address_state: input.state || null,
-    address_zip: input.postal_code || null,
-    address_country: input.country || 'República Dominicana',
+    // Direccion - usa nombres simples
+    address: input.address || null,
+    city: input.city || null,
+    state: input.state || null,
+    postal_code: input.postal_code || null,
     emergency_contact_name: input.emergency_contact_name || null,
     emergency_contact_phone: input.emergency_contact_phone || null,
-    // Mapeo: API usa preferred_contact, DB usa preferred_contact_method
-    preferred_contact_method: input.preferred_contact || 'whatsapp',
     source: input.source || null,
     tags: input.tags || [],
     notes: input.notes || null,
