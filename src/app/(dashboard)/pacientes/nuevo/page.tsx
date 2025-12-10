@@ -54,6 +54,7 @@ import {
   PATIENT_STATUS_OPTIONS,
   PATIENT_SOURCES,
 } from '@/types/patients'
+import { createPatient } from '@/actions/patients'
 
 export default function NuevoPacientePage() {
   const router = useRouter()
@@ -109,12 +110,39 @@ export default function NuevoPacientePage() {
     setIsLoading(true)
 
     try {
-      // TODO: Llamar a Server Action para crear paciente
-      console.log('Patient data:', data)
+      // Mapear campos del formulario al formato de la base de datos
+      const result = await createPatient({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email || undefined,
+        phone: data.phone || '',
+        phone_secondary: data.phoneSecondary || undefined,
+        date_of_birth: data.dateOfBirth || undefined,
+        gender: data.gender || undefined,
+        document_type: data.documentType || undefined,
+        document_number: data.documentNumber || undefined,
+        address: data.addressStreet || undefined,
+        city: data.addressCity || undefined,
+        state: data.addressState || undefined,
+        postal_code: data.addressZip || undefined,
+        country: data.addressCountry || undefined,
+        emergency_contact_name: data.emergencyContactName || undefined,
+        emergency_contact_phone: data.emergencyContactPhone || undefined,
+        preferred_contact: data.preferredContactMethod || undefined,
+        source: data.source || undefined,
+        tags: data.tags || undefined,
+        notes: data.notes || undefined,
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
 
       toast.success('Paciente creado exitosamente')
       router.push('/pacientes')
     } catch (error) {
+      console.error('Error creating patient:', error)
       toast.error('Error al crear el paciente')
     } finally {
       setIsLoading(false)
