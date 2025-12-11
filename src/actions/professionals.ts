@@ -210,27 +210,27 @@ export async function getProfessionalById(id: string): Promise<ProfessionalSumma
     license_number: user.license_number,
     license_expiry: null,
     specialties: user.specialty ? user.specialty.split(', ') : [],
-    title: null,
-    bio: null,
-    employment_type: 'employee',
-    hire_date: null,
+    title: user.title || null,
+    bio: user.bio || null,
+    employment_type: user.employment_type || 'employee',
+    hire_date: user.hire_date || null,
     termination_date: null,
-    base_salary: null,
-    salary_type: 'monthly',
-    default_commission_rate: 15,
-    commission_type: 'percentage',
-    max_daily_appointments: 20,
-    appointment_buffer_minutes: 15,
-    accepts_walk_ins: true,
-    can_view_all_patients: false,
-    can_modify_prices: false,
-    can_give_discounts: false,
-    max_discount_percent: 0,
+    base_salary: user.base_salary || null,
+    salary_type: user.salary_type || 'monthly',
+    default_commission_rate: user.commission_rate || 15,
+    commission_type: user.commission_type || 'percentage',
+    max_daily_appointments: user.max_daily_appointments || 20,
+    appointment_buffer_minutes: user.appointment_buffer_minutes || 15,
+    accepts_walk_ins: user.accepts_walk_ins ?? true,
+    can_view_all_patients: user.can_view_all_patients ?? false,
+    can_modify_prices: user.can_modify_prices ?? false,
+    can_give_discounts: user.can_give_discounts ?? false,
+    max_discount_percent: user.max_discount_percent || 0,
     status: user.is_active ? 'active' as ProfessionalStatus : 'inactive' as ProfessionalStatus,
     profile_image_url: user.avatar_url,
     signature_image_url: null,
     display_order: 0,
-    show_on_booking: true,
+    show_on_booking: user.show_on_booking ?? true,
     created_at: user.created_at,
     updated_at: user.updated_at,
     first_name: user.first_name || '',
@@ -379,12 +379,37 @@ export async function updateProfessional(
       updated_at: new Date().toISOString(),
     }
 
+    // Datos personales
     if (input.firstName !== undefined) updateData.first_name = input.firstName
     if (input.lastName !== undefined) updateData.last_name = input.lastName
     if (input.email !== undefined) updateData.email = input.email
     if (input.phone !== undefined) updateData.phone = input.phone || null
     if (input.licenseNumber !== undefined) updateData.license_number = input.licenseNumber || null
     if (input.specialties !== undefined) updateData.specialty = input.specialties?.join(', ') || null
+    if (input.bio !== undefined) updateData.bio = input.bio || null
+    if (input.title !== undefined) updateData.title = input.title || null
+
+    // Datos de empleo
+    if (input.employmentType !== undefined) updateData.employment_type = input.employmentType
+    if (input.hireDate !== undefined) updateData.hire_date = input.hireDate || null
+    if (input.baseSalary !== undefined) updateData.base_salary = input.baseSalary || null
+    if (input.salaryType !== undefined) updateData.salary_type = input.salaryType
+
+    // Datos de comisión
+    if (input.commissionRate !== undefined) updateData.commission_rate = input.commissionRate
+    if (input.commissionType !== undefined) updateData.commission_type = input.commissionType
+
+    // Configuración de citas
+    if (input.maxDailyAppointments !== undefined) updateData.max_daily_appointments = input.maxDailyAppointments
+    if (input.appointmentBufferMinutes !== undefined) updateData.appointment_buffer_minutes = input.appointmentBufferMinutes
+    if (input.acceptsWalkIns !== undefined) updateData.accepts_walk_ins = input.acceptsWalkIns
+    if (input.showOnBooking !== undefined) updateData.show_on_booking = input.showOnBooking
+
+    // Permisos
+    if (input.canViewAllPatients !== undefined) updateData.can_view_all_patients = input.canViewAllPatients
+    if (input.canModifyPrices !== undefined) updateData.can_modify_prices = input.canModifyPrices
+    if (input.canGiveDiscounts !== undefined) updateData.can_give_discounts = input.canGiveDiscounts
+    if (input.maxDiscountPercent !== undefined) updateData.max_discount_percent = input.maxDiscountPercent
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updateError } = await (supabase as any)
@@ -662,5 +687,148 @@ export async function getProfessionalStats(): Promise<{
     pending_amount: pendingAmount,
     month_revenue: 0, // TODO: Calculate from sessions/sales
     month_appointments: 0, // TODO: Calculate from appointments
+  }
+}
+
+// =============================================
+// HORARIOS
+// =============================================
+
+export interface DaySchedule {
+  enabled: boolean
+  start: string
+  end: string
+  breaks: { start: string; end: string }[]
+}
+
+export interface WeekSchedule {
+  monday: DaySchedule
+  tuesday: DaySchedule
+  wednesday: DaySchedule
+  thursday: DaySchedule
+  friday: DaySchedule
+  saturday: DaySchedule
+  sunday: DaySchedule
+}
+
+export async function getProfessionalSchedule(professionalId: string): Promise<WeekSchedule | null> {
+  const supabase = createAdminClient()
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from('professional_schedules')
+      .select('*')
+      .eq('professional_id', professionalId)
+
+    if (error) {
+      console.error('Error fetching schedule:', error)
+      return null
+    }
+
+    if (!data || data.length === 0) {
+      return null
+    }
+
+    // Convert database records to WeekSchedule format
+    const dayMap: Record<number, keyof WeekSchedule> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday',
+    }
+
+    const defaultDaySchedule: DaySchedule = {
+      enabled: false,
+      start: '09:00',
+      end: '18:00',
+      breaks: [],
+    }
+
+    const schedule: WeekSchedule = {
+      monday: { ...defaultDaySchedule },
+      tuesday: { ...defaultDaySchedule },
+      wednesday: { ...defaultDaySchedule },
+      thursday: { ...defaultDaySchedule },
+      friday: { ...defaultDaySchedule },
+      saturday: { ...defaultDaySchedule },
+      sunday: { ...defaultDaySchedule },
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data.forEach((record: any) => {
+      const dayName = dayMap[record.day_of_week]
+      if (dayName) {
+        schedule[dayName] = {
+          enabled: record.is_active,
+          start: record.start_time?.substring(0, 5) || '09:00',
+          end: record.end_time?.substring(0, 5) || '18:00',
+          breaks: record.break_start && record.break_end
+            ? [{ start: record.break_start.substring(0, 5), end: record.break_end.substring(0, 5) }]
+            : [],
+        }
+      }
+    })
+
+    return schedule
+  } catch {
+    return null
+  }
+}
+
+export async function saveProfessionalSchedule(
+  professionalId: string,
+  schedule: WeekSchedule
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  const dayMap: Record<keyof WeekSchedule, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  }
+
+  try {
+    // Delete existing schedules for this professional
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('professional_schedules')
+      .delete()
+      .eq('professional_id', professionalId)
+
+    // Insert new schedules
+    const records = Object.entries(schedule).map(([day, daySchedule]) => ({
+      clinic_id: '00000000-0000-0000-0000-000000000001',
+      professional_id: professionalId,
+      day_of_week: dayMap[day as keyof WeekSchedule],
+      start_time: daySchedule.start + ':00',
+      end_time: daySchedule.end + ':00',
+      break_start: daySchedule.breaks[0]?.start ? daySchedule.breaks[0].start + ':00' : null,
+      break_end: daySchedule.breaks[0]?.end ? daySchedule.breaks[0].end + ':00' : null,
+      is_active: daySchedule.enabled,
+    }))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('professional_schedules')
+      .insert(records)
+
+    if (error) {
+      console.error('Error saving schedule:', error)
+      return { success: false, error: 'Error al guardar los horarios' }
+    }
+
+    revalidatePath(`/profesionales/${professionalId}/horarios`)
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error in saveProfessionalSchedule:', error)
+    return { success: false, error: 'Error inesperado al guardar los horarios' }
   }
 }

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { getProfessionalById } from '@/actions/professionals'
+import { getProfessionalById, getProfessionalSchedule, saveProfessionalSchedule } from '@/actions/professionals'
 
 interface DaySchedule {
   enabled: boolean
@@ -79,24 +79,32 @@ export default function HorariosProfesionalPage() {
   const [schedule, setSchedule] = useState<WeekSchedule>(defaultWeekSchedule)
 
   useEffect(() => {
-    async function loadProfessional() {
+    async function loadData() {
       try {
-        const professional = await getProfessionalById(professionalId)
+        const [professional, savedSchedule] = await Promise.all([
+          getProfessionalById(professionalId),
+          getProfessionalSchedule(professionalId),
+        ])
+
         if (professional) {
           setProfessionalName(professional.full_name)
-          // TODO: Load saved schedule from database if exists
         } else {
           toast.error('Profesional no encontrado')
         }
+
+        // Load saved schedule if exists
+        if (savedSchedule) {
+          setSchedule(savedSchedule)
+        }
       } catch (error) {
-        console.error('Error loading professional:', error)
-        toast.error('Error al cargar los datos del profesional')
+        console.error('Error loading data:', error)
+        toast.error('Error al cargar los datos')
       } finally {
         setIsLoadingData(false)
       }
     }
 
-    loadProfessional()
+    loadData()
   }, [professionalId])
 
   const handleDayToggle = (day: keyof WeekSchedule, enabled: boolean) => {
@@ -160,12 +168,15 @@ export default function HorariosProfesionalPage() {
     toast.loading('Guardando horarios...', { id: 'save-schedule' })
 
     try {
-      // TODO: Implement save schedule to database
-      // For now, just simulate a successful save
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const result = await saveProfessionalSchedule(professionalId, schedule)
 
       toast.dismiss('save-schedule')
-      toast.success('Horarios guardados exitosamente')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Horarios guardados exitosamente')
+      }
     } catch (error) {
       toast.dismiss('save-schedule')
       console.error('Error saving schedule:', error)
