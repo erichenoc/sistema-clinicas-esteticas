@@ -80,6 +80,12 @@ export const treatmentSchema = z.object({
   cost: z
     .number()
     .min(0, 'El costo no puede ser negativo'),
+  currency: z
+    .enum(['DOP', 'USD'], {
+      message: 'Selecciona una moneda válida',
+    })
+    .optional()
+    .default('DOP'),
 
   // Sesiones
   recommendedSessions: z

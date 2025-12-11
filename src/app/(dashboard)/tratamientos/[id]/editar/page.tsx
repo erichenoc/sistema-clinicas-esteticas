@@ -1,7 +1,8 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import {
@@ -12,6 +13,9 @@ import {
   Plus,
   Trash2,
   GripVertical,
+  Upload,
+  ImageIcon,
+  DollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,12 +70,17 @@ export default function EditTreatmentPage({ params }: PageProps) {
     bufferMinutes: 10,
     price: 0,
     cost: 0,
+    currency: 'DOP' as 'DOP' | 'USD',
     recommendedSessions: 1,
     sessionIntervalDays: 30,
     aftercareInstructions: '',
     isActive: true,
     isPublic: true,
+    imageUrl: '' as string | null,
   })
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [contraindications, setContraindications] = useState<string[]>([])
   const [newContraindication, setNewContraindication] = useState('')
@@ -103,11 +112,13 @@ export default function EditTreatmentPage({ params }: PageProps) {
           bufferMinutes: treatmentData.buffer_minutes || 0,
           price: treatmentData.price || 0,
           cost: treatmentData.cost || 0,
+          currency: treatmentData.currency || 'DOP',
           recommendedSessions: treatmentData.recommended_sessions || 1,
           sessionIntervalDays: treatmentData.session_interval_days || 30,
           aftercareInstructions: treatmentData.aftercare_instructions || '',
           isActive: treatmentData.is_active ?? true,
           isPublic: treatmentData.is_public ?? true,
+          imageUrl: treatmentData.image_url || null,
         })
 
         setContraindications(treatmentData.contraindications || [])
@@ -183,7 +194,9 @@ export default function EditTreatmentPage({ params }: PageProps) {
         duration_minutes: formData.durationMinutes,
         price: formData.price,
         cost: formData.cost,
+        currency: formData.currency,
         is_active: formData.isActive,
+        image_url: formData.imageUrl || null,
         contraindications: contraindications,
       }
 
@@ -328,6 +341,102 @@ export default function EditTreatmentPage({ params }: PageProps) {
                 />
               </div>
 
+              {/* Imagen del Tratamiento */}
+              <div className="space-y-2">
+                <Label>Imagen del Tratamiento</Label>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {/* Preview de la imagen */}
+                  <div className="relative w-32 h-32 rounded-lg border-2 border-dashed border-muted-foreground/30 overflow-hidden flex items-center justify-center bg-muted/50">
+                    {formData.imageUrl ? (
+                      <>
+                        <Image
+                          src={formData.imageUrl}
+                          alt={formData.name || 'Imagen del tratamiento'}
+                          fill
+                          className="object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange('imageUrl', null)}
+                          className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center text-muted-foreground">
+                        <ImageIcon className="h-8 w-8 mb-1" />
+                        <span className="text-xs">Sin imagen</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botones de upload */}
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+
+                        setIsUploadingImage(true)
+                        try {
+                          // Crear FormData para subir a Supabase Storage
+                          const formData = new FormData()
+                          formData.append('file', file)
+
+                          // Por ahora usamos un placeholder URL basado en el nombre
+                          // TODO: Integrar con Supabase Storage
+                          const imageUrl = URL.createObjectURL(file)
+                          handleInputChange('imageUrl', imageUrl)
+                          toast.success('Imagen cargada correctamente')
+                        } catch (error) {
+                          console.error('Error uploading image:', error)
+                          toast.error('Error al subir la imagen')
+                        } finally {
+                          setIsUploadingImage(false)
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingImage}
+                    >
+                      {isUploadingImage ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Subir Imagen
+                        </>
+                      )}
+                    </Button>
+                    <div className="space-y-1">
+                      <Label htmlFor="imageUrl" className="text-xs text-muted-foreground">
+                        O pegar URL de imagen
+                      </Label>
+                      <Input
+                        id="imageUrl"
+                        type="url"
+                        value={formData.imageUrl || ''}
+                        onChange={(e) => handleInputChange('imageUrl', e.target.value || null)}
+                        placeholder="https://ejemplo.com/imagen.jpg"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="duration">Duracion (minutos)</Label>
@@ -383,27 +492,58 @@ export default function EditTreatmentPage({ params }: PageProps) {
               <CardDescription>Configuracion financiera del tratamiento</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Selector de Moneda */}
+              <div className="space-y-2">
+                <Label htmlFor="currency">Moneda</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value: 'DOP' | 'USD') => handleInputChange('currency', value)}
+                >
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Seleccionar moneda" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DOP">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">RD$</span>
+                        <span className="text-muted-foreground">Peso Dominicano</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="USD">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        <span className="text-muted-foreground">Dolar Estadounidense</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Precio de Venta (RD$)</Label>
+                  <Label htmlFor="price">
+                    Precio de Venta ({formData.currency === 'USD' ? 'US$' : 'RD$'})
+                  </Label>
                   <Input
                     id="price"
                     type="number"
                     value={formData.price}
                     onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
                     min={0}
-                    step={100}
+                    step={formData.currency === 'USD' ? 1 : 100}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cost">Costo (RD$)</Label>
+                  <Label htmlFor="cost">
+                    Costo ({formData.currency === 'USD' ? 'US$' : 'RD$'})
+                  </Label>
                   <Input
                     id="cost"
                     type="number"
                     value={formData.cost}
                     onChange={(e) => handleInputChange('cost', parseFloat(e.target.value) || 0)}
                     min={0}
-                    step={100}
+                    step={formData.currency === 'USD' ? 1 : 100}
                   />
                 </div>
               </div>
@@ -414,7 +554,7 @@ export default function EditTreatmentPage({ params }: PageProps) {
                   <div className="text-right">
                     <span className="text-lg font-bold text-green-600">{marginPercent}%</span>
                     <span className="text-sm text-muted-foreground ml-2">
-                      (RD${margin.toLocaleString('es-MX')})
+                      ({formData.currency === 'USD' ? 'US$' : 'RD$'}{margin.toLocaleString('es-MX')})
                     </span>
                   </div>
                 </div>

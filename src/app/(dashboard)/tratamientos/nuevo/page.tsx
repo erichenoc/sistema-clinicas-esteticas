@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Loader2, Plus, X } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, X, Upload, ImageIcon, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -50,6 +51,8 @@ export default function NuevoTratamientoPage() {
   const [contraindication, setContraindication] = useState('')
   const [categories, setCategories] = useState<CategoryWithCountData[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cargar categorias al montar el componente
   useEffect(() => {
@@ -80,6 +83,7 @@ export default function NuevoTratamientoPage() {
       price: 0,
       priceFrom: null,
       cost: 0,
+      currency: 'DOP',
       recommendedSessions: 1,
       sessionIntervalDays: null,
       contraindications: [],
@@ -139,10 +143,12 @@ export default function NuevoTratamientoPage() {
         price: data.price,
         price_from: data.priceFrom || undefined,
         cost: data.cost || 0,
+        currency: data.currency || 'DOP',
         recommended_sessions: data.recommendedSessions || 1,
         session_interval_days: data.sessionIntervalDays || undefined,
         contraindications: data.contraindications || [],
         aftercare_instructions: data.aftercareInstructions || undefined,
+        image_url: data.imageUrl || undefined,
         is_public: data.isPublic ?? true,
         is_active: data.isActive ?? true,
       })
@@ -351,6 +357,106 @@ export default function NuevoTratamientoPage() {
                       )}
                     />
                   </div>
+
+                  {/* Imagen del Tratamiento */}
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Imagen del Tratamiento</FormLabel>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* Preview de la imagen */}
+                          <div className="relative w-32 h-32 rounded-lg border-2 border-dashed border-muted-foreground/30 overflow-hidden flex items-center justify-center bg-muted/50">
+                            {field.value ? (
+                              <>
+                                <Image
+                                  src={field.value}
+                                  alt="Imagen del tratamiento"
+                                  fill
+                                  className="object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => field.onChange(null)}
+                                  className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <div className="flex flex-col items-center text-muted-foreground">
+                                <ImageIcon className="h-8 w-8 mb-1" />
+                                <span className="text-xs">Sin imagen</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Botones de upload */}
+                          <div className="flex flex-col gap-2">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+
+                                setIsUploadingImage(true)
+                                try {
+                                  // Por ahora usamos un placeholder URL basado en el nombre
+                                  // TODO: Integrar con Supabase Storage
+                                  const imageUrl = URL.createObjectURL(file)
+                                  field.onChange(imageUrl)
+                                  toast.success('Imagen cargada correctamente')
+                                } catch (error) {
+                                  console.error('Error uploading image:', error)
+                                  toast.error('Error al subir la imagen')
+                                } finally {
+                                  setIsUploadingImage(false)
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingImage}
+                            >
+                              {isUploadingImage ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Subiendo...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Subir Imagen
+                                </>
+                              )}
+                            </Button>
+                            <div className="space-y-1">
+                              <FormDescription className="text-xs">
+                                O pegar URL de imagen
+                              </FormDescription>
+                              <FormControl>
+                                <Input
+                                  type="url"
+                                  value={field.value || ''}
+                                  onChange={(e) => field.onChange(e.target.value || null)}
+                                  placeholder="https://ejemplo.com/imagen.jpg"
+                                  className="text-sm"
+                                />
+                              </FormControl>
+                            </div>
+                          </div>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -365,23 +471,59 @@ export default function NuevoTratamientoPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Selector de Moneda */}
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Moneda</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || 'DOP'}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full sm:w-[200px]">
+                              <SelectValue placeholder="Seleccionar moneda" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="DOP">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">RD$</span>
+                                <span className="text-muted-foreground">Peso Dominicano</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="USD">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                <span className="text-muted-foreground">Dolar Estadounidense</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="grid gap-4 sm:grid-cols-3">
                     <FormField
                       control={form.control}
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Precio *</FormLabel>
+                          <FormLabel>Precio ({form.watch('currency') === 'USD' ? 'US$' : 'RD$'}) *</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                                $
+                                {form.watch('currency') === 'USD' ? '$' : 'RD$'}
                               </span>
                               <Input
                                 type="number"
                                 min={0}
-                                step={0.01}
-                                className="pl-7"
+                                step={form.watch('currency') === 'USD' ? 1 : 100}
+                                className={form.watch('currency') === 'USD' ? 'pl-7' : 'pl-12'}
                                 {...field}
                                 onChange={(e) =>
                                   field.onChange(parseFloat(e.target.value) || 0)
