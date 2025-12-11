@@ -77,26 +77,17 @@ export function MedLuxeLogoSimple({
   inverted?: boolean
 }) {
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div className={cn('flex items-center', className)}>
       <Image
         src={LOGO_URL}
         alt="Med Luxe Aesthetics & Wellness"
-        width={150}
-        height={50}
+        width={200}
+        height={70}
         className={cn(
-          'h-10 w-auto object-contain',
+          'h-14 w-auto object-contain',
           inverted && 'brightness-0 invert'
         )}
       />
-      <span
-        className={cn(
-          'text-[8px] tracking-[0.2em] uppercase',
-          inverted ? 'text-white/70' : 'text-[#998577]'
-        )}
-        style={{ fontFamily: 'var(--font-montserrat)' }}
-      >
-        Aesthetics & Wellness
-      </span>
     </div>
   )
 }
