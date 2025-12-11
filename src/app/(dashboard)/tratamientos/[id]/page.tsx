@@ -39,6 +39,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { getTreatments, getCategories } from '@/actions/treatments'
+import { getProfessionals } from '@/actions/professionals'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -82,9 +83,10 @@ export default function TreatmentDetailPage({ params }: PageProps) {
   useEffect(() => {
     const loadTreatment = async () => {
       try {
-        const [treatments, categories] = await Promise.all([
+        const [treatments, categories, professionals] = await Promise.all([
           getTreatments(),
           getCategories(),
+          getProfessionals(),
         ])
 
         const found = treatments.find(t => t.id === id)
@@ -124,7 +126,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
             { order: 4, title: 'Finalizacion', description: 'Cuidados post-tratamiento e indicaciones', durationMinutes: 5 },
           ],
           consumables: [],
-          allowedProfessionalIds: ['1', '2', '3'],
+          allowedProfessionalIds: professionals.map(p => p.id),
           isActive: found.is_active ?? true,
           isPublic: true,
         }
@@ -470,7 +472,7 @@ export default function TreatmentDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                {treatment.allowedProfessionalIds.length} profesionales autorizados
+                {treatment.allowedProfessionalIds.length} {treatment.allowedProfessionalIds.length === 1 ? 'profesional autorizado' : 'profesionales autorizados'}
               </p>
               <Button variant="outline" size="sm" className="mt-3 w-full" asChild>
                 <Link href={`/tratamientos/${treatment.id}/editar#profesionales`}>
