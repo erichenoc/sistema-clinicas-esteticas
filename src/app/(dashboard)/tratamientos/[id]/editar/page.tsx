@@ -196,7 +196,7 @@ export default function EditTreatmentPage({ params }: PageProps) {
         cost: formData.cost,
         currency: formData.currency,
         is_active: formData.isActive,
-        image_url: formData.imageUrl || null,
+        image_url: formData.imageUrl || undefined,
         contraindications: contraindications,
       }
 

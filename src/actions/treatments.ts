@@ -108,6 +108,7 @@ export interface TreatmentData {
   price: number
   price_from: number | null
   cost: number
+  currency: 'DOP' | 'USD'
   recommended_sessions: number
   session_interval_days: number | null
   contraindications: string[] | null
@@ -152,6 +153,7 @@ export interface CreateTreatmentInput {
   price: number
   price_from?: number
   cost?: number
+  currency?: 'DOP' | 'USD'
   recommended_sessions?: number
   session_interval_days?: number
   contraindications?: string[]

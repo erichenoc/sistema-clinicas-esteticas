@@ -33,11 +33,15 @@ export interface PackageWithTreatments extends PackageData {
   }[]
 }
 
+// Helper type for Supabase queries - bypasses strict typing for tables not in generated types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAny = any
+
 // Obtener todos los paquetes
 export async function getPackages(): Promise<PackageData[]> {
   const supabase = await createAdminClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as SupabaseAny)
     .from('packages')
     .select('*')
     .order('created_at', { ascending: false })
@@ -54,28 +58,32 @@ export async function getPackages(): Promise<PackageData[]> {
 export async function getPackageById(id: string): Promise<PackageWithTreatments | null> {
   const supabase = await createAdminClient()
 
-  const { data: packageData, error: packageError } = await supabase
+  const { data, error: packageError } = await (supabase as SupabaseAny)
     .from('packages')
     .select('*')
     .eq('id', id)
     .single()
 
-  if (packageError) {
+  if (packageError || !data) {
     console.error('Error fetching package:', packageError)
     return null
   }
+
+  // Cast to our known type
+  const packageData = data as PackageData
 
   // Obtener detalles de los tratamientos incluidos
   const treatmentIds = packageData.treatments?.map((t: PackageTreatmentItem) => t.treatment_id) || []
 
   if (treatmentIds.length > 0) {
-    const { data: treatmentsData, error: treatmentsError } = await supabase
+    const { data: treatmentsData, error: treatmentsError } = await (supabase as SupabaseAny)
       .from('treatments')
       .select('id, name, price, duration_minutes')
       .in('id', treatmentIds)
 
     if (!treatmentsError && treatmentsData) {
-      const treatmentDetails = treatmentsData.map(treatment => {
+      const treatments = treatmentsData as { id: string; name: string; price: number; duration_minutes: number }[]
+      const treatmentDetails = treatments.map(treatment => {
         const packageTreatment = packageData.treatments?.find(
           (t: PackageTreatmentItem) => t.treatment_id === treatment.id
         )
@@ -108,7 +116,7 @@ export async function createPackage(data: {
 }): Promise<{ data: PackageData | null; error: string | null }> {
   const supabase = await createAdminClient()
 
-  const { data: newPackage, error } = await supabase
+  const { data: newPackage, error } = await (supabase as SupabaseAny)
     .from('packages')
     .insert({
       name: data.name,
@@ -148,7 +156,7 @@ export async function updatePackage(
 ): Promise<{ data: PackageData | null; error: string | null }> {
   const supabase = await createAdminClient()
 
-  const { data: updatedPackage, error } = await supabase
+  const { data: updatedPackage, error } = await (supabase as SupabaseAny)
     .from('packages')
     .update(data)
     .eq('id', id)
@@ -169,7 +177,7 @@ export async function updatePackage(
 export async function deletePackage(id: string): Promise<{ error: string | null }> {
   const supabase = await createAdminClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as SupabaseAny)
     .from('packages')
     .delete()
     .eq('id', id)
@@ -190,7 +198,7 @@ export async function togglePackageStatus(
 ): Promise<{ error: string | null }> {
   const supabase = await createAdminClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as SupabaseAny)
     .from('packages')
     .update({ is_active: isActive })
     .eq('id', id)
@@ -212,7 +220,7 @@ export async function calculatePackageRegularPrice(
 
   const treatmentIds = treatments.map(t => t.treatment_id)
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as SupabaseAny)
     .from('treatments')
     .select('id, price')
     .in('id', treatmentIds)
@@ -222,8 +230,9 @@ export async function calculatePackageRegularPrice(
     return 0
   }
 
+  const treatmentsData = data as { id: string; price: number }[]
   return treatments.reduce((total, treatment) => {
-    const treatmentData = data.find(t => t.id === treatment.treatment_id)
+    const treatmentData = treatmentsData.find(t => t.id === treatment.treatment_id)
     return total + (treatmentData?.price || 0) * treatment.quantity
   }, 0)
 }

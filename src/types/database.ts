@@ -284,6 +284,144 @@ export interface Database {
           deleted_at?: string | null
         }
       }
+      // Treatments
+      treatments: {
+        Row: {
+          id: string
+          clinic_id: string | null
+          category_id: string | null
+          name: string
+          slug: string
+          description: string | null
+          description_internal: string | null
+          duration_minutes: number
+          buffer_minutes: number
+          price: number
+          price_from: number | null
+          cost: number
+          currency: 'DOP' | 'USD'
+          recommended_sessions: number
+          session_interval_days: number | null
+          contraindications: string[]
+          aftercare_instructions: string | null
+          required_consent_id: string | null
+          allowed_professional_ids: string[]
+          required_room_types: string[]
+          required_equipment_ids: string[]
+          consumables: { productId: string; quantity: number }[]
+          protocol_steps: { order: number; title: string; description?: string; durationMinutes?: number }[]
+          image_url: string | null
+          gallery_urls: string[]
+          is_public: boolean
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          clinic_id?: string | null
+          category_id?: string | null
+          name: string
+          slug: string
+          description?: string | null
+          description_internal?: string | null
+          duration_minutes: number
+          buffer_minutes?: number
+          price: number
+          price_from?: number | null
+          cost?: number
+          currency?: 'DOP' | 'USD'
+          recommended_sessions?: number
+          session_interval_days?: number | null
+          contraindications?: string[]
+          aftercare_instructions?: string | null
+          required_consent_id?: string | null
+          allowed_professional_ids?: string[]
+          required_room_types?: string[]
+          required_equipment_ids?: string[]
+          consumables?: { productId: string; quantity: number }[]
+          protocol_steps?: { order: number; title: string; description?: string; durationMinutes?: number }[]
+          image_url?: string | null
+          gallery_urls?: string[]
+          is_public?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          clinic_id?: string | null
+          category_id?: string | null
+          name?: string
+          slug?: string
+          description?: string | null
+          description_internal?: string | null
+          duration_minutes?: number
+          buffer_minutes?: number
+          price?: number
+          price_from?: number | null
+          cost?: number
+          currency?: 'DOP' | 'USD'
+          recommended_sessions?: number
+          session_interval_days?: number | null
+          contraindications?: string[]
+          aftercare_instructions?: string | null
+          required_consent_id?: string | null
+          allowed_professional_ids?: string[]
+          required_room_types?: string[]
+          required_equipment_ids?: string[]
+          consumables?: { productId: string; quantity: number }[]
+          protocol_steps?: { order: number; title: string; description?: string; durationMinutes?: number }[]
+          image_url?: string | null
+          gallery_urls?: string[]
+          is_public?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      // Packages
+      packages: {
+        Row: {
+          id: string
+          clinic_id: string | null
+          name: string
+          description: string | null
+          total_sessions: number
+          price: number
+          currency: 'DOP' | 'USD'
+          validity_days: number
+          is_active: boolean
+          treatments: { treatment_id: string; quantity: number }[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          clinic_id?: string | null
+          name: string
+          description?: string | null
+          total_sessions: number
+          price: number
+          currency?: 'DOP' | 'USD'
+          validity_days?: number
+          is_active?: boolean
+          treatments: { treatment_id: string; quantity: number }[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          clinic_id?: string | null
+          name?: string
+          description?: string | null
+          total_sessions?: number
+          price?: number
+          currency?: 'DOP' | 'USD'
+          validity_days?: number
+          is_active?: boolean
+          treatments?: { treatment_id: string; quantity: number }[]
+          created_at?: string
+        }
+      }
       // Patient Medical History
       patient_medical_history: {
         Row: {

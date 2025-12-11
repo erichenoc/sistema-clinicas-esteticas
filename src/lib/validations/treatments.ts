@@ -83,9 +83,7 @@ export const treatmentSchema = z.object({
   currency: z
     .enum(['DOP', 'USD'], {
       message: 'Selecciona una moneda válida',
-    })
-    .optional()
-    .default('DOP'),
+    }),
 
   // Sesiones
   recommendedSessions: z
