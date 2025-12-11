@@ -78,7 +78,8 @@ export async function getPatients(): Promise<PatientData[]> {
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('first_name', { ascending: true })
+    .order('last_name', { ascending: true })
 
   if (error) {
     console.error('Error fetching patients:', error)
@@ -251,7 +252,8 @@ export async function getPatientsByStatus(status: string): Promise<PatientData[]
     .from('patients')
     .select('*')
     .eq('status', status)
-    .order('created_at', { ascending: false })
+    .order('first_name', { ascending: true })
+    .order('last_name', { ascending: true })
 
   if (error) {
     console.error('Error fetching patients by status:', error)
@@ -270,7 +272,8 @@ export async function getVIPPatients(): Promise<PatientData[]> {
     .from('patients')
     .select('*')
     .contains('tags', ['VIP'])
-    .order('created_at', { ascending: false })
+    .order('first_name', { ascending: true })
+    .order('last_name', { ascending: true })
 
   if (error) {
     console.error('Error fetching VIP patients:', error)
