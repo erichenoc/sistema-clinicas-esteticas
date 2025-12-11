@@ -67,6 +67,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   type ClinicSettings,
@@ -567,6 +568,35 @@ export function SettingsClient({ initialClinic, initialBranches }: SettingsClien
                     />
                   </div>
                   <ThemeToggle />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tasas de Cambio */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Tasas de Cambio
+                </CardTitle>
+                <CardDescription>Configurar conversion USD/DOP para cotizaciones y cobros</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm">
+                      Administra las tasas de cambio entre dolares y pesos dominicanos
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Se utiliza para calcular automaticamente conversiones en el POS y cotizaciones
+                    </p>
+                  </div>
+                  <Link href="/configuracion/tasas-cambio">
+                    <Button>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Configurar Tasas
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
