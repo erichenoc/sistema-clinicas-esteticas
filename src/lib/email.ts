@@ -1,15 +1,24 @@
 import nodemailer from 'nodemailer'
 
-// Email configuration for Hostinger SMTP
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: true, // SSL
-  auth: {
-    user: process.env.SMTP_USER || 'info@medluxeclinic.com',
-    pass: process.env.SMTP_PASSWORD || '',
-  },
-})
+// Create transporter lazily to ensure env vars are available
+function createTransporter() {
+  const host = process.env.SMTP_HOST || 'smtp.hostinger.com'
+  const port = parseInt(process.env.SMTP_PORT || '465')
+  const user = process.env.SMTP_USER || 'info@medluxeclinic.com'
+  const pass = process.env.SMTP_PASSWORD || ''
+
+  console.log('[Email] Creating transporter with:', { host, port, user, hasPassword: !!pass })
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: true, // SSL
+    auth: {
+      user,
+      pass,
+    },
+  })
+}
 
 export interface EmailOptions {
   to: string
@@ -24,16 +33,24 @@ export interface EmailOptions {
 
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
+    const transporter = createTransporter()
+    const fromEmail = process.env.SMTP_USER || 'info@medluxeclinic.com'
+
+    console.log('[Email] Sending email to:', options.to)
+    console.log('[Email] From:', fromEmail)
+
     await transporter.sendMail({
-      from: `"Med Luxe Aesthetics & Wellness" <${process.env.SMTP_USER || 'info@medluxeclinic.com'}>`,
+      from: `"Med Luxe Aesthetics & Wellness" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
       attachments: options.attachments,
     })
+
+    console.log('[Email] Email sent successfully')
     return { success: true }
   } catch (error) {
-    console.error('Error sending email:', error)
+    console.error('[Email] Error sending email:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Error al enviar el email'

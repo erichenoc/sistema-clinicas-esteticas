@@ -1,0 +1,802 @@
+'use client'
+
+import { useState, useEffect, use } from 'react'
+import { useRouter } from 'next/navigation'
+import { format, addDays } from 'date-fns'
+import { es } from 'date-fns/locale'
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Search,
+  Package,
+  Stethoscope,
+  Gift,
+  FileText,
+  Save,
+  Send,
+  Calculator,
+  Loader2,
+} from 'lucide-react'
+import Link from 'next/link'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+
+import { formatCurrency } from '@/types/billing'
+import { getPatients, type PatientData } from '@/actions/patients'
+import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
+import { getProducts, type ProductListItemData } from '@/actions/inventory'
+import { getQuotationById, createQuotation, deleteQuotation, sendQuotationEmail } from '@/actions/quotations'
+
+interface ClientData {
+  id: string
+  name: string
+  email: string | null
+  phone: string
+  rncCedula?: string | null
+}
+
+interface TreatmentItem {
+  id: string
+  name: string
+  price: number
+  category: string | null
+}
+
+interface ProductItem {
+  id: string
+  name: string
+  price: number
+  stock: number
+}
+
+interface PackageItem {
+  id: string
+  name: string
+  price: number
+  sessions: number
+}
+
+type ItemType = 'treatment' | 'product' | 'package' | 'custom'
+
+interface QuoteItem {
+  id: string
+  type: ItemType
+  referenceId?: string
+  description: string
+  quantity: number
+  unitPrice: number
+  discount: number
+  discountType: 'percentage' | 'fixed'
+  notes?: string
+}
+
+export default function EditarCotizacionPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params)
+  const router = useRouter()
+  const [selectedClient, setSelectedClient] = useState<ClientData | null>(null)
+  const [clientSearchOpen, setClientSearchOpen] = useState(false)
+  const [items, setItems] = useState<QuoteItem[]>([])
+  const [itemSearchOpen, setItemSearchOpen] = useState(false)
+  const [currency, setCurrency] = useState<'DOP' | 'USD'>('DOP')
+  const [applyTax, setApplyTax] = useState(true)
+  const [notes, setNotes] = useState('')
+  const [terms, setTerms] = useState('')
+  const [validDays, setValidDays] = useState(30)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [originalQuoteNumber, setOriginalQuoteNumber] = useState('')
+
+  const [clients, setClients] = useState<ClientData[]>([])
+  const [treatments, setTreatments] = useState<TreatmentItem[]>([])
+  const [products, setProducts] = useState<ProductItem[]>([])
+  const [packages, setPackages] = useState<PackageItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Load quotation and reference data
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true)
+      try {
+        const [quotation, patientsData, treatmentsData, packagesData, productsData] = await Promise.all([
+          getQuotationById(resolvedParams.id),
+          getPatients(),
+          getTreatments({ isActive: true }),
+          getPackages(),
+          getProducts({ isActive: true }),
+        ])
+
+        if (!quotation) {
+          toast.error('Cotizacion no encontrada')
+          router.push('/facturacion/cotizaciones')
+          return
+        }
+
+        if (quotation.status !== 'draft') {
+          toast.error('Solo se pueden editar cotizaciones en borrador')
+          router.push(`/facturacion/cotizaciones/${resolvedParams.id}`)
+          return
+        }
+
+        // Set quotation data
+        setOriginalQuoteNumber(quotation.quote_number)
+        setCurrency(quotation.currency)
+        setApplyTax(quotation.tax_rate > 0)
+        setNotes(quotation.notes || '')
+        setTerms(quotation.terms_conditions || '')
+
+        // Calculate valid days from valid_until
+        const validUntil = new Date(quotation.valid_until)
+        const today = new Date()
+        const diffTime = validUntil.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        setValidDays(Math.max(1, diffDays))
+
+        // Transform patients to clients
+        const clientsList = patientsData.map((p: PatientData) => ({
+          id: p.id,
+          name: `${p.first_name} ${p.last_name}`,
+          email: p.email,
+          phone: p.phone,
+          rncCedula: p.document_number || null,
+        }))
+        setClients(clientsList)
+
+        // Find and set selected client
+        const client = clientsList.find((c: ClientData) => c.id === quotation.patient_id)
+        if (client) {
+          setSelectedClient(client)
+        }
+
+        // Transform items
+        if (quotation.items) {
+          setItems(quotation.items.map(item => ({
+            id: item.id || crypto.randomUUID(),
+            type: item.type as ItemType,
+            referenceId: item.reference_id,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
+            discount: item.discount,
+            discountType: item.discount_type as 'percentage' | 'fixed',
+            notes: item.notes,
+          })))
+        }
+
+        // Transform treatments
+        setTreatments(treatmentsData.map((t: TreatmentListItemData) => ({
+          id: t.id,
+          name: t.name,
+          price: t.price || 0,
+          category: t.category_name || null,
+        })))
+
+        // Transform products
+        setProducts(productsData.map((p: ProductListItemData) => ({
+          id: p.id,
+          name: p.name,
+          price: p.sell_price || 0,
+          stock: p.current_stock || 0,
+        })))
+
+        // Transform packages
+        setPackages(packagesData.map((pk: PackageData) => ({
+          id: pk.id,
+          name: pk.name,
+          price: pk.salePrice || pk.regularPrice || 0,
+          sessions: pk.items?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1,
+        })))
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Error al cargar los datos')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [resolvedParams.id, router])
+
+  // Calculate totals
+  const calculateItemSubtotal = (item: QuoteItem) => {
+    const gross = item.quantity * item.unitPrice
+    const discountAmount = item.discountType === 'percentage'
+      ? gross * (item.discount / 100)
+      : item.discount
+    return gross - discountAmount
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + calculateItemSubtotal(item), 0)
+  const discountTotal = items.reduce((sum, item) => {
+    const gross = item.quantity * item.unitPrice
+    return sum + (item.discountType === 'percentage'
+      ? gross * (item.discount / 100)
+      : item.discount)
+  }, 0)
+  const taxRate = applyTax ? 18 : 0
+  const taxAmount = subtotal * (taxRate / 100)
+  const total = subtotal + taxAmount
+
+  // Add item
+  const addItem = (type: ItemType, data: { id: string; name: string; price: number }) => {
+    const newItem: QuoteItem = {
+      id: crypto.randomUUID(),
+      type,
+      referenceId: data.id,
+      description: data.name,
+      quantity: 1,
+      unitPrice: data.price,
+      discount: 0,
+      discountType: 'percentage',
+    }
+    setItems([...items, newItem])
+    setItemSearchOpen(false)
+  }
+
+  // Add custom item
+  const addCustomItem = () => {
+    const newItem: QuoteItem = {
+      id: crypto.randomUUID(),
+      type: 'custom',
+      description: '',
+      quantity: 1,
+      unitPrice: 0,
+      discount: 0,
+      discountType: 'percentage',
+    }
+    setItems([...items, newItem])
+  }
+
+  // Update item
+  const updateItem = (id: string, field: keyof QuoteItem, value: string | number) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ))
+  }
+
+  // Remove item
+  const removeItem = (id: string) => {
+    setItems(items.filter(item => item.id !== id))
+  }
+
+  // Save quotation (delete old one and create new)
+  const handleSave = async (sendToClient: boolean = false) => {
+    if (!selectedClient) {
+      toast.error('Selecciona un cliente')
+      return
+    }
+    if (items.length === 0) {
+      toast.error('Agrega al menos un item')
+      return
+    }
+
+    setIsSubmitting(true)
+    toast.loading('Guardando cambios...', { id: 'save-quote' })
+
+    try {
+      // Delete old quotation
+      await deleteQuotation(resolvedParams.id)
+
+      // Prepare items for database
+      const itemsForDB = items.map(item => ({
+        type: item.type,
+        reference_id: item.referenceId,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        discount: item.discount,
+        discount_type: item.discountType,
+        subtotal: calculateItemSubtotal(item),
+        notes: item.notes,
+      }))
+
+      // Create new quotation
+      const result = await createQuotation({
+        patient_id: selectedClient.id,
+        currency,
+        items: itemsForDB,
+        valid_until: format(addDays(new Date(), validDays), 'yyyy-MM-dd'),
+        notes,
+        terms_conditions: terms,
+        subtotal,
+        discount_total: discountTotal,
+        tax_rate: taxRate,
+        tax_amount: taxAmount,
+        total,
+        status: 'draft',
+      })
+
+      if (!result.success) {
+        toast.dismiss('save-quote')
+        toast.error(result.error || 'Error al guardar la cotizacion')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Send by email if requested
+      if (sendToClient && result.data?.id) {
+        toast.loading('Enviando cotizacion por email...', { id: 'save-quote' })
+
+        const emailResult = await sendQuotationEmail(result.data.id)
+
+        if (!emailResult.success) {
+          toast.dismiss('save-quote')
+          toast.warning(`Cotizacion guardada pero no se pudo enviar: ${emailResult.error}`)
+          setIsSubmitting(false)
+          router.push('/facturacion/cotizaciones')
+          return
+        }
+      }
+
+      toast.dismiss('save-quote')
+      toast.success(sendToClient ? 'Cotizacion guardada y enviada' : 'Cotizacion actualizada')
+      router.push('/facturacion/cotizaciones')
+    } catch (error) {
+      console.error('Error saving quotation:', error)
+      toast.dismiss('save-quote')
+      toast.error('Error inesperado al guardar')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getItemTypeIcon = (type: ItemType) => {
+    switch (type) {
+      case 'treatment': return <Stethoscope className="h-4 w-4" />
+      case 'product': return <Package className="h-4 w-4" />
+      case 'package': return <Gift className="h-4 w-4" />
+      default: return <FileText className="h-4 w-4" />
+    }
+  }
+
+  const getItemTypeBadge = (type: ItemType) => {
+    const config = {
+      treatment: { label: 'Tratamiento', variant: 'default' as const },
+      product: { label: 'Producto', variant: 'secondary' as const },
+      package: { label: 'Paquete', variant: 'outline' as const },
+      custom: { label: 'Personalizado', variant: 'outline' as const },
+    }
+    return config[type]
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href={`/facturacion/cotizaciones/${resolvedParams.id}`}>
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">Editar Cotizacion</h1>
+            <p className="text-muted-foreground">
+              {originalQuoteNumber}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Guardar Cambios
+          </Button>
+          <Button onClick={() => handleSave(true)} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            Guardar y Enviar
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Client selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cliente</CardTitle>
+              <CardDescription>Selecciona el cliente para esta cotizacion</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-start"
+                  >
+                    {selectedClient ? (
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{selectedClient.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {selectedClient.email} - {selectedClient.phone}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        <Search className="mr-2 h-4 w-4 inline" />
+                        Buscar cliente...
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nombre, email o telefono..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron clientes</CommandEmpty>
+                      <CommandGroup>
+                        {clients.map((client) => (
+                          <CommandItem
+                            key={client.id}
+                            onSelect={() => {
+                              setSelectedClient(client)
+                              setClientSearchOpen(false)
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{client.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {client.email} - {client.phone}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </CardContent>
+          </Card>
+
+          {/* Items */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Items</CardTitle>
+                  <CardDescription>Servicios y productos a cotizar</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Agregar Item
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[500px] p-0" align="end">
+                      <Command>
+                        <CommandInput placeholder="Buscar tratamiento, producto o paquete..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron resultados</CommandEmpty>
+                          <CommandGroup heading="Tratamientos">
+                            {treatments.map((t) => (
+                              <CommandItem
+                                key={t.id}
+                                onSelect={() => addItem('treatment', { id: t.id, name: t.name, price: t.price })}
+                              >
+                                <Stethoscope className="mr-2 h-4 w-4 text-blue-500" />
+                                <div className="flex-1">
+                                  <span>{t.name}</span>
+                                </div>
+                                <span className="font-medium">{formatCurrency(t.price, currency)}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandGroup heading="Productos">
+                            {products.map((p) => (
+                              <CommandItem
+                                key={p.id}
+                                onSelect={() => addItem('product', { id: p.id, name: p.name, price: p.price })}
+                              >
+                                <Package className="mr-2 h-4 w-4 text-green-500" />
+                                <div className="flex-1">
+                                  <span>{p.name}</span>
+                                </div>
+                                <span className="font-medium">{formatCurrency(p.price, currency)}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandGroup heading="Paquetes">
+                            {packages.map((pk) => (
+                              <CommandItem
+                                key={pk.id}
+                                onSelect={() => addItem('package', { id: pk.id, name: pk.name, price: pk.price })}
+                              >
+                                <Gift className="mr-2 h-4 w-4 text-purple-500" />
+                                <div className="flex-1">
+                                  <span>{pk.name}</span>
+                                </div>
+                                <span className="font-medium">{formatCurrency(pk.price, currency)}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="outline" onClick={addCustomItem}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Item Personalizado
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {items.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calculator className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                  <p>No hay items agregados</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Descripcion</TableHead>
+                      <TableHead className="w-[80px]">Cant.</TableHead>
+                      <TableHead className="w-[120px]">Precio Unit.</TableHead>
+                      <TableHead className="w-[150px]">Descuento</TableHead>
+                      <TableHead className="w-[120px] text-right">Subtotal</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => {
+                      const itemSubtotal = calculateItemSubtotal(item)
+                      const badgeConfig = getItemTypeBadge(item.type)
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <div className="flex items-start gap-2">
+                              <Badge variant={badgeConfig.variant} className="mt-1">
+                                {getItemTypeIcon(item.type)}
+                              </Badge>
+                              {item.type === 'custom' ? (
+                                <Input
+                                  value={item.description}
+                                  onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                  placeholder="Descripcion del item"
+                                  className="h-8"
+                                />
+                              ) : (
+                                <div>
+                                  <span className="font-medium">{item.description}</span>
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    {badgeConfig.label}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                              min={0.01}
+                              step={1}
+                              className="h-8 w-16"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={item.unitPrice}
+                              onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                              min={0}
+                              className="h-8 w-24"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={item.discount}
+                                onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                min={0}
+                                className="h-8 w-16"
+                              />
+                              <Select
+                                value={item.discountType}
+                                onValueChange={(v) => updateItem(item.id, 'discountType', v)}
+                              >
+                                <SelectTrigger className="h-8 w-14">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="fixed">$</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(itemSubtotal, currency)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeItem(item.id)}
+                              className="h-8 w-8 text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notes and terms */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notas y Terminos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Notas para el cliente</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notas adicionales..."
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Terminos y condiciones</Label>
+                <Textarea
+                  value={terms}
+                  onChange={(e) => setTerms(e.target.value)}
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuracion</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Moneda</Label>
+                <Select value={currency} onValueChange={(v: 'DOP' | 'USD') => setCurrency(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DOP">Peso Dominicano (RD$)</SelectItem>
+                    <SelectItem value="USD">Dolar Estadounidense (US$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Validez (dias)</Label>
+                <Input
+                  type="number"
+                  value={validDays}
+                  onChange={(e) => setValidDays(parseInt(e.target.value) || 30)}
+                  min={1}
+                  max={365}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Valida hasta: {format(addDays(new Date(), validDays), "d 'de' MMMM, yyyy", { locale: es })}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Aplicar ITBIS (18%)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Impuesto sobre bienes y servicios
+                  </p>
+                </div>
+                <Switch
+                  checked={applyTax}
+                  onCheckedChange={setApplyTax}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatCurrency(subtotal + discountTotal, currency)}</span>
+              </div>
+              {discountTotal > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Descuentos</span>
+                  <span>-{formatCurrency(discountTotal, currency)}</span>
+                </div>
+              )}
+              {applyTax && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">ITBIS (18%)</span>
+                  <span>{formatCurrency(taxAmount, currency)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total</span>
+                <span>{formatCurrency(total, currency)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {items.length} item{items.length !== 1 ? 's' : ''} en esta cotizacion
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
