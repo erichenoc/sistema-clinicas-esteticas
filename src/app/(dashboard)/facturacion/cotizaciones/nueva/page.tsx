@@ -68,6 +68,7 @@ import { formatCurrency } from '@/types/billing'
 import { getPatients, type PatientData } from '@/actions/patients'
 import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
 import { getProducts, type ProductListItemData } from '@/actions/inventory'
+import { createQuotation, sendQuotationEmail } from '@/actions/quotations'
 
 // Tipos para datos UI
 interface ClientData {
@@ -263,40 +264,68 @@ export default function NuevaCotizacionPage() {
     setIsSubmitting(true)
     toast.loading('Guardando cotización...', { id: 'save-quote' })
 
-    const quoteData = {
-      clientId: selectedClient.id,
-      items: items.map(item => ({
+    try {
+      // Preparar items para la base de datos
+      const itemsForDB = items.map(item => ({
         type: item.type,
-        referenceId: item.referenceId,
+        reference_id: item.referenceId,
         description: item.description,
         quantity: item.quantity,
-        unitPrice: item.unitPrice,
+        unit_price: item.unitPrice,
         discount: item.discount,
-        discountType: item.discountType,
+        discount_type: item.discountType,
+        subtotal: calculateItemSubtotal(item),
         notes: item.notes,
-      })),
-      currency,
-      validUntil: format(addDays(new Date(), validDays), 'yyyy-MM-dd'),
-      notes,
-      termsAndConditions: terms,
-      subtotal,
-      discountTotal,
-      taxRate,
-      taxAmount,
-      total,
-      status: sendToClient ? 'sent' : 'draft',
+      }))
+
+      // Crear cotización en la base de datos
+      const result = await createQuotation({
+        patient_id: selectedClient.id,
+        currency,
+        items: itemsForDB,
+        valid_until: format(addDays(new Date(), validDays), 'yyyy-MM-dd'),
+        notes,
+        terms_conditions: terms,
+        subtotal,
+        discount_total: discountTotal,
+        tax_rate: taxRate,
+        tax_amount: taxAmount,
+        total,
+        status: 'draft',
+      })
+
+      if (!result.success) {
+        toast.dismiss('save-quote')
+        toast.error(result.error || 'Error al guardar la cotización')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Si se debe enviar por email
+      if (sendToClient && result.data?.id) {
+        toast.loading('Enviando cotización por email...', { id: 'save-quote' })
+
+        const emailResult = await sendQuotationEmail(result.data.id)
+
+        if (!emailResult.success) {
+          toast.dismiss('save-quote')
+          toast.warning(`Cotización guardada pero no se pudo enviar: ${emailResult.error}`)
+          setIsSubmitting(false)
+          router.push('/facturacion/cotizaciones')
+          return
+        }
+      }
+
+      toast.dismiss('save-quote')
+      toast.success(sendToClient ? 'Cotización guardada y enviada al cliente' : 'Cotización guardada como borrador')
+      router.push('/facturacion/cotizaciones')
+    } catch (error) {
+      console.error('Error saving quotation:', error)
+      toast.dismiss('save-quote')
+      toast.error('Error inesperado al guardar la cotización')
+    } finally {
+      setIsSubmitting(false)
     }
-
-    console.log('Guardando cotización:', quoteData)
-
-    // TODO: Implementar acción de servidor para guardar cotización
-    // Por ahora simular guardado
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    toast.dismiss('save-quote')
-    toast.success(sendToClient ? 'Cotización enviada al cliente' : 'Cotización guardada como borrador')
-    setIsSubmitting(false)
-    router.push('/facturacion')
   }
 
   const getItemTypeIcon = (type: ItemType) => {
