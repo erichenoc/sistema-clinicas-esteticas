@@ -14,7 +14,6 @@ import {
   Send,
   Mail,
   Loader2,
-  Printer,
   Copy,
   Edit,
   Trash2,
@@ -59,6 +58,7 @@ import {
   updateQuotationStatus,
   type QuotationData,
 } from '@/actions/quotations'
+import { DownloadQuotationPDF } from '@/components/pdf/download-quotation-pdf'
 
 const statusConfig = {
   draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-800', icon: FileText },
@@ -252,10 +252,33 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
             </Button>
           </Link>
 
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-          </Button>
+          <DownloadQuotationPDF
+            data={{
+              quoteNumber: quotation.quote_number,
+              createdAt: quotation.created_at,
+              validUntil: quotation.valid_until,
+              status: quotation.status,
+              clientName: quotation.patient_name || 'Cliente',
+              clientEmail: quotation.patient_email,
+              clientPhone: quotation.patient_phone,
+              items: (quotation.items || []).map(item => ({
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unit_price,
+                discount: item.discount,
+                discountType: item.discount_type as 'percentage' | 'fixed',
+                subtotal: item.subtotal,
+              })),
+              subtotal: quotation.subtotal,
+              discountTotal: quotation.discount_total,
+              taxRate: quotation.tax_rate,
+              taxAmount: quotation.tax_amount,
+              total: quotation.total,
+              currency: quotation.currency,
+              notes: quotation.notes,
+              termsConditions: quotation.terms_conditions,
+            }}
+          />
 
           <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="mr-2 h-4 w-4" />
