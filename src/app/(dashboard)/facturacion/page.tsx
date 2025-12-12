@@ -1,41 +1,16 @@
 export const dynamic = 'force-dynamic'
 
 import { getInvoices, getBillingStats } from '@/actions/billing'
+import { getQuotations, getQuotationStats } from '@/actions/quotations'
 import { FacturacionClient } from './_components/facturacion-client'
 import type { InvoiceStatus } from '@/types/billing'
 
-// Mock quotes - TODO: Create quotes table in database
-const mockQuotes = [
-  {
-    id: '1',
-    quoteNumber: 'COT-2024-0015',
-    clientName: 'Maria Garcia Lopez',
-    clientRnc: null,
-    total: 45000,
-    currency: 'DOP' as const,
-    status: 'sent' as const,
-    issueDate: '2024-12-05',
-    validUntil: '2024-12-20',
-    itemsCount: 3,
-  },
-  {
-    id: '2',
-    quoteNumber: 'COT-2024-0014',
-    clientName: 'Centro Medico San Rafael',
-    clientRnc: '101234567',
-    total: 125000,
-    currency: 'DOP' as const,
-    status: 'accepted' as const,
-    issueDate: '2024-12-03',
-    validUntil: '2024-12-18',
-    itemsCount: 8,
-  },
-]
-
 export default async function FacturacionPage() {
-  const [dbInvoices, dbStats] = await Promise.all([
+  const [dbInvoices, dbStats, dbQuotations, dbQuoteStats] = await Promise.all([
     getInvoices(),
     getBillingStats(),
+    getQuotations(),
+    getQuotationStats(),
   ])
 
   // Map invoice status for display
@@ -70,12 +45,49 @@ export default async function FacturacionPage() {
     hasFiscalReceipt: !!inv.ncf,
   }))
 
+  // Map quote status for display
+  const mapQuoteStatus = (status: string): 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' => {
+    switch (status) {
+      case 'draft':
+        return 'draft'
+      case 'sent':
+        return 'sent'
+      case 'accepted':
+        return 'accepted'
+      case 'rejected':
+        return 'rejected'
+      case 'expired':
+        return 'expired'
+      default:
+        return 'draft'
+    }
+  }
+
+  // Transform quotations data
+  const quotes = dbQuotations.map((q) => ({
+    id: q.id,
+    quoteNumber: q.quote_number,
+    clientName: q.patient_name || 'Cliente',
+    clientRnc: null,
+    total: q.total,
+    currency: q.currency as 'DOP' | 'USD',
+    status: mapQuoteStatus(q.status),
+    issueDate: q.created_at,
+    validUntil: q.valid_until,
+    itemsCount: q.items?.length || 0,
+  }))
+
+  // Calculate quote conversion rate
+  const quoteConversionRate = dbQuoteStats.total > 0
+    ? Math.round((dbQuoteStats.accepted / dbQuoteStats.total) * 100)
+    : 0
+
   // Transform stats
   const stats = {
     invoicedThisMonth: dbStats.invoiced_this_month,
     pendingCollection: dbStats.pending_collection,
     overdueAmount: dbStats.overdue_amount,
-    quoteConversionRate: 68, // TODO: Calculate from real data
+    quoteConversionRate,
     pendingCount: dbStats.pending_count,
     overdueCount: dbStats.overdue_count,
   }
@@ -83,7 +95,7 @@ export default async function FacturacionPage() {
   return (
     <FacturacionClient
       invoices={invoices}
-      quotes={mockQuotes}
+      quotes={quotes}
       stats={stats}
     />
   )
