@@ -261,6 +261,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               clientName: quotation.patient_name || 'Cliente',
               clientEmail: quotation.patient_email,
               clientPhone: quotation.patient_phone,
+              clientAddress: quotation.patient_address,
               items: (quotation.items || []).map(item => ({
                 description: item.description,
                 quantity: item.quantity,

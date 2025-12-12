@@ -2,14 +2,14 @@
 
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
-// Med Luxe logo URL
-const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765388675/Med_Luxe_Logo_zq8fsv.png'
+// Med Luxe logo URL (new logo with transparent background)
+const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/Med_Luxe_Logo_1_kohhy1.png'
 
 // Brand colors matching the email template
 const colors = {
   primary: '#A67C52',       // Med Luxe Gold
   primaryDark: '#8a6543',   // Gold dark for gradients
-  dark: '#1f2937',          // Footer background
+  dark: '#1f2937',          // Dark background (not used for header/footer now)
   text: '#333333',          // Main text
   gray: '#666666',          // Muted text
   lightGray: '#9ca3af',     // Light muted text
@@ -32,28 +32,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // Header bar (dark background for logo contrast)
+  // Header bar (gold background)
   headerBar: {
     height: 90,
-    backgroundColor: colors.dark,
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 30,
   },
   headerLogo: {
     width: 160,
     height: 65,
   },
+  headerTitleSection: {
+    alignItems: 'flex-end',
+  },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.white,
-    letterSpacing: 3,
-  },
-  headerSubtitle: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.9)',
     letterSpacing: 2,
+  },
+  headerQuoteNumber: {
+    fontSize: 12,
+    color: colors.white,
     marginTop: 4,
   },
 
@@ -61,23 +64,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 30,
     paddingTop: 25,
-  },
-
-  // Title section
-  titleSection: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  mainTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  quoteNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.gray,
   },
 
   // Client info box
@@ -199,30 +185,42 @@ const styles = StyleSheet.create({
     lineHeight: 1.6,
   },
 
-  // Footer
+  // Footer (gold background with white text)
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.dark,
+    backgroundColor: colors.primary,
     padding: 20,
     alignItems: 'center',
   },
   footerQuestion: {
     fontSize: 11,
-    color: colors.lightGray,
+    color: colors.white,
     marginBottom: 8,
   },
   footerEmail: {
     fontSize: 11,
-    color: colors.primary,
+    color: colors.white,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  footerPhone: {
+    fontSize: 11,
+    color: colors.white,
     marginBottom: 6,
   },
   footerAddress: {
     fontSize: 10,
-    color: colors.lightGray,
+    color: colors.white,
     textAlign: 'center',
+  },
+  footerCompany: {
+    fontSize: 10,
+    color: colors.white,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
 })
 
@@ -283,6 +281,7 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
     clientName,
     clientEmail,
     clientPhone,
+    clientAddress,
     items,
     subtotal,
     discountTotal,
@@ -296,25 +295,41 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header with Logo */}
+        {/* Header with Logo and Title on right */}
         <View style={styles.headerBar}>
           <Image src={LOGO_URL} style={styles.headerLogo} />
+          <View style={styles.headerTitleSection}>
+            <Text style={styles.headerTitle}>Cotizacion</Text>
+            <Text style={styles.headerQuoteNumber}>{quoteNumber}</Text>
+          </View>
         </View>
 
         {/* Main Content */}
         <View style={styles.content}>
-          {/* Title Section */}
-          <View style={styles.titleSection}>
-            <Text style={styles.mainTitle}>Cotizacion</Text>
-            <Text style={styles.quoteNumber}>{quoteNumber}</Text>
-          </View>
-
-          {/* Client Info Box */}
+          {/* Client Info Box - All client data */}
           <View style={styles.clientBox}>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Cliente:</Text>
               <Text style={styles.clientValue}>{clientName}</Text>
             </View>
+            {clientPhone && (
+              <View style={styles.clientRow}>
+                <Text style={styles.clientLabel}>Telefono:</Text>
+                <Text style={styles.clientValue}>{clientPhone}</Text>
+              </View>
+            )}
+            {clientEmail && (
+              <View style={styles.clientRow}>
+                <Text style={styles.clientLabel}>Correo:</Text>
+                <Text style={styles.clientValue}>{clientEmail}</Text>
+              </View>
+            )}
+            {clientAddress && (
+              <View style={styles.clientRow}>
+                <Text style={styles.clientLabel}>Direccion:</Text>
+                <Text style={styles.clientValue}>{clientAddress}</Text>
+              </View>
+            )}
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Fecha:</Text>
               <Text style={styles.clientValue}>{formatDate(createdAt)}</Text>
@@ -384,8 +399,9 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
         <View style={styles.footer}>
           <Text style={styles.footerQuestion}>Tienes preguntas? Contactanos</Text>
           <Text style={styles.footerEmail}>info@medluxeclinic.com</Text>
-          <Text style={styles.footerAddress}>Med Luxe Aesthetics & Wellness</Text>
-          <Text style={styles.footerAddress}>Santo Domingo, Republica Dominicana</Text>
+          <Text style={styles.footerPhone}>809-558-0911</Text>
+          <Text style={styles.footerCompany}>Med Luxe Aesthetics & Wellness</Text>
+          <Text style={styles.footerAddress}>Plaza Terranova Caribbean 2, Av. Barcelo, Punta Cana 23000, Republica Dominicana</Text>
         </View>
       </Page>
     </Document>

@@ -27,6 +27,7 @@ export interface QuotationData {
   patient_name?: string
   patient_email?: string
   patient_phone?: string
+  patient_address?: string
   currency: 'DOP' | 'USD'
   subtotal: number
   discount_total: number
@@ -195,7 +196,7 @@ export async function getQuotationById(id: string): Promise<QuotationData | null
     .from('quotations')
     .select(`
       *,
-      patient:patients(first_name, last_name, email, phone),
+      patient:patients(first_name, last_name, email, phone, address),
       items:quotation_items(*)
     `)
     .eq('id', id)
@@ -211,6 +212,7 @@ export async function getQuotationById(id: string): Promise<QuotationData | null
     patient_name: data.patient ? `${data.patient.first_name} ${data.patient.last_name}` : 'Cliente desconocido',
     patient_email: data.patient?.email,
     patient_phone: data.patient?.phone,
+    patient_address: data.patient?.address,
   }
 }
 
