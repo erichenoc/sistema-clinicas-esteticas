@@ -84,7 +84,7 @@ export function generateQuotationEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); padding: 30px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #A67C52 0%, #8a6543 100%); padding: 30px; text-align: center;">
           <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 300; letter-spacing: 2px;">MED LUXE</h1>
           <p style="margin: 5px 0 0; color: rgba(255,255,255,0.9); font-size: 12px; letter-spacing: 1px;">AESTHETICS & WELLNESS</p>
         </div>
@@ -137,7 +137,7 @@ export function generateQuotationEmailHTML(data: {
             ` : ''}
             <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #e5e5e5; font-size: 18px; font-weight: bold;">
               <span>Total:</span>
-              <span style="color: #8b5cf6;">${formatPrice(data.total)}</span>
+              <span style="color: #A67C52;">${formatPrice(data.total)}</span>
             </div>
           </div>
 
@@ -162,7 +162,7 @@ export function generateQuotationEmailHTML(data: {
             ¿Tienes preguntas? Contáctanos
           </p>
           <p style="margin: 0 0 5px; color: #ffffff; font-size: 14px;">
-            <a href="mailto:info@medluxeclinic.com" style="color: #a78bfa; text-decoration: none;">info@medluxeclinic.com</a>
+            <a href="mailto:info@medluxeclinic.com" style="color: #c9a67a; text-decoration: none;">info@medluxeclinic.com</a>
           </p>
           <p style="margin: 0; color: #9ca3af; font-size: 12px;">
             Med Luxe Aesthetics & Wellness<br>
