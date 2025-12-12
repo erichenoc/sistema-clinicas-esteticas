@@ -160,7 +160,8 @@ export async function getQuotations(): Promise<QuotationData[]> {
       .from('quotations')
       .select(`
         *,
-        patient:patients(first_name, last_name, email, phone)
+        patient:patients(first_name, last_name, email, phone),
+        items:quotation_items(id)
       `)
       .order('created_at', { ascending: false })
 
@@ -172,11 +173,12 @@ export async function getQuotations(): Promise<QuotationData[]> {
     console.log('[Quotations] Fetched quotations count:', data?.length || 0)
 
     // Transform data
-    return (data || []).map((q: { patient?: { first_name?: string; last_name?: string; email?: string; phone?: string } } & QuotationData) => ({
+    return (data || []).map((q: { patient?: { first_name?: string; last_name?: string; email?: string; phone?: string }; items?: { id: string }[] } & QuotationData) => ({
       ...q,
       patient_name: q.patient ? `${q.patient.first_name} ${q.patient.last_name}` : 'Cliente desconocido',
       patient_email: q.patient?.email,
       patient_phone: q.patient?.phone,
+      items: q.items || [],
     }))
   } catch (err) {
     console.error('[Quotations] Unexpected error in getQuotations:', err)
