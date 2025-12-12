@@ -34,17 +34,15 @@ const styles = StyleSheet.create({
 
   // Header gradient bar (gold)
   headerBar: {
-    height: 80,
+    height: 90,
     backgroundColor: colors.primary,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 30,
   },
   headerLogo: {
-    width: 120,
-    height: 50,
-    marginBottom: 5,
+    width: 160,
+    height: 65,
   },
   headerTitle: {
     fontSize: 22,
