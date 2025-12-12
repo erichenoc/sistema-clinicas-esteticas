@@ -248,18 +248,18 @@ export default function NominaPage() {
   const employerCost = totalGross * 0.2206
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Nómina</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Nómina</h1>
+          <p className="text-muted-foreground text-sm">
             Gestión de pagos y empleados
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <Calendar className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Período" />
             </SelectTrigger>
@@ -270,14 +270,16 @@ export default function NominaPage() {
               <SelectItem value="2024-09">Septiembre 2024</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Button>
-            <Calculator className="mr-2 h-4 w-4" />
-            Calcular Nómina
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 sm:flex-none">
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+            <Button className="flex-1 sm:flex-none">
+              <Calculator className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Calcular </span>Nómina
+            </Button>
+          </div>
         </div>
       </div>
 
