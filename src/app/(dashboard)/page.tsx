@@ -290,23 +290,23 @@ export default function DashboardPage() {
   const progressPercent = (completedToday / totalToday) * 100
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             Bienvenido de vuelta. Aqui esta el resumen de hoy{todayDate && `, ${todayDate}`}.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button variant="outline" asChild className="flex-1 sm:flex-none">
             <Link href="/reportes">
               <Activity className="h-4 w-4 mr-2" />
-              Ver Reportes
+              <span className="hidden sm:inline">Ver </span>Reportes
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="flex-1 sm:flex-none">
             <Link href="/agenda/nueva">
               <Calendar className="h-4 w-4 mr-2" />
               Nueva Cita

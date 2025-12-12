@@ -202,9 +202,9 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
           </h2>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <Users className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Profesional" />
             </SelectTrigger>
@@ -221,10 +221,10 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
           </Select>
 
           <Tabs value={view} onValueChange={(v) => handleViewChange(v as 'timeGridDay' | 'timeGridWeek' | 'dayGridMonth')}>
-            <TabsList>
-              <TabsTrigger value="timeGridDay">Dia</TabsTrigger>
-              <TabsTrigger value="timeGridWeek">Semana</TabsTrigger>
-              <TabsTrigger value="dayGridMonth">Mes</TabsTrigger>
+            <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+              <TabsTrigger value="timeGridDay" className="text-xs sm:text-sm">Dia</TabsTrigger>
+              <TabsTrigger value="timeGridWeek" className="text-xs sm:text-sm">Semana</TabsTrigger>
+              <TabsTrigger value="dayGridMonth" className="text-xs sm:text-sm">Mes</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

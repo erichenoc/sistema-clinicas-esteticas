@@ -287,28 +287,28 @@ export function SettingsClient({ initialClinic, initialBranches }: SettingsClien
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-          <TabsTrigger value="clinica" className="gap-2">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto gap-1">
+          <TabsTrigger value="clinica" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Clinica</span>
           </TabsTrigger>
-          <TabsTrigger value="sucursales" className="gap-2">
+          <TabsTrigger value="sucursales" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <MapPin className="h-4 w-4" />
             <span className="hidden sm:inline">Sucursales</span>
           </TabsTrigger>
-          <TabsTrigger value="usuarios" className="gap-2">
+          <TabsTrigger value="usuarios" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Usuarios</span>
           </TabsTrigger>
-          <TabsTrigger value="roles" className="gap-2">
+          <TabsTrigger value="roles" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Roles</span>
           </TabsTrigger>
-          <TabsTrigger value="mensajes" className="gap-2">
+          <TabsTrigger value="mensajes" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Mensajes</span>
           </TabsTrigger>
-          <TabsTrigger value="integraciones" className="gap-2">
+          <TabsTrigger value="integraciones" className="gap-1 sm:gap-2 py-2 sm:py-1.5">
             <Plug className="h-4 w-4" />
             <span className="hidden sm:inline">Integraciones</span>
           </TabsTrigger>

@@ -198,18 +198,20 @@ export function POSClient({ treatments, packages, products, patients }: POSClien
           </div>
 
           <Tabs defaultValue="treatments" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="treatments" className="flex-1">
-                <Sparkles className="mr-2 h-4 w-4" />
-                Tratamientos
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="treatments" className="text-xs sm:text-sm px-2 sm:px-3">
+                <Sparkles className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Tratamientos</span>
+                <span className="sm:hidden">Trat.</span>
               </TabsTrigger>
-              <TabsTrigger value="packages" className="flex-1">
-                <Package className="mr-2 h-4 w-4" />
+              <TabsTrigger value="packages" className="text-xs sm:text-sm px-2 sm:px-3">
+                <Package className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 Paquetes
               </TabsTrigger>
-              <TabsTrigger value="products" className="flex-1">
-                <Tag className="mr-2 h-4 w-4" />
-                Productos
+              <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3">
+                <Tag className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Productos</span>
+                <span className="sm:hidden">Prod.</span>
               </TabsTrigger>
             </TabsList>
 
