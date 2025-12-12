@@ -209,24 +209,24 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Inventario</h1>
-          <p className="text-gray-600 mt-1">Control de stock, productos y movimientos</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Inventario</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Control de stock, productos y movimientos</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/inventario/ordenes-compra">
               <Truck className="h-4 w-4 mr-2" />
-              Ordenes de Compra
+              <span className="truncate">Ordenes de Compra</span>
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/inventario/productos/nuevo">
               <Plus className="h-4 w-4 mr-2" />
-              Nuevo Producto
+              <span className="truncate">Nuevo Producto</span>
             </Link>
           </Button>
         </div>

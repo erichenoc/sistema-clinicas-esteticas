@@ -240,16 +240,16 @@ export function ReportesClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reportes</h1>
-          <p className="text-muted-foreground">Analisis detallado del rendimiento de la clinica</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Reportes</h1>
+          <p className="text-muted-foreground text-sm">Analisis detallado del rendimiento de la clinica</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent>
@@ -259,32 +259,34 @@ export function ReportesClient({
               <SelectItem value="year">Este ano</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleToggleFilters}>
-            <Filter className="mr-2 h-4 w-4" />
-            Filtros
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportPDF}>
-                <FileText className="mr-2 h-4 w-4" />
-                Exportar como PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportExcel}>
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Exportar como Excel (CSV)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleToggleFilters} className="flex-1 sm:flex-none">
+              <Filter className="mr-2 h-4 w-4" />
+              Filtros
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={isExporting} className="flex-1 sm:flex-none">
+                  {isExporting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Exportar como PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Exportar como Excel (CSV)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

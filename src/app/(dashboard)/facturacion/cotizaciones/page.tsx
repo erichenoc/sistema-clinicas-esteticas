@@ -144,22 +144,22 @@ export default function CotizacionesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/facturacion">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Cotizaciones</h1>
-            <p className="text-muted-foreground">Gestiona cotizaciones y presupuestos</p>
+            <h1 className="text-xl sm:text-2xl font-bold">Cotizaciones</h1>
+            <p className="text-muted-foreground text-sm">Gestiona cotizaciones y presupuestos</p>
           </div>
         </div>
-        <Link href="/facturacion/cotizaciones/nueva">
-          <Button>
+        <Link href="/facturacion/cotizaciones/nueva" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Cotizacion
           </Button>

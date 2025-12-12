@@ -348,38 +348,38 @@ export default function NuevaCotizacionPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-4">
           <Link href="/facturacion">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Nueva Cotización</h1>
-            <p className="text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold">Nueva Cotización</h1>
+            <p className="text-muted-foreground text-sm">
               Crea una cotización para enviar a tu cliente
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave(false)} disabled={isSubmitting}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:ml-auto">
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={isSubmitting} className="w-full sm:w-auto">
             {isSubmitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            Guardar Borrador
+            <span className="truncate">Guardar Borrador</span>
           </Button>
-          <Button onClick={() => handleSave(true)} disabled={isSubmitting}>
+          <Button onClick={() => handleSave(true)} disabled={isSubmitting} className="w-full sm:w-auto">
             {isSubmitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            Guardar y Enviar
+            <span className="truncate">Guardar y Enviar</span>
           </Button>
         </div>
       </div>
@@ -481,16 +481,16 @@ export default function NuevaCotizacionPage() {
 
           {/* Items de la cotización */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Items</CardTitle>
                   <CardDescription>Agrega los servicios y productos a cotizar</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
                     <PopoverTrigger asChild>
-                      <Button>
+                      <Button className="w-full sm:w-auto">
                         <Plus className="mr-2 h-4 w-4" />
                         Agregar Item
                       </Button>
@@ -578,9 +578,9 @@ export default function NuevaCotizacionPage() {
                       </Command>
                     </PopoverContent>
                   </Popover>
-                  <Button variant="outline" onClick={addCustomItem}>
+                  <Button variant="outline" onClick={addCustomItem} className="w-full sm:w-auto">
                     <FileText className="mr-2 h-4 w-4" />
-                    Item Personalizado
+                    <span className="truncate">Item Personalizado</span>
                   </Button>
                 </div>
               </div>

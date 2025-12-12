@@ -106,27 +106,27 @@ export default function FacturasPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/facturacion">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Facturas</h1>
-            <p className="text-muted-foreground">Gestiona facturas y comprobantes fiscales</p>
+            <h1 className="text-xl sm:text-2xl font-bold">Facturas</h1>
+            <p className="text-muted-foreground text-sm">Gestiona facturas y comprobantes fiscales</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>
-          <Link href="/facturacion/facturas/nueva">
-            <Button>
+          <Link href="/facturacion/facturas/nueva" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Nueva Factura
             </Button>

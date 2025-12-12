@@ -134,23 +134,23 @@ export function ConsentimientosClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Consentimientos Informados</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Consentimientos Informados</h1>
+          <p className="text-muted-foreground text-sm">
             Gestiona plantillas y consentimientos firmados
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/consentimientos/plantillas/nueva">
               <FileText className="mr-2 h-4 w-4" />
               Nueva Plantilla
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/consentimientos/firmar">
               <FileSignature className="mr-2 h-4 w-4" />
               Firmar Consentimiento

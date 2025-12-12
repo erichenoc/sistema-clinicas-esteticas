@@ -107,24 +107,24 @@ export function ProfesionalesClient({
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Profesionales</h1>
-          <p className="text-gray-600 mt-1">Gestion del equipo, comisiones y asistencia</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Profesionales</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Gestion del equipo, comisiones y asistencia</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/profesionales/comisiones">
               <DollarSign className="h-4 w-4 mr-2" />
-              Ver Comisiones
+              <span className="sm:inline">Ver Comisiones</span>
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/profesionales/nuevo">
               <Plus className="h-4 w-4 mr-2" />
-              Nuevo Profesional
+              <span className="sm:inline">Nuevo Profesional</span>
             </Link>
           </Button>
         </div>
