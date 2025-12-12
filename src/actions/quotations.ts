@@ -355,6 +355,8 @@ export async function sendQuotationEmail(id: string): Promise<{ success: boolean
   const emailHTML = generateQuotationEmailHTML({
     quotationNumber: quotation.quote_number,
     clientName: quotation.patient_name || 'Cliente',
+    clientPhone: quotation.patient_phone,
+    clientEmail: quotation.patient_email,
     items: (quotation.items || []).map(item => ({
       description: item.description,
       quantity: item.quantity,

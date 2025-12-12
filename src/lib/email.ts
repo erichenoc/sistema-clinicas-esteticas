@@ -58,10 +58,15 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
   }
 }
 
+// Logo URL
+const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/Med_Luxe_Logo_1_kohhy1.png'
+
 // Generate quotation email HTML
 export function generateQuotationEmailHTML(data: {
   quotationNumber: string
   clientName: string
+  clientPhone?: string
+  clientEmail?: string
   items: Array<{
     description: string
     quantity: number
@@ -100,23 +105,30 @@ export function generateQuotationEmailHTML(data: {
     </head>
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #A67C52 0%, #8a6543 100%); padding: 30px; text-align: center;">
-          <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 300; letter-spacing: 2px;">MED LUXE</h1>
-          <p style="margin: 5px 0 0; color: rgba(255,255,255,0.9); font-size: 12px; letter-spacing: 1px;">AESTHETICS & WELLNESS</p>
+        <!-- Header with Logo and Title -->
+        <div style="background-color: #A67C52; padding: 20px 30px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 50%; vertical-align: middle;">
+                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 60px; width: auto;" />
+              </td>
+              <td style="width: 50%; text-align: right; vertical-align: middle;">
+                <p style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Cotización</p>
+                <p style="margin: 5px 0 0; color: #ffffff; font-size: 14px;">${data.quotationNumber}</p>
+              </td>
+            </tr>
+          </table>
         </div>
 
         <!-- Content -->
         <div style="padding: 30px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h2 style="margin: 0 0 10px; color: #333; font-size: 24px;">Cotización</h2>
-            <p style="margin: 0; color: #666; font-size: 16px;"><strong>${data.quotationNumber}</strong></p>
-          </div>
-
+          <!-- Client Info Box -->
           <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
-            <p style="margin: 0 0 8px;"><strong>Cliente:</strong> ${data.clientName}</p>
-            <p style="margin: 0 0 8px;"><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p style="margin: 0;"><strong>Válida hasta:</strong> ${new Date(data.validUntil).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Cliente:</span> ${data.clientName}</p>
+            ${data.clientPhone ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Teléfono:</span> ${data.clientPhone}</p>` : ''}
+            ${data.clientEmail ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Correo:</span> ${data.clientEmail}</p>` : ''}
+            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Fecha:</span> ${new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="margin: 0;"><span style="color: #A67C52; font-weight: 600;">Válida hasta:</span> ${new Date(data.validUntil).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
 
           <!-- Items Table -->
@@ -136,26 +148,31 @@ export function generateQuotationEmailHTML(data: {
 
           <!-- Totals -->
           <div style="background: #f9fafb; border-radius: 8px; padding: 20px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #666;">Subtotal:</span>
-              <span>${formatPrice(data.subtotal + data.discountTotal)}</span>
-            </div>
-            ${data.discountTotal > 0 ? `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #16a34a;">
-              <span>Descuento:</span>
-              <span>-${formatPrice(data.discountTotal)}</span>
-            </div>
-            ` : ''}
-            ${data.taxRate > 0 ? `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="color: #666;">ITBIS (${data.taxRate}%):</span>
-              <span>${formatPrice(data.taxAmount)}</span>
-            </div>
-            ` : ''}
-            <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #e5e5e5; font-size: 18px; font-weight: bold;">
-              <span>Total:</span>
-              <span style="color: #A67C52;">${formatPrice(data.total)}</span>
-            </div>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 4px 0; color: #666;">Subtotal:</td>
+                <td style="padding: 4px 0; text-align: right;">${formatPrice(data.subtotal + data.discountTotal)}</td>
+              </tr>
+              ${data.discountTotal > 0 ? `
+              <tr style="color: #16a34a;">
+                <td style="padding: 4px 0;">Descuento:</td>
+                <td style="padding: 4px 0; text-align: right;">-${formatPrice(data.discountTotal)}</td>
+              </tr>
+              ` : ''}
+              ${data.taxRate > 0 ? `
+              <tr>
+                <td style="padding: 4px 0; color: #666;">ITBIS (${data.taxRate}%):</td>
+                <td style="padding: 4px 0; text-align: right;">${formatPrice(data.taxAmount)}</td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td colspan="2" style="padding: 12px 0 0;"><hr style="border: none; border-top: 2px solid #e5e5e5; margin: 0;" /></td>
+              </tr>
+              <tr style="font-size: 18px; font-weight: bold;">
+                <td style="padding: 8px 0 0;">Total:</td>
+                <td style="padding: 8px 0 0; text-align: right; color: #A67C52;">${formatPrice(data.total)}</td>
+              </tr>
+            </table>
           </div>
 
           ${data.notes ? `
@@ -173,17 +190,20 @@ export function generateQuotationEmailHTML(data: {
           ` : ''}
         </div>
 
-        <!-- Footer -->
-        <div style="background: #1f2937; padding: 25px; text-align: center;">
-          <p style="margin: 0 0 10px; color: #9ca3af; font-size: 14px;">
+        <!-- Footer - Gold background with white text -->
+        <div style="background-color: #A67C52; padding: 25px; text-align: center;">
+          <p style="margin: 0 0 10px; color: #ffffff; font-size: 14px;">
             ¿Tienes preguntas? Contáctanos
           </p>
           <p style="margin: 0 0 5px; color: #ffffff; font-size: 14px;">
-            <a href="mailto:info@medluxeclinic.com" style="color: #c9a67a; text-decoration: none;">info@medluxeclinic.com</a>
+            <a href="mailto:info@medluxeclinic.com" style="color: #ffffff; text-decoration: underline;">info@medluxeclinic.com</a>
           </p>
-          <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+          <p style="margin: 0 0 5px; color: #ffffff; font-size: 14px;">
+            809-558-0911
+          </p>
+          <p style="margin: 10px 0 0; color: #ffffff; font-size: 12px;">
             Med Luxe Aesthetics & Wellness<br>
-            Santo Domingo, República Dominicana
+            Plaza Terranova Caribbean 2, Av. Barceló, Punta Cana 23000, República Dominicana
           </p>
         </div>
       </div>
