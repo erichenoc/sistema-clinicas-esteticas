@@ -1,36 +1,29 @@
 'use client'
 
-import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
-// Register fonts
-Font.register({
-  family: 'Helvetica',
-  fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
-  ],
-})
+// Med Luxe logo URL
+const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765388675/Med_Luxe_Logo_zq8fsv.png'
 
-// Brand colors - Med Luxe official palette inspired by reference design
+// Brand colors matching the email template
 const colors = {
-  primary: '#A67C52',       // Med Luxe Gold (main brand color)
-  primaryLight: '#c9a67a',  // Gold light
-  primaryDark: '#8a6543',   // Gold dark
-  secondary: '#93beb8',     // Med Luxe Teal
-  accent: '#e8a0c0',        // Med Luxe Rose
-  cream: '#FEF7E6',         // Cream highlight (like reference yellow)
-  warmGray: '#998577',      // Med Luxe Warm Gray
-  dark: '#2D2D2D',          // Main text
-  gray: '#6B7280',          // Muted text
-  lightGray: '#F8F6F3',     // Light background
-  border: '#E5E2DD',        // Border color
+  primary: '#A67C52',       // Med Luxe Gold
+  primaryDark: '#8a6543',   // Gold dark for gradients
+  dark: '#1f2937',          // Footer background
+  text: '#333333',          // Main text
+  gray: '#666666',          // Muted text
+  lightGray: '#9ca3af',     // Light muted text
+  border: '#e5e5e5',        // Border color
   white: '#FFFFFF',
-  background: '#FDFCFA',    // Page background
-  success: '#10b981',       // Green for discounts
-  tableHeader: '#A67C52',   // Gold header like orange in reference
+  cream: '#fffbeb',         // Terms background (amber tint)
+  creamBorder: '#f59e0b',   // Terms border (amber)
+  creamText: '#92400e',     // Terms title
+  creamTextDark: '#78350f', // Terms content
+  tableHeader: '#f3f4f6',   // Table header background
+  background: '#f9fafb',    // Section background
 }
 
-// Styles inspired by the reference design
+// Styles matching the email template exactly
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
@@ -39,386 +32,199 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // Top decorative bar (like reference)
-  topBar: {
-    height: 8,
+  // Header gradient bar (gold)
+  headerBar: {
+    height: 80,
     backgroundColor: colors.primary,
-  },
-
-  // Main content area
-  content: {
-    padding: 40,
-    paddingTop: 30,
-  },
-
-  // Header section
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 20,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  logoContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+  headerLogo: {
+    width: 120,
+    height: 50,
+    marginBottom: 5,
   },
-  logo: {
-    width: 140,
-    height: 60,
-    objectFit: 'contain',
-  },
-  companyInfo: {
-    marginTop: 8,
-  },
-  companyInfoText: {
-    fontSize: 8,
-    color: colors.gray,
-    marginBottom: 2,
-  },
-
-  // Quote title section (right side)
-  quoteInfo: {
-    alignItems: 'flex-end',
-  },
-  quoteTitle: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: colors.dark,
-    letterSpacing: 1,
+    color: colors.white,
+    letterSpacing: 3,
   },
-  quoteNumber: {
-    fontSize: 11,
-    color: colors.gray,
-    marginTop: 6,
-  },
-  quoteDate: {
+  headerSubtitle: {
     fontSize: 10,
-    color: colors.gray,
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 2,
     marginTop: 4,
   },
 
-  // Client info section (like "INVOICE TO" in reference)
-  clientSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // Main content
+  content: {
+    padding: 30,
+    paddingTop: 25,
+  },
+
+  // Title section
+  titleSection: {
+    alignItems: 'center',
     marginBottom: 25,
   },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  quoteNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.gray,
+  },
+
+  // Client info box
   clientBox: {
-    width: '48%',
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    padding: 16,
+    marginBottom: 20,
+  },
+  clientRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
   },
   clientLabel: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: colors.text,
+    width: 80,
   },
-  clientCard: {
-    backgroundColor: colors.lightGray,
-    padding: 14,
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-  },
-  clientName: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: colors.dark,
-    marginBottom: 6,
-  },
-  clientText: {
-    fontSize: 9,
-    color: colors.gray,
-    marginBottom: 3,
+  clientValue: {
+    fontSize: 10,
+    color: colors.text,
   },
 
-  // Contact info (right side like reference)
-  contactInfo: {
-    alignItems: 'flex-end',
-  },
-  contactText: {
-    fontSize: 9,
-    color: colors.gray,
-    marginBottom: 3,
-    textAlign: 'right',
-  },
-
-  // Table section title
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Items Table (styled like reference with gold header)
+  // Items table
   table: {
     marginBottom: 20,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: colors.tableHeader,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.border,
   },
   tableHeaderCell: {
-    color: colors.white,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#374151',
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  tableRowAlt: {
-    backgroundColor: colors.lightGray,
-  },
   tableCell: {
-    fontSize: 9,
-    color: colors.dark,
-  },
-  tableCellMuted: {
-    fontSize: 9,
-    color: colors.gray,
-  },
-
-  // Column widths (matching reference layout)
-  colDescription: { width: '40%' },
-  colPrice: { width: '18%', textAlign: 'center' },
-  colQty: { width: '12%', textAlign: 'center' },
-  colTotal: { width: '18%', textAlign: 'right' },
-  colDiscount: { width: '12%', textAlign: 'center' },
-
-  // Totals section (like reference - bottom right)
-  totalsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
-  },
-  paymentMethodBox: {
-    width: '45%',
-  },
-  paymentMethodTitle: {
     fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.dark,
-    marginBottom: 10,
-  },
-  paymentMethodText: {
-    fontSize: 9,
-    color: colors.gray,
-    marginBottom: 4,
+    color: colors.text,
   },
 
+  // Column widths
+  colDescription: { width: '40%' },
+  colQty: { width: '15%', textAlign: 'center' },
+  colPrice: { width: '22%', textAlign: 'right' },
+  colSubtotal: { width: '23%', textAlign: 'right' },
+
+  // Totals section
   totalsBox: {
-    width: '45%',
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    padding: 16,
+    marginBottom: 20,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginBottom: 6,
   },
   totalLabel: {
     fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.dark,
+    color: colors.gray,
   },
   totalValue: {
     fontSize: 10,
-    color: colors.dark,
+    color: colors.text,
   },
-  discountValue: {
-    fontSize: 10,
-    color: colors.success,
-  },
-  taxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.lightGray,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  taxLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.gray,
+  totalDivider: {
+    height: 2,
+    backgroundColor: colors.border,
+    marginVertical: 10,
   },
   grandTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: colors.tableHeader,
+    paddingTop: 8,
   },
   grandTotalLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: colors.white,
-    textTransform: 'uppercase',
+    color: colors.text,
   },
   grandTotalValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-
-  // Validity notice (cream/yellow box like reference)
-  validityBox: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: colors.cream,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  validityText: {
-    fontSize: 9,
-    color: colors.primaryDark,
-    textAlign: 'center',
-  },
-
-  // Terms and conditions section
-  termsSection: {
-    marginTop: 20,
-  },
-  termsTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.dark,
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 6,
-  },
-  termsList: {
-    paddingLeft: 8,
-  },
-  termsItem: {
-    fontSize: 8,
-    color: colors.gray,
-    marginBottom: 4,
-    lineHeight: 1.5,
-  },
-
-  // Notes section
-  notesSection: {
-    marginTop: 15,
-  },
-  notesTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.dark,
-    marginBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 6,
-  },
-  notesText: {
-    fontSize: 9,
-    color: colors.gray,
-    lineHeight: 1.5,
-  },
-
-  // Thank you message (like reference)
-  thankYouSection: {
-    marginTop: 30,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  thankYouText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  signatureBox: {
-    alignItems: 'flex-end',
-  },
-  signatureLine: {
-    width: 120,
-    height: 1,
-    backgroundColor: colors.dark,
-    marginBottom: 6,
-  },
-  signatureName: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.dark,
   },
 
-  // Bottom decorative bars (like reference)
-  bottomDecoration: {
+  // Terms section (amber/cream box)
+  termsBox: {
+    backgroundColor: colors.cream,
+    borderRadius: 6,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.creamBorder,
+    marginBottom: 20,
+  },
+  termsTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: colors.creamText,
+    marginBottom: 8,
+  },
+  termsText: {
+    fontSize: 10,
+    color: colors.creamTextDark,
+    lineHeight: 1.6,
+  },
+
+  // Footer
+  footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 30,
-    flexDirection: 'row',
+    backgroundColor: colors.dark,
+    padding: 20,
+    alignItems: 'center',
   },
-  bottomBar1: {
-    width: '70%',
-    height: 8,
-    backgroundColor: colors.primary,
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
+  footerQuestion: {
+    fontSize: 11,
+    color: colors.lightGray,
+    marginBottom: 8,
   },
-  bottomBar2: {
-    width: '60%',
-    height: 8,
-    backgroundColor: colors.primary,
-    position: 'absolute',
-    bottom: 8,
-    left: 0,
+  footerEmail: {
+    fontSize: 11,
+    color: colors.primary,
+    marginBottom: 6,
   },
-
-  // Status badge
-  statusBadge: {
-    position: 'absolute',
-    top: 50,
-    right: 40,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 3,
-  },
-  statusDraft: {
-    backgroundColor: colors.gray,
-  },
-  statusSent: {
-    backgroundColor: '#3B82F6',
-  },
-  statusAccepted: {
-    backgroundColor: colors.success,
-  },
-  statusRejected: {
-    backgroundColor: '#EF4444',
-  },
-  statusExpired: {
-    backgroundColor: '#F59E0B',
-  },
-  statusText: {
-    fontSize: 8,
-    color: colors.white,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  footerAddress: {
+    fontSize: 10,
+    color: colors.lightGray,
+    textAlign: 'center',
   },
 })
 
@@ -471,37 +277,11 @@ const formatDate = (date: string) => {
   })
 }
 
-const getStatusStyle = (status: string) => {
-  switch (status) {
-    case 'sent': return styles.statusSent
-    case 'accepted': return styles.statusAccepted
-    case 'rejected': return styles.statusRejected
-    case 'expired': return styles.statusExpired
-    default: return styles.statusDraft
-  }
-}
-
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    draft: 'BORRADOR',
-    sent: 'ENVIADA',
-    accepted: 'ACEPTADA',
-    rejected: 'RECHAZADA',
-    expired: 'EXPIRADA',
-    converted: 'FACTURADA',
-  }
-  return labels[status] || status.toUpperCase()
-}
-
-// Med Luxe logo URL
-const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765388675/Med_Luxe_Logo_zq8fsv.png'
-
 export function QuotationPDF({ data }: { data: QuotationPDFData }) {
   const {
     quoteNumber,
     createdAt,
     validUntil,
-    status,
     clientName,
     clientEmail,
     clientPhone,
@@ -512,171 +292,102 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
     taxAmount,
     total,
     currency,
-    notes,
     termsConditions,
   } = data
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Top decorative bar */}
-        <View style={styles.topBar} />
-
-        {/* Status Badge */}
-        {status !== 'draft' && (
-          <View style={[styles.statusBadge, getStatusStyle(status)]}>
-            <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
-          </View>
-        )}
+        {/* Header with Logo */}
+        <View style={styles.headerBar}>
+          <Image src={LOGO_URL} style={styles.headerLogo} />
+        </View>
 
         {/* Main Content */}
         <View style={styles.content}>
-          {/* Header with Logo and Quote Info */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Image src={LOGO_URL} style={styles.logo} />
-              <View style={styles.companyInfo}>
-                <Text style={styles.companyInfoText}>www.medluxeclinic.com</Text>
-                <Text style={styles.companyInfoText}>info@medluxeclinic.com</Text>
-              </View>
-            </View>
-            <View style={styles.quoteInfo}>
-              <Text style={styles.quoteTitle}>COTIZACION</Text>
-              <Text style={styles.quoteNumber}>No. {quoteNumber}</Text>
-              <Text style={styles.quoteDate}>Fecha: {formatDate(createdAt)}</Text>
-            </View>
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.mainTitle}>Cotizacion</Text>
+            <Text style={styles.quoteNumber}>{quoteNumber}</Text>
           </View>
 
-          {/* Client Section */}
-          <View style={styles.clientSection}>
-            <View style={styles.clientBox}>
+          {/* Client Info Box */}
+          <View style={styles.clientBox}>
+            <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Cliente:</Text>
-              <View style={styles.clientCard}>
-                <Text style={styles.clientName}>{clientName}</Text>
-                {clientEmail && <Text style={styles.clientText}>{clientEmail}</Text>}
-                {clientPhone && <Text style={styles.clientText}>{clientPhone}</Text>}
-              </View>
+              <Text style={styles.clientValue}>{clientName}</Text>
             </View>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactText}>+1 (809) 555-0123</Text>
-              <Text style={styles.contactText}>info@medluxeclinic.com</Text>
-              <Text style={styles.contactText}>Santo Domingo, Rep. Dominicana</Text>
+            <View style={styles.clientRow}>
+              <Text style={styles.clientLabel}>Fecha:</Text>
+              <Text style={styles.clientValue}>{formatDate(createdAt)}</Text>
+            </View>
+            <View style={styles.clientRow}>
+              <Text style={styles.clientLabel}>Valida hasta:</Text>
+              <Text style={styles.clientValue}>{formatDate(validUntil)}</Text>
             </View>
           </View>
 
           {/* Items Table */}
-          <Text style={styles.sectionLabel}>Servicios y Productos Cotizados</Text>
           <View style={styles.table}>
             {/* Table Header */}
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderCell, styles.colDescription]}>Descripcion</Text>
-              <Text style={[styles.tableHeaderCell, styles.colPrice]}>Precio</Text>
               <Text style={[styles.tableHeaderCell, styles.colQty]}>Cant.</Text>
-              <Text style={[styles.tableHeaderCell, styles.colDiscount]}>Desc.</Text>
-              <Text style={[styles.tableHeaderCell, styles.colTotal]}>Total</Text>
+              <Text style={[styles.tableHeaderCell, styles.colPrice]}>Precio</Text>
+              <Text style={[styles.tableHeaderCell, styles.colSubtotal]}>Subtotal</Text>
             </View>
 
             {/* Table Rows */}
             {items.map((item, index) => (
-              <View key={index} style={[styles.tableRow, index % 2 === 1 ? styles.tableRowAlt : {}]}>
+              <View key={index} style={styles.tableRow}>
                 <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
-                <Text style={[styles.tableCellMuted, styles.colPrice]}>{formatCurrency(item.unitPrice, currency)}</Text>
                 <Text style={[styles.tableCell, styles.colQty]}>{item.quantity}</Text>
-                <Text style={[styles.tableCellMuted, styles.colDiscount]}>
-                  {item.discount > 0
-                    ? item.discountType === 'percentage'
-                      ? `${item.discount}%`
-                      : formatCurrency(item.discount, currency)
-                    : '-'}
-                </Text>
-                <Text style={[styles.tableCell, styles.colTotal]}>{formatCurrency(item.subtotal, currency)}</Text>
+                <Text style={[styles.tableCell, styles.colPrice]}>{formatCurrency(item.unitPrice, currency)}</Text>
+                <Text style={[styles.tableCell, styles.colSubtotal]}>{formatCurrency(item.subtotal, currency)}</Text>
               </View>
             ))}
           </View>
 
-          {/* Payment Method & Totals */}
-          <View style={styles.totalsContainer}>
-            {/* Payment Method (left side) */}
-            <View style={styles.paymentMethodBox}>
-              <Text style={styles.paymentMethodTitle}>Metodo de Pago</Text>
-              <Text style={styles.paymentMethodText}>Transferencia / Efectivo / Tarjeta</Text>
-              <Text style={styles.paymentMethodText}>Banco: Popular Dominicano</Text>
-              <Text style={styles.paymentMethodText}>Cuenta: XXXX-XXXX-XXXX</Text>
+          {/* Totals Box */}
+          <View style={styles.totalsBox}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal:</Text>
+              <Text style={styles.totalValue}>{formatCurrency(subtotal + discountTotal, currency)}</Text>
             </View>
-
-            {/* Totals (right side) */}
-            <View style={styles.totalsBox}>
+            {discountTotal > 0 && (
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>SUB-TOTAL</Text>
-                <Text style={styles.totalValue}>{formatCurrency(subtotal + discountTotal, currency)}</Text>
+                <Text style={[styles.totalLabel, { color: '#16a34a' }]}>Descuento:</Text>
+                <Text style={[styles.totalValue, { color: '#16a34a' }]}>-{formatCurrency(discountTotal, currency)}</Text>
               </View>
-              {discountTotal > 0 && (
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>DESCUENTO</Text>
-                  <Text style={styles.discountValue}>-{formatCurrency(discountTotal, currency)}</Text>
-                </View>
-              )}
-              {taxRate > 0 && (
-                <View style={styles.taxRow}>
-                  <Text style={styles.taxLabel}>ITBIS ({taxRate}%)</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(taxAmount, currency)}</Text>
-                </View>
-              )}
-              <View style={styles.grandTotalRow}>
-                <Text style={styles.grandTotalLabel}>TOTAL</Text>
-                <Text style={styles.grandTotalValue}>{formatCurrency(total, currency)}</Text>
+            )}
+            {taxRate > 0 && (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>ITBIS ({taxRate}%):</Text>
+                <Text style={styles.totalValue}>{formatCurrency(taxAmount, currency)}</Text>
               </View>
+            )}
+            <View style={styles.totalDivider} />
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Total:</Text>
+              <Text style={styles.grandTotalValue}>{formatCurrency(total, currency)}</Text>
             </View>
-          </View>
-
-          {/* Validity Notice */}
-          <View style={styles.validityBox}>
-            <Text style={styles.validityText}>
-              Esta cotizacion es valida hasta el {formatDate(validUntil)}
-            </Text>
           </View>
 
           {/* Terms and Conditions */}
           {termsConditions && (
-            <View style={styles.termsSection}>
-              <Text style={styles.termsTitle}>Terminos y Condiciones</Text>
-              <View style={styles.termsList}>
-                {termsConditions.split('\n').filter(t => t.trim()).map((term, idx) => (
-                  <Text key={idx} style={styles.termsItem}>
-                    {term.startsWith('*') || term.startsWith('-') || term.startsWith('•')
-                      ? term
-                      : `* ${term}`}
-                  </Text>
-                ))}
-              </View>
+            <View style={styles.termsBox}>
+              <Text style={styles.termsTitle}>Terminos y Condiciones:</Text>
+              <Text style={styles.termsText}>{termsConditions}</Text>
             </View>
           )}
-
-          {/* Notes */}
-          {notes && (
-            <View style={styles.notesSection}>
-              <Text style={styles.notesTitle}>Notas Adicionales</Text>
-              <Text style={styles.notesText}>{notes}</Text>
-            </View>
-          )}
-
-          {/* Thank You Section */}
-          <View style={styles.thankYouSection}>
-            <View>
-              <Text style={styles.thankYouText}>GRACIAS POR</Text>
-              <Text style={styles.thankYouText}>SU PREFERENCIA</Text>
-            </View>
-            <View style={styles.signatureBox}>
-              <View style={styles.signatureLine} />
-              <Text style={styles.signatureName}>Med Luxe Clinic</Text>
-            </View>
-          </View>
         </View>
 
-        {/* Bottom Decorative Bars */}
-        <View style={styles.bottomDecoration}>
-          <View style={styles.bottomBar1} />
-          <View style={styles.bottomBar2} />
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerQuestion}>Tienes preguntas? Contactanos</Text>
+          <Text style={styles.footerEmail}>info@medluxeclinic.com</Text>
+          <Text style={styles.footerAddress}>Med Luxe Aesthetics & Wellness</Text>
+          <Text style={styles.footerAddress}>Santo Domingo, Republica Dominicana</Text>
         </View>
       </Page>
     </Document>
