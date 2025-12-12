@@ -32,10 +32,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // Header gradient bar (gold)
+  // Header bar (dark background for logo contrast)
   headerBar: {
     height: 90,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.dark,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 30,

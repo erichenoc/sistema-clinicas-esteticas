@@ -151,29 +151,37 @@ export async function createQuotation(input: CreateQuotationInput): Promise<{ su
 
 // Get all quotations
 export async function getQuotations(): Promise<QuotationData[]> {
-  const supabase = createAdminClient()
+  try {
+    console.log('[Quotations] Starting getQuotations...')
+    const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('quotations')
-    .select(`
-      *,
-      patient:patients(first_name, last_name, email, phone)
-    `)
-    .order('created_at', { ascending: false })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from('quotations')
+      .select(`
+        *,
+        patient:patients(first_name, last_name, email, phone)
+      `)
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching quotations:', error)
+    if (error) {
+      console.error('[Quotations] Error fetching quotations:', error)
+      return []
+    }
+
+    console.log('[Quotations] Fetched quotations count:', data?.length || 0)
+
+    // Transform data
+    return (data || []).map((q: { patient?: { first_name?: string; last_name?: string; email?: string; phone?: string } } & QuotationData) => ({
+      ...q,
+      patient_name: q.patient ? `${q.patient.first_name} ${q.patient.last_name}` : 'Cliente desconocido',
+      patient_email: q.patient?.email,
+      patient_phone: q.patient?.phone,
+    }))
+  } catch (err) {
+    console.error('[Quotations] Unexpected error in getQuotations:', err)
     return []
   }
-
-  // Transform data
-  return (data || []).map((q: { patient?: { first_name?: string; last_name?: string; email?: string; phone?: string } } & QuotationData) => ({
-    ...q,
-    patient_name: q.patient ? `${q.patient.first_name} ${q.patient.last_name}` : 'Cliente desconocido',
-    patient_email: q.patient?.email,
-    patient_phone: q.patient?.phone,
-  }))
 }
 
 // Get quotation by ID
@@ -201,6 +209,96 @@ export async function getQuotationById(id: string): Promise<QuotationData | null
     patient_name: data.patient ? `${data.patient.first_name} ${data.patient.last_name}` : 'Cliente desconocido',
     patient_email: data.patient?.email,
     patient_phone: data.patient?.phone,
+  }
+}
+
+// Update quotation (full edit)
+export interface UpdateQuotationInput {
+  id: string
+  patient_id: string
+  currency: 'DOP' | 'USD'
+  items: Omit<QuotationItem, 'id' | 'quotation_id'>[]
+  valid_until: string
+  notes?: string
+  terms_conditions?: string
+  subtotal: number
+  discount_total: number
+  tax_rate: number
+  tax_amount: number
+  total: number
+}
+
+export async function updateQuotation(input: UpdateQuotationInput): Promise<{ success: boolean; data?: QuotationData; error?: string }> {
+  const supabase = createAdminClient()
+
+  try {
+    console.log('[Quotations] Updating quotation:', input.id)
+
+    // Update quotation main data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: quotation, error: quotationError } = await (supabase as any)
+      .from('quotations')
+      .update({
+        patient_id: input.patient_id,
+        currency: input.currency,
+        subtotal: input.subtotal,
+        discount_total: input.discount_total,
+        tax_rate: input.tax_rate,
+        tax_amount: input.tax_amount,
+        total: input.total,
+        valid_until: input.valid_until,
+        notes: input.notes,
+        terms_conditions: input.terms_conditions,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', input.id)
+      .select()
+      .single()
+
+    if (quotationError) {
+      console.error('[Quotations] Error updating quotation:', quotationError)
+      return { success: false, error: quotationError.message }
+    }
+
+    // Delete existing items
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('quotation_items')
+      .delete()
+      .eq('quotation_id', input.id)
+
+    // Insert new items
+    const itemsToInsert = input.items.map(item => ({
+      quotation_id: input.id,
+      type: item.type,
+      reference_id: item.reference_id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      discount: item.discount,
+      discount_type: item.discount_type,
+      subtotal: item.subtotal,
+      notes: item.notes,
+    }))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: itemsError } = await (supabase as any)
+      .from('quotation_items')
+      .insert(itemsToInsert)
+
+    if (itemsError) {
+      console.error('[Quotations] Error inserting updated items:', itemsError)
+      return { success: false, error: itemsError.message }
+    }
+
+    console.log('[Quotations] Quotation updated successfully')
+    revalidatePath('/facturacion/cotizaciones')
+    revalidatePath(`/facturacion/cotizaciones/${input.id}`)
+    return { success: true, data: quotation }
+
+  } catch (error) {
+    console.error('[Quotations] Error in updateQuotation:', error)
+    return { success: false, error: 'Error inesperado al actualizar la cotización' }
   }
 }
 
@@ -321,25 +419,33 @@ export async function getQuotationStats(): Promise<{
   accepted: number
   totalValue: number
 }> {
-  const supabase = createAdminClient()
+  try {
+    console.log('[Quotations] Starting getQuotationStats...')
+    const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('quotations')
-    .select('status, total')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from('quotations')
+      .select('status, total')
 
-  if (error) {
-    console.error('Error fetching quotation stats:', error)
+    if (error) {
+      console.error('[Quotations] Error fetching quotation stats:', error)
+      return { total: 0, pending: 0, accepted: 0, totalValue: 0 }
+    }
+
+    console.log('[Quotations] Stats data count:', data?.length || 0)
+
+    const quotes = data || []
+    return {
+      total: quotes.length,
+      pending: quotes.filter((q: { status: string }) => q.status === 'draft' || q.status === 'sent').length,
+      accepted: quotes.filter((q: { status: string }) => q.status === 'accepted').length,
+      totalValue: quotes
+        .filter((q: { status: string }) => q.status === 'accepted')
+        .reduce((sum: number, q: { total: number }) => sum + (q.total || 0), 0),
+    }
+  } catch (err) {
+    console.error('[Quotations] Unexpected error in getQuotationStats:', err)
     return { total: 0, pending: 0, accepted: 0, totalValue: 0 }
-  }
-
-  const quotes = data || []
-  return {
-    total: quotes.length,
-    pending: quotes.filter((q: { status: string }) => q.status === 'draft' || q.status === 'sent').length,
-    accepted: quotes.filter((q: { status: string }) => q.status === 'accepted').length,
-    totalValue: quotes
-      .filter((q: { status: string }) => q.status === 'accepted')
-      .reduce((sum: number, q: { total: number }) => sum + (q.total || 0), 0),
   }
 }

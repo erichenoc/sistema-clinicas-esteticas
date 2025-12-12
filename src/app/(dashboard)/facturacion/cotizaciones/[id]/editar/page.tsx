@@ -68,7 +68,7 @@ import { formatCurrency } from '@/types/billing'
 import { getPatients, type PatientData } from '@/actions/patients'
 import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
 import { getProducts, type ProductListItemData } from '@/actions/inventory'
-import { getQuotationById, createQuotation, deleteQuotation, sendQuotationEmail } from '@/actions/quotations'
+import { getQuotationById, updateQuotation, sendQuotationEmail } from '@/actions/quotations'
 
 interface ClientData {
   id: string
@@ -299,7 +299,7 @@ export default function EditarCotizacionPage({ params }: { params: Promise<{ id:
     setItems(items.filter(item => item.id !== id))
   }
 
-  // Save quotation (delete old one and create new)
+  // Save quotation (update in place)
   const handleSave = async (sendToClient: boolean = false) => {
     if (!selectedClient) {
       toast.error('Selecciona un cliente')
@@ -314,9 +314,6 @@ export default function EditarCotizacionPage({ params }: { params: Promise<{ id:
     toast.loading('Guardando cambios...', { id: 'save-quote' })
 
     try {
-      // Delete old quotation
-      await deleteQuotation(resolvedParams.id)
-
       // Prepare items for database
       const itemsForDB = items.map(item => ({
         type: item.type,
@@ -330,8 +327,9 @@ export default function EditarCotizacionPage({ params }: { params: Promise<{ id:
         notes: item.notes,
       }))
 
-      // Create new quotation
-      const result = await createQuotation({
+      // Update quotation (keeps same ID and quote number)
+      const result = await updateQuotation({
+        id: resolvedParams.id,
         patient_id: selectedClient.id,
         currency,
         items: itemsForDB,
@@ -343,7 +341,6 @@ export default function EditarCotizacionPage({ params }: { params: Promise<{ id:
         tax_rate: taxRate,
         tax_amount: taxAmount,
         total,
-        status: 'draft',
       })
 
       if (!result.success) {
@@ -354,10 +351,10 @@ export default function EditarCotizacionPage({ params }: { params: Promise<{ id:
       }
 
       // Send by email if requested
-      if (sendToClient && result.data?.id) {
+      if (sendToClient) {
         toast.loading('Enviando cotizacion por email...', { id: 'save-quote' })
 
-        const emailResult = await sendQuotationEmail(result.data.id)
+        const emailResult = await sendQuotationEmail(resolvedParams.id)
 
         if (!emailResult.success) {
           toast.dismiss('save-quote')
