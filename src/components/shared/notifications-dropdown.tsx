@@ -118,7 +118,7 @@ export function NotificationsDropdown() {
       handleMarkAsRead(notification.id)
     }
     setIsOpen(false)
-    // Navigate to the notification link, or to notifications page as fallback
+    // Navigate to notification link, or fallback to notifications page
     router.push(notification.link || '/notificaciones')
   }
 
