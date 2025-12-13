@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   FileText,
   Receipt,
@@ -31,6 +32,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -54,12 +57,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   type QuoteStatus,
   type InvoiceStatus,
   QUOTE_STATUS_OPTIONS,
   INVOICE_STATUS_OPTIONS,
   formatCurrency,
 } from '@/types/billing'
+import { cancelInvoice } from '@/actions/billing'
 
 // Tipos para los datos de la base de datos
 interface InvoiceItem {
@@ -106,6 +118,7 @@ interface FacturacionClientProps {
 }
 
 export function FacturacionClient({ invoices, quotes, stats }: FacturacionClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('facturas')
   const [quoteSearch, setQuoteSearch] = useState('')
   const [quoteStatusFilter, setQuoteStatusFilter] = useState('all')
@@ -114,6 +127,12 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
   const [invoiceFiscalFilter, setInvoiceFiscalFilter] = useState('all')
   const [isExporting, setIsExporting] = useState(false)
   const [processingAction, setProcessingAction] = useState<string | null>(null)
+
+  // Estado para el diálogo de anulación
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelInvoiceData, setCancelInvoiceData] = useState<{ id: string; number: string } | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch =
@@ -243,13 +262,42 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
     setProcessingAction(null)
   }
 
-  const handleCancelInvoice = async (invoiceNumber: string) => {
-    setProcessingAction(`cancel-${invoiceNumber}`)
-    toast.loading('Anulando factura...', { id: 'cancel-invoice' })
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    toast.dismiss('cancel-invoice')
-    toast.success(`Factura ${invoiceNumber} anulada`)
-    setProcessingAction(null)
+  // Abrir diálogo de anulación
+  const openCancelDialog = (invoiceId: string, invoiceNumber: string) => {
+    setCancelInvoiceData({ id: invoiceId, number: invoiceNumber })
+    setCancelReason('')
+    setCancelDialogOpen(true)
+  }
+
+  // Procesar anulación real
+  const handleCancelInvoice = async () => {
+    if (!cancelInvoiceData) return
+
+    if (!cancelReason.trim()) {
+      toast.error('Ingrese el motivo de la anulación')
+      return
+    }
+
+    setIsCancelling(true)
+    try {
+      const result = await cancelInvoice(cancelInvoiceData.id, cancelReason)
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success(`Factura ${cancelInvoiceData.number} anulada exitosamente`)
+      setCancelDialogOpen(false)
+      setCancelInvoiceData(null)
+      setCancelReason('')
+      router.refresh()
+    } catch (error) {
+      console.error('Error cancelling invoice:', error)
+      toast.error('Error al anular la factura')
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   // Quote action handlers
@@ -540,7 +588,7 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
                             {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
                               <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" onClick={() => handleCancelInvoice(invoice.invoiceNumber)}>
+                                <DropdownMenuItem className="text-destructive" onClick={() => openCancelDialog(invoice.id, invoice.invoiceNumber)}>
                                   <XCircle className="mr-2 h-4 w-4" />
                                   Anular factura
                                 </DropdownMenuItem>
@@ -713,6 +761,38 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Diálogo de confirmación para anular factura */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anular Factura</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. La factura {cancelInvoiceData?.number} será marcada como anulada y los montos serán excluidos de las estadísticas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancelReason">Motivo de anulación</Label>
+              <Textarea
+                id="cancelReason"
+                placeholder="Ingrese el motivo de la anulación"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleCancelInvoice} disabled={isCancelling}>
+              {isCancelling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Anular Factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
