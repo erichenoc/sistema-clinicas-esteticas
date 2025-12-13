@@ -440,6 +440,17 @@ export async function updateProfessional(
 // COMISIONES
 // =============================================
 
+export interface CreateCommissionInput {
+  professionalId: string
+  referenceType?: string
+  referenceId?: string
+  baseAmount: number
+  commissionRate: number
+  periodStart?: string
+  periodEnd?: string
+  notes?: string
+}
+
 export async function getCommissions(options?: {
   professionalId?: string
   status?: CommissionStatus
@@ -451,8 +462,13 @@ export async function getCommissions(options?: {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase as any)
-      .from('professional_commissions')
-      .select('*')
+      .from('commissions')
+      .select(`
+        *,
+        professional:professional_id (
+          user_id
+        )
+      `)
       .order('created_at', { ascending: false })
 
     if (options?.professionalId) {
@@ -487,6 +503,170 @@ export async function getCommissions(options?: {
   }
 }
 
+export async function getAllCommissionsWithProfessionals(): Promise<{
+  commissions: CommissionData[]
+  professionals: { id: string; name: string; defaultRate: number }[]
+}> {
+  const supabase = createAdminClient()
+
+  try {
+    // Get all professionals
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: users } = await (supabase as any)
+      .from('users')
+      .select('id, first_name, last_name, commission_rate')
+      .eq('is_professional', true)
+      .eq('is_active', true)
+      .order('first_name', { ascending: true })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const professionals = (users || []).map((u: any) => ({
+      id: u.id,
+      name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Profesional',
+      defaultRate: u.commission_rate || 15,
+    }))
+
+    // Get all commissions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: commissions } = await (supabase as any)
+      .from('commissions')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    // Map professional names to commissions
+    const professionalMap = new Map(professionals.map((p: { id: string; name: string }) => [p.id, p.name]))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mappedCommissions = (commissions || []).map((c: any) => ({
+      ...c,
+      professional_name: professionalMap.get(c.professional_id) || 'Profesional',
+      reference_description: `${c.reference_type || 'Manual'} - ${c.period_start || 'Sin período'}`,
+    }))
+
+    return { commissions: mappedCommissions, professionals }
+  } catch (error) {
+    console.error('Error fetching commissions with professionals:', error)
+    return { commissions: [], professionals: [] }
+  }
+}
+
+export async function createCommission(
+  input: CreateCommissionInput
+): Promise<{ data: CommissionData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    const commissionAmount = input.baseAmount * (input.commissionRate / 100)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from('commissions')
+      .insert({
+        clinic_id: DEFAULT_CLINIC_ID,
+        professional_id: input.professionalId,
+        reference_type: input.referenceType || 'manual',
+        reference_id: input.referenceId || crypto.randomUUID(),
+        base_amount: input.baseAmount,
+        commission_rate: input.commissionRate,
+        commission_amount: commissionAmount,
+        status: 'pending',
+        period_start: input.periodStart || null,
+        period_end: input.periodEnd || null,
+        notes: input.notes || null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating commission:', error)
+      return { data: null, error: 'Error al crear la comisión' }
+    }
+
+    revalidatePath('/profesionales/comisiones')
+    return {
+      data: {
+        ...data,
+        professional_name: 'Profesional',
+        reference_description: `${data.reference_type} - ${data.period_start || 'Sin período'}`,
+      },
+      error: null
+    }
+  } catch (error) {
+    console.error('Error in createCommission:', error)
+    return { data: null, error: 'Error inesperado al crear la comisión' }
+  }
+}
+
+export async function updateCommission(
+  id: string,
+  input: Partial<CreateCommissionInput> & { status?: CommissionStatus }
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    const updateData: Record<string, unknown> = {}
+
+    if (input.baseAmount !== undefined) updateData.base_amount = input.baseAmount
+    if (input.commissionRate !== undefined) updateData.commission_rate = input.commissionRate
+    if (input.baseAmount !== undefined && input.commissionRate !== undefined) {
+      updateData.commission_amount = input.baseAmount * (input.commissionRate / 100)
+    }
+    if (input.periodStart !== undefined) updateData.period_start = input.periodStart
+    if (input.periodEnd !== undefined) updateData.period_end = input.periodEnd
+    if (input.notes !== undefined) updateData.notes = input.notes
+    if (input.status !== undefined) {
+      updateData.status = input.status
+      if (input.status === 'paid') {
+        updateData.paid_at = new Date().toISOString()
+      } else if (input.status === 'approved') {
+        updateData.approved_at = new Date().toISOString()
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('commissions')
+      .update(updateData)
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error updating commission:', error)
+      return { success: false, error: 'Error al actualizar la comisión' }
+    }
+
+    revalidatePath('/profesionales/comisiones')
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error in updateCommission:', error)
+    return { success: false, error: 'Error inesperado al actualizar la comisión' }
+  }
+}
+
+export async function deleteCommission(
+  id: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('commissions')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting commission:', error)
+      return { success: false, error: 'Error al eliminar la comisión' }
+    }
+
+    revalidatePath('/profesionales/comisiones')
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error in deleteCommission:', error)
+    return { success: false, error: 'Error inesperado al eliminar la comisión' }
+  }
+}
+
 export async function updateCommissionStatus(
   id: string,
   status: CommissionStatus,
@@ -496,7 +676,6 @@ export async function updateCommissionStatus(
 
   const updateData: Record<string, unknown> = {
     status,
-    updated_at: new Date().toISOString(),
   }
 
   if (status === 'approved') {
@@ -509,7 +688,7 @@ export async function updateCommissionStatus(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
-    .from('professional_commissions')
+    .from('commissions')
     .update(updateData)
     .eq('id', id)
 
@@ -519,6 +698,7 @@ export async function updateCommissionStatus(
   }
 
   revalidatePath('/profesionales')
+  revalidatePath('/profesionales/comisiones')
   return { success: true, error: null }
 }
 
@@ -656,12 +836,12 @@ export async function getProfessionalStats(): Promise<{
     .select('id, is_active')
     .eq('is_professional', true)
 
-  // Note: professional_commissions table may not exist, handle gracefully
+  // Note: commissions table may not exist, handle gracefully
   let commissions: { id: string; status: string; commission_amount: number }[] = []
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase as any)
-      .from('professional_commissions')
+      .from('commissions')
       .select('id, status, commission_amount')
       .in('status', ['pending', 'approved'])
     commissions = data || []
