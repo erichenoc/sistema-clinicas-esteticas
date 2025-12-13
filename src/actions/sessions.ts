@@ -300,7 +300,7 @@ export async function updateSession(
   return { data: data as SessionData, error: null }
 }
 
-// Completar sesion
+// Completar sesion y generar comisión automáticamente
 export async function completeSession(
   id: string,
   input?: {
@@ -310,10 +310,36 @@ export async function completeSession(
     follow_up_required?: boolean
     follow_up_notes?: string
     next_session_recommended_at?: string
+    totalAmount?: number // Monto total del servicio (opcional, si no se pasa usa el precio del tratamiento)
   }
-): Promise<{ success: boolean; error: string | null }> {
+): Promise<{ success: boolean; error: string | null; commissionGenerated?: boolean }> {
   const supabase = createAdminClient()
 
+  // Primero, obtener los datos de la sesión para generar la comisión
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessionData, error: sessionError } = await (supabase as any)
+    .from('sessions')
+    .select(`
+      *,
+      treatments (
+        id,
+        name,
+        price
+      ),
+      users!sessions_professional_id_fkey (
+        id,
+        commission_rate
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  if (sessionError) {
+    console.error('Error fetching session:', sessionError)
+    return { success: false, error: 'Error al obtener la sesión' }
+  }
+
+  // Actualizar la sesión como completada
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('sessions')
@@ -330,9 +356,45 @@ export async function completeSession(
     return { success: false, error: 'Error al completar la sesion' }
   }
 
+  // Generar comisión automáticamente si el profesional tiene tasa de comisión
+  let commissionGenerated = false
+  const commissionRate = sessionData?.users?.commission_rate || 0
+  const treatmentPrice = input?.totalAmount || sessionData?.treatments?.price || 0
+
+  if (commissionRate > 0 && treatmentPrice > 0) {
+    const commissionAmount = treatmentPrice * (commissionRate / 100)
+
+    // Crear registro de comisión
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: commissionError } = await (supabase as any)
+      .from('commissions')
+      .insert({
+        clinic_id: sessionData.clinic_id,
+        professional_id: sessionData.professional_id,
+        reference_type: 'session',
+        reference_id: id,
+        base_amount: treatmentPrice,
+        commission_rate: commissionRate,
+        commission_amount: commissionAmount,
+        status: 'pending',
+        period_start: new Date().toISOString().split('T')[0],
+        period_end: new Date().toISOString().split('T')[0],
+        notes: `Comisión automática por sesión: ${sessionData?.treatments?.name || sessionData.treatment_name}`,
+      })
+
+    if (commissionError) {
+      console.error('Error creating commission:', commissionError)
+      // No fallamos la operación, solo logueamos el error
+    } else {
+      commissionGenerated = true
+    }
+  }
+
   revalidatePath('/sesiones')
   revalidatePath(`/sesiones/${id}`)
-  return { success: true, error: null }
+  revalidatePath('/profesionales/comisiones')
+
+  return { success: true, error: null, commissionGenerated }
 }
 
 // Cancelar sesion
