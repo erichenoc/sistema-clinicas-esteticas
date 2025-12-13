@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Menu, LogOut, User, Settings } from 'lucide-react'
+import { Search, Menu, LogOut, User, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Sidebar } from './sidebar'
+import { NotificationsDropdown } from './notifications-dropdown'
 import { useUser } from '@/contexts/user-context'
 import { logout } from '@/actions/auth'
 import { ROLE_LABELS, ROLE_COLORS } from '@/lib/auth/roles'
@@ -67,46 +68,7 @@ export function HeaderWrapper() {
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <Badge
-                variant="destructive"
-                className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs"
-              >
-                3
-              </Badge>
-              <span className="sr-only">Notificaciones</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-              <span className="font-medium">Nueva cita programada</span>
-              <span className="text-sm text-muted-foreground">
-                Maria Garcia - Limpieza Facial - 10:00 AM
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-              <span className="font-medium">Stock bajo</span>
-              <span className="text-sm text-muted-foreground">
-                Acido Hialuronico - Quedan 5 unidades
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-              <span className="font-medium">Cita sin confirmar</span>
-              <span className="text-sm text-muted-foreground">
-                3 citas para manana sin confirmar
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-primary">
-              Ver todas las notificaciones
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationsDropdown />
 
         {/* User Menu */}
         <DropdownMenu>
