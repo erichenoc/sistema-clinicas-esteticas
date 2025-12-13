@@ -95,9 +95,15 @@ export default function ComisionesPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [deleteComisionId, setDeleteComisionId] = useState<string | null>(null)
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false)
+  // Obtener mes actual en formato YYYY-MM
+  const getCurrentMonth = () => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  }
+
   const [newComision, setNewComision] = useState({
     professionalId: '',
-    period: '',
+    period: getCurrentMonth(),
     totalSales: '',
     commissionRate: '',
     notes: '',
@@ -257,7 +263,7 @@ export default function ComisionesPage() {
       }
 
       setIsNewDialogOpen(false)
-      setNewComision({ professionalId: '', period: '', totalSales: '', commissionRate: '', notes: '' })
+      setNewComision({ professionalId: '', period: getCurrentMonth(), totalSales: '', commissionRate: '', notes: '' })
       toast.success('Comisión creada exitosamente')
     } catch (error) {
       console.error('Error creating commission:', error)
@@ -724,12 +730,13 @@ export default function ComisionesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Período</Label>
+                <Label>Mes de las ventas</Label>
                 <Input
                   type="month"
                   value={newComision.period}
                   onChange={(e) => setNewComision(prev => ({ ...prev, period: e.target.value }))}
                 />
+                <p className="text-xs text-muted-foreground">Selecciona el mes al que corresponden las ventas</p>
               </div>
               <div className="space-y-2">
                 <Label>Ventas Totales (RD$)</Label>
