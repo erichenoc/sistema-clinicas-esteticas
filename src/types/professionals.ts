@@ -30,6 +30,7 @@ export interface ProfessionalProfile {
   licenseExpiry: string | null
   specialties: string[]
   title: string | null
+  jobTitle: string | null
   bio: string | null
 
   // Configuración laboral

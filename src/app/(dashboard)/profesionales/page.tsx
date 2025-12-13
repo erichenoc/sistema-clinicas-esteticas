@@ -39,6 +39,7 @@ export default async function ProfesionalesPage() {
     licenseExpiry: p.license_expiry,
     specialties: p.specialties || [],
     title: p.title,
+    jobTitle: p.job_title,
     bio: p.bio,
     employmentType: (p.employment_type || 'employee') as EmploymentType,
     hireDate: p.hire_date,

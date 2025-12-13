@@ -46,6 +46,7 @@ export default function NuevoProfesionalPage() {
     email: '',
     phone: '',
     title: '',
+    jobTitle: '',
     licenseNumber: '',
     specialties: [] as string[],
     bio: '',
@@ -98,6 +99,7 @@ export default function NuevoProfesionalPage() {
         email: formData.email,
         phone: formData.phone || undefined,
         title: formData.title || undefined,
+        jobTitle: formData.jobTitle || undefined,
         licenseNumber: formData.licenseNumber || undefined,
         specialties: formData.specialties,
         bio: formData.bio || undefined,
@@ -277,6 +279,20 @@ export default function NuevoProfesionalPage() {
                       onChange={handleInputChange}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="jobTitle">Cargo / Puesto</Label>
+                    <Input
+                      id="jobTitle"
+                      name="jobTitle"
+                      placeholder="Ej: Cosmiatra, Masajista, Recepcionista"
+                      value={formData.jobTitle}
+                      onChange={handleInputChange}
+                    />
+                    <p className="text-xs text-muted-foreground">El rol que desempeña en la clinica</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="licenseNumber">Numero de Licencia</Label>
                     <Input

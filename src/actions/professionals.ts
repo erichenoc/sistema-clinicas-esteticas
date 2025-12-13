@@ -17,6 +17,7 @@ export interface ProfessionalData {
   license_expiry: string | null
   specialties: string[]
   title: string | null
+  job_title: string | null
   bio: string | null
   employment_type: string
   hire_date: string | null
@@ -148,6 +149,7 @@ export async function getProfessionals(options?: {
       license_expiry: null,
       specialties: user.specialty ? user.specialty.split(', ') : [],
       title: null,
+      job_title: user.job_title || null,
       bio: null,
       employment_type: 'employee',
       hire_date: null,
@@ -211,6 +213,7 @@ export async function getProfessionalById(id: string): Promise<ProfessionalSumma
     license_expiry: null,
     specialties: user.specialty ? user.specialty.split(', ') : [],
     title: user.title || null,
+    job_title: user.job_title || null,
     bio: user.bio || null,
     employment_type: user.employment_type || 'employee',
     hire_date: user.hire_date || null,
@@ -256,6 +259,7 @@ export interface CreateProfessionalInput {
   email: string
   phone?: string
   title?: string
+  jobTitle?: string
   licenseNumber?: string
   specialties?: string[]
   bio?: string
@@ -302,6 +306,7 @@ export async function createProfessional(
         is_active: true,
         specialty: input.specialties?.join(', ') || null,
         license_number: input.licenseNumber || null,
+        job_title: input.jobTitle || null,
       })
       .select()
       .single()
@@ -324,6 +329,7 @@ export async function createProfessional(
         license_expiry: null,
         specialties: input.specialties || [],
         title: input.title || null,
+        job_title: input.jobTitle || null,
         bio: input.bio || null,
         employment_type: input.employmentType || 'employee',
         hire_date: null,
@@ -388,6 +394,7 @@ export async function updateProfessional(
     if (input.specialties !== undefined) updateData.specialty = input.specialties?.join(', ') || null
     if (input.bio !== undefined) updateData.bio = input.bio || null
     if (input.title !== undefined) updateData.title = input.title || null
+    if (input.jobTitle !== undefined) updateData.job_title = input.jobTitle || null
 
     // Datos de empleo
     if (input.employmentType !== undefined) updateData.employment_type = input.employmentType

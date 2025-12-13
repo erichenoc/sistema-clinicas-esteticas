@@ -277,6 +277,11 @@ export function ProfesionalesClient({
                             <h3 className="font-semibold text-lg">
                               {professional.fullName}
                             </h3>
+                            {professional.jobTitle && (
+                              <p className="text-sm font-medium text-primary">
+                                {professional.jobTitle}
+                              </p>
+                            )}
                             <p className="text-sm text-gray-500">
                               {professional.specialties.slice(0, 2).join(', ') || 'Sin especialidad'}
                             </p>
