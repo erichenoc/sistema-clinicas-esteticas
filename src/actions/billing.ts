@@ -416,7 +416,7 @@ export async function getBillingStats(): Promise<BillingStats> {
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  // Obtener todas las facturas
+  // Obtener todas las facturas EXCLUYENDO las anuladas
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: invoices } = await (supabase as any)
     .from('invoices')
@@ -430,6 +430,7 @@ export async function getBillingStats(): Promise<BillingStats> {
         amount
       )
     `)
+    .neq('status', 'cancelled') // Excluir facturas anuladas
 
   if (!invoices) {
     return {
