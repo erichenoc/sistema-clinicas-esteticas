@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Menu, Sparkles } from 'lucide-react'
+import { Search, Menu, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,9 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Sidebar } from './sidebar'
+import { NotificationsDropdown } from './notifications-dropdown'
 
 interface HeaderProps {
   user?: {
@@ -79,54 +79,7 @@ export function Header({ user }: HeaderProps) {
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-10 w-10 rounded-xl text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10"
-            >
-              <Bell className="h-5 w-5" />
-              <Badge
-                className="absolute -right-0.5 -top-0.5 h-5 w-5 rounded-full p-0 text-[10px] bg-[#e8a0c0] text-white border-2 border-white"
-              >
-                3
-              </Badge>
-              <span className="sr-only">Notificaciones</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-80 rounded-xl border-[#e8e4df] shadow-luxury-lg"
-          >
-            <DropdownMenuLabel className="font-display text-[#3d3d3d]">
-              Notificaciones
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-[#e8e4df]" />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer hover:bg-[#f5f3f0]">
-              <span className="font-medium text-[#3d3d3d]">Nueva cita programada</span>
-              <span className="text-sm text-[#998577]">
-                Maria Garcia - Limpieza Facial - 10:00 AM
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer hover:bg-[#f5f3f0]">
-              <span className="font-medium text-[#3d3d3d]">Stock bajo</span>
-              <span className="text-sm text-[#998577]">
-                Acido Hialuronico - Quedan 5 unidades
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer hover:bg-[#f5f3f0]">
-              <span className="font-medium text-[#3d3d3d]">Cita sin confirmar</span>
-              <span className="text-sm text-[#998577]">
-                3 citas para manana sin confirmar
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-[#e8e4df]" />
-            <DropdownMenuItem className="text-center py-3 text-[#A67C52] hover:text-[#8a6543] cursor-pointer hover:bg-[#A67C52]/5">
-              Ver todas las notificaciones
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationsDropdown />
 
         {/* User Menu */}
         <DropdownMenu>

@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendEmail, generateQuotationEmailHTML } from '@/lib/email'
+import { notifyQuotationSent } from '@/actions/notifications'
 
 // Types
 export interface QuotationItem {
@@ -387,6 +388,13 @@ export async function sendQuotationEmail(id: string): Promise<{ success: boolean
 
   // Update status to sent
   await updateQuotationStatus(id, 'sent')
+
+  // Create notification
+  await notifyQuotationSent(
+    quotation.quote_number,
+    id,
+    quotation.patient_name || 'Cliente'
+  )
 
   return { success: true }
 }
