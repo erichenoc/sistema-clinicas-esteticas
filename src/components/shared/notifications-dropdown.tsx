@@ -185,21 +185,25 @@ export function NotificationsDropdown() {
             </div>
           ) : (
             notifications.map((notification) => (
-              <DropdownMenuItem
+              <div
                 key={notification.id}
-                className={`flex items-start gap-3 px-4 py-3 cursor-pointer focus:bg-[#f5f3f0] ${
+                role="menuitem"
+                tabIndex={0}
+                className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-[#f5f3f0] transition-colors ${
                   !notification.is_read ? 'bg-[#A67C52]/5' : ''
                 }`}
-                onSelect={(e) => {
-                  e.preventDefault()
-                  handleNotificationClick(notification)
+                onClick={() => handleNotificationClick(notification)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleNotificationClick(notification)
+                  }
                 }}
               >
-                <span className="text-lg mt-0.5">
+                <span className="text-lg mt-0.5 flex-shrink-0">
                   {getNotificationIcon(notification.type)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <span className={`font-medium text-sm block truncate ${getPriorityColor(notification.priority)} ${notification.link ? 'hover:underline' : ''}`}>
+                  <span className={`font-medium text-sm block truncate ${getPriorityColor(notification.priority)}`}>
                     {notification.title}
                   </span>
                   <p className="text-sm text-[#998577] truncate">
@@ -211,37 +215,33 @@ export function NotificationsDropdown() {
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   {!notification.is_read && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10"
-                      onPointerDown={(e) => {
+                    <button
+                      type="button"
+                      className="h-6 w-6 inline-flex items-center justify-center rounded-md text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10 transition-colors"
+                      onClick={(e) => {
                         e.stopPropagation()
-                        e.preventDefault()
                         handleMarkAsRead(notification.id)
                       }}
                       disabled={isPending}
                       title="Marcar como leída"
                     >
                       <Check className="h-3 w-3" />
-                    </Button>
+                    </button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-[#998577] hover:text-red-500 hover:bg-red-50"
-                    onPointerDown={(e) => {
+                  <button
+                    type="button"
+                    className="h-6 w-6 inline-flex items-center justify-center rounded-md text-[#998577] hover:text-red-500 hover:bg-red-50 transition-colors"
+                    onClick={(e) => {
                       e.stopPropagation()
-                      e.preventDefault()
                       handleDelete(notification.id)
                     }}
                     disabled={isPending}
                     title="Eliminar"
                   >
                     <Trash2 className="h-3 w-3" />
-                  </Button>
+                  </button>
                 </div>
-              </DropdownMenuItem>
+              </div>
             ))
           )}
         </div>
