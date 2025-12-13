@@ -17,9 +17,11 @@ import {
   getUnreadNotificationCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteNotification,
   type Notification,
 } from '@/actions/notifications'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -57,10 +59,12 @@ function getPriorityColor(priority: string): string {
 }
 
 export function NotificationsDropdown() {
+  const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
+  const [isOpen, setIsOpen] = useState(false)
 
   const loadNotifications = async () => {
     try {
@@ -98,6 +102,28 @@ export function NotificationsDropdown() {
     })
   }
 
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    startTransition(async () => {
+      await deleteNotification(id)
+      setNotifications(prev => prev.filter(n => n.id !== id))
+      setUnreadCount(prev => {
+        const notification = notifications.find(n => n.id === id)
+        return notification && !notification.is_read ? prev - 1 : prev
+      })
+    })
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.is_read) {
+      handleMarkAsRead(notification.id)
+    }
+    if (notification.link) {
+      setIsOpen(false)
+      router.push(notification.link)
+    }
+  }
+
   const formatTime = (dateString: string) => {
     try {
       return formatDistanceToNow(new Date(dateString), {
@@ -110,7 +136,7 @@ export function NotificationsDropdown() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -163,27 +189,18 @@ export function NotificationsDropdown() {
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`flex items-start gap-3 px-4 py-3 hover:bg-[#f5f3f0] transition-colors ${
+                className={`flex items-start gap-3 px-4 py-3 hover:bg-[#f5f3f0] transition-colors cursor-pointer ${
                   !notification.is_read ? 'bg-[#A67C52]/5' : ''
                 }`}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <span className="text-lg mt-0.5">
                   {getNotificationIcon(notification.type)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  {notification.link ? (
-                    <Link
-                      href={notification.link}
-                      className={`font-medium text-sm block truncate hover:underline ${getPriorityColor(notification.priority)}`}
-                      onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
-                    >
-                      {notification.title}
-                    </Link>
-                  ) : (
-                    <span className={`font-medium text-sm block truncate ${getPriorityColor(notification.priority)}`}>
-                      {notification.title}
-                    </span>
-                  )}
+                  <span className={`font-medium text-sm block truncate ${getPriorityColor(notification.priority)} ${notification.link ? 'hover:underline' : ''}`}>
+                    {notification.title}
+                  </span>
                   <p className="text-sm text-[#998577] truncate">
                     {notification.message}
                   </p>
@@ -191,17 +208,33 @@ export function NotificationsDropdown() {
                     {formatTime(notification.created_at)}
                   </p>
                 </div>
-                {!notification.is_read && (
+                <div className="flex gap-1 flex-shrink-0">
+                  {!notification.is_read && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMarkAsRead(notification.id)
+                      }}
+                      disabled={isPending}
+                      title="Marcar como leída"
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10 flex-shrink-0"
-                    onClick={() => handleMarkAsRead(notification.id)}
+                    className="h-6 w-6 text-[#998577] hover:text-red-500 hover:bg-red-50"
+                    onClick={(e) => handleDelete(notification.id, e)}
                     disabled={isPending}
+                    title="Eliminar"
                   >
-                    <Check className="h-3 w-3" />
+                    <Trash2 className="h-3 w-3" />
                   </Button>
-                )}
+                </div>
               </div>
             ))
           )}
