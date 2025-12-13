@@ -80,10 +80,13 @@ import {
   getInvoiceItems,
   cancelInvoice,
   registerPayment,
+  sendInvoiceEmail,
   type InvoiceListItemData,
   type InvoiceItemData,
   type PaymentMethod,
 } from '@/actions/billing'
+import { downloadInvoicePDF } from '@/components/pdf/download-invoice-pdf'
+import type { InvoicePDFData } from '@/components/pdf/invoice-pdf'
 
 export default function InvoiceDetailPage({
   params,
@@ -106,6 +109,10 @@ export default function InvoiceDetailPage({
   const [isLoading, setIsLoading] = useState(true)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [emailRecipient, setEmailRecipient] = useState('')
   const [invoice, setInvoice] = useState<(InvoiceListItemData & { items?: InvoiceItemData[] }) | null>(null)
 
   // Fetch invoice data from database
@@ -183,13 +190,87 @@ export default function InvoiceDetailPage({
     toast.success('Preparando impresion...')
   }
 
-  const handleDownloadPDF = () => {
-    toast.success('Descargando factura como PDF...')
-    // Would trigger PDF generation in production
+  const handleDownloadPDF = async () => {
+    if (!invoice) return
+
+    setIsGeneratingPDF(true)
+    toast.loading('Generando PDF...', { id: 'pdf-generate' })
+
+    try {
+      const pdfData: InvoicePDFData = {
+        invoiceNumber: invoice.invoice_number,
+        ncf: invoice.ncf || undefined,
+        issueDate: invoice.issue_date,
+        dueDate: invoice.due_date || undefined,
+        status: invoice.status,
+        clientName: invoice.patient_name || 'Cliente General',
+        items: (invoice.items || []).map(item => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unit_price,
+          total: item.total,
+        })),
+        subtotal: invoice.subtotal,
+        discountAmount: invoice.discount_amount,
+        taxAmount: invoice.tax_amount,
+        total: invoice.total,
+        paidAmount: invoice.paid_amount,
+        amountDue: invoice.amount_due,
+        currency: invoice.currency,
+        notes: invoice.notes || undefined,
+      }
+
+      const success = await downloadInvoicePDF(pdfData)
+
+      toast.dismiss('pdf-generate')
+      if (success) {
+        toast.success('PDF descargado')
+      } else {
+        toast.error('Error al generar el PDF')
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast.dismiss('pdf-generate')
+      toast.error('Error al generar el PDF')
+    } finally {
+      setIsGeneratingPDF(false)
+    }
   }
 
-  const handleSendEmail = () => {
-    toast.success(`Factura enviada`)
+  const handleSendEmail = async () => {
+    if (!invoice) return
+
+    if (!emailRecipient.trim()) {
+      toast.error('Ingrese un correo electronico')
+      return
+    }
+
+    setIsSendingEmail(true)
+    toast.loading('Enviando factura...', { id: 'send-email' })
+
+    try {
+      const result = await sendInvoiceEmail(invoice.id, emailRecipient)
+
+      toast.dismiss('send-email')
+      if (result.success) {
+        toast.success(`Factura enviada a ${emailRecipient}`)
+        setShowEmailDialog(false)
+        setEmailRecipient('')
+      } else {
+        toast.error(result.error || 'Error al enviar el email')
+      }
+    } catch (error) {
+      console.error('Error sending email:', error)
+      toast.dismiss('send-email')
+      toast.error('Error al enviar el email')
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
+  const openEmailDialog = () => {
+    setEmailRecipient('')
+    setShowEmailDialog(true)
   }
 
   const handleCopyNCF = () => {
@@ -328,11 +409,15 @@ export default function InvoiceDetailPage({
             <Printer className="mr-2 h-4 w-4" />
             Imprimir
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
-            <Download className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isGeneratingPDF}>
+            {isGeneratingPDF ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
             Descargar PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={handleSendEmail}>
+          <Button variant="outline" size="sm" onClick={openEmailDialog}>
             <Send className="mr-2 h-4 w-4" />
             Enviar
           </Button>
@@ -731,6 +816,39 @@ export default function InvoiceDetailPage({
           </Card>
         </div>
       </div>
+
+      {/* Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar Factura por Email</DialogTitle>
+            <DialogDescription>
+              Ingrese el correo electronico del destinatario para enviar la factura {invoice.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Electronico</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="correo@ejemplo.com"
+                value={emailRecipient}
+                onChange={(e) => setEmailRecipient(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
+              {isSendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Enviar Factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -615,3 +615,91 @@ async function recalculateInvoiceTotals(invoiceId: string): Promise<void> {
     })
     .eq('id', invoiceId)
 }
+
+// =============================================
+// ENVIO DE EMAIL
+// =============================================
+
+import { sendEmail, generateInvoiceEmailHTML } from '@/lib/email'
+
+// Enviar factura por email
+export async function sendInvoiceEmail(
+  invoiceId: string,
+  recipientEmail: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    // Obtener la factura con datos del paciente
+    const invoice = await getInvoiceById(invoiceId)
+    if (!invoice) {
+      return { success: false, error: 'Factura no encontrada' }
+    }
+
+    // Obtener items de la factura
+    const items = await getInvoiceItems(invoiceId)
+
+    // Obtener datos adicionales del paciente si existe
+    let patientEmail = recipientEmail
+    let patientPhone: string | undefined
+    let patientRnc: string | undefined
+
+    if (invoice.patient_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: patient } = await (supabase as any)
+        .from('patients')
+        .select('email, phone, document_id')
+        .eq('id', invoice.patient_id)
+        .single()
+
+      if (patient) {
+        patientEmail = recipientEmail || patient.email
+        patientPhone = patient.phone
+        patientRnc = patient.document_id
+      }
+    }
+
+    // Generar HTML del email
+    const emailHTML = generateInvoiceEmailHTML({
+      invoiceNumber: invoice.invoice_number,
+      ncf: invoice.ncf || undefined,
+      clientName: invoice.patient_name || 'Cliente General',
+      clientPhone: patientPhone,
+      clientEmail: patientEmail,
+      clientRnc: patientRnc,
+      items: items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        total: item.total,
+      })),
+      subtotal: invoice.subtotal,
+      discountAmount: invoice.discount_amount,
+      taxAmount: invoice.tax_amount,
+      total: invoice.total,
+      paidAmount: invoice.paid_amount,
+      amountDue: invoice.amount_due,
+      currency: invoice.currency,
+      issueDate: invoice.issue_date,
+      dueDate: invoice.due_date || undefined,
+      status: invoice.status,
+      notes: invoice.notes || undefined,
+    })
+
+    // Enviar email
+    const result = await sendEmail({
+      to: patientEmail,
+      subject: `Factura ${invoice.invoice_number} - Med Luxe Aesthetics & Wellness`,
+      html: emailHTML,
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Error al enviar el email' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error sending invoice email:', error)
+    return { success: false, error: 'Error al enviar el email' }
+  }
+}
