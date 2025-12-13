@@ -102,8 +102,7 @@ export function NotificationsDropdown() {
     })
   }
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDelete = (id: string) => {
     startTransition(async () => {
       await deleteNotification(id)
       setNotifications(prev => prev.filter(n => n.id !== id))
@@ -187,12 +186,15 @@ export function NotificationsDropdown() {
             </div>
           ) : (
             notifications.map((notification) => (
-              <div
+              <DropdownMenuItem
                 key={notification.id}
-                className={`flex items-start gap-3 px-4 py-3 hover:bg-[#f5f3f0] transition-colors cursor-pointer ${
+                className={`flex items-start gap-3 px-4 py-3 cursor-pointer focus:bg-[#f5f3f0] ${
                   !notification.is_read ? 'bg-[#A67C52]/5' : ''
                 }`}
-                onClick={() => handleNotificationClick(notification)}
+                onSelect={(e) => {
+                  e.preventDefault()
+                  handleNotificationClick(notification)
+                }}
               >
                 <span className="text-lg mt-0.5">
                   {getNotificationIcon(notification.type)}
@@ -214,8 +216,9 @@ export function NotificationsDropdown() {
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10"
-                      onClick={(e) => {
+                      onPointerDown={(e) => {
                         e.stopPropagation()
+                        e.preventDefault()
                         handleMarkAsRead(notification.id)
                       }}
                       disabled={isPending}
@@ -228,14 +231,18 @@ export function NotificationsDropdown() {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 text-[#998577] hover:text-red-500 hover:bg-red-50"
-                    onClick={(e) => handleDelete(notification.id, e)}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      handleDelete(notification.id)
+                    }}
                     disabled={isPending}
                     title="Eliminar"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
-              </div>
+              </DropdownMenuItem>
             ))
           )}
         </div>
