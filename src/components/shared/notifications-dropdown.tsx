@@ -117,10 +117,9 @@ export function NotificationsDropdown() {
     if (!notification.is_read) {
       handleMarkAsRead(notification.id)
     }
-    if (notification.link) {
-      setIsOpen(false)
-      router.push(notification.link)
-    }
+    setIsOpen(false)
+    // Navigate to the notification link, or to notifications page as fallback
+    router.push(notification.link || '/notificaciones')
   }
 
   const formatTime = (dateString: string) => {
