@@ -208,7 +208,7 @@ export default function InvoiceDetailPage({
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unit_price,
-          total: item.total,
+          total: item.subtotal,
         })),
         subtotal: invoice.subtotal,
         discountAmount: invoice.discount_amount,
@@ -644,7 +644,7 @@ export default function InvoiceDetailPage({
                           {formatCurrency(item.unit_price, invoice.currency)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {formatCurrency(item.total, invoice.currency)}
+                          {formatCurrency(item.subtotal, invoice.currency)}
                         </TableCell>
                       </TableRow>
                     ))

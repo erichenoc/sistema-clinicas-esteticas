@@ -505,11 +505,10 @@ export interface InvoiceItemData {
   description: string
   quantity: number
   unit_price: number
-  discount: number
-  tax_rate: number
-  total: number
+  discount_percent: number
+  tax_percent: number
+  subtotal: number
   treatment_id: string | null
-  product_id: string | null
   created_at: string
 }
 
@@ -547,7 +546,11 @@ export async function addInvoiceItem(
 ): Promise<{ data: InvoiceItemData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  const total = item.quantity * item.unit_price * (1 - (item.discount || 0) / 100) * (1 + (item.tax_rate || 0) / 100)
+  // Calculate subtotal including tax
+  const discountPercent = item.discount || 0
+  const taxPercent = item.tax_rate || 0
+  const subtotalBeforeTax = item.quantity * item.unit_price * (1 - discountPercent / 100)
+  const subtotal = subtotalBeforeTax * (1 + taxPercent / 100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
@@ -557,11 +560,10 @@ export async function addInvoiceItem(
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      discount: item.discount || 0,
-      tax_rate: item.tax_rate || 0,
-      total: total,
+      discount_percent: discountPercent,
+      tax_percent: taxPercent,
+      subtotal: subtotal,
       treatment_id: item.treatment_id || null,
-      product_id: item.product_id || null,
     })
     .select()
     .single()
@@ -586,20 +588,20 @@ async function recalculateInvoiceTotals(invoiceId: string): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: items } = await (supabase as any)
     .from('invoice_items')
-    .select('total, tax_rate, unit_price, quantity, discount')
+    .select('subtotal, tax_percent, unit_price, quantity, discount_percent')
     .eq('invoice_id', invoiceId)
 
   if (!items || items.length === 0) return
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subtotal = items.reduce((sum: number, item: any) => {
-    return sum + (item.quantity * item.unit_price * (1 - (item.discount || 0) / 100))
+    return sum + (item.quantity * item.unit_price * (1 - (item.discount_percent || 0) / 100))
   }, 0)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const taxAmount = items.reduce((sum: number, item: any) => {
-    const itemSubtotal = item.quantity * item.unit_price * (1 - (item.discount || 0) / 100)
-    return sum + (itemSubtotal * (item.tax_rate || 0) / 100)
+    const itemSubtotal = item.quantity * item.unit_price * (1 - (item.discount_percent || 0) / 100)
+    return sum + (itemSubtotal * (item.tax_percent || 0) / 100)
   }, 0)
 
   const total = subtotal + taxAmount
@@ -671,7 +673,7 @@ export async function sendInvoiceEmail(
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unit_price,
-        total: item.total,
+        total: item.subtotal,
       })),
       subtotal: invoice.subtotal,
       discountAmount: invoice.discount_amount,
