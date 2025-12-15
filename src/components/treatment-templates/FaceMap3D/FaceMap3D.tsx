@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState, useCallback } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html, Environment } from '@react-three/drei'
+import { OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { InjectionPoint, Point3D, InjectionZone } from '@/types/treatment-templates'
 import { FaceModel } from './FaceModel'
@@ -112,9 +112,6 @@ function Scene({
       <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
       <directionalLight position={[-5, 5, 5]} intensity={0.4} />
       <directionalLight position={[0, -5, 5]} intensity={0.2} />
-
-      {/* Environment for realistic reflections */}
-      <Environment preset="studio" />
 
       {/* Camera controls */}
       <OrbitControls
