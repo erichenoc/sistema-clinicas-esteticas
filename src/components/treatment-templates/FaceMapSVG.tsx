@@ -111,7 +111,7 @@ export function FaceMapSVG({
   readOnly = false,
   className,
   gender = 'female',
-  useRealImages = true,
+  useRealImages = false, // Disabled until we have properly aligned professional images
 }: FaceMapSVGProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoveredZone, setHoveredZone] = useState<string | null>(null)
