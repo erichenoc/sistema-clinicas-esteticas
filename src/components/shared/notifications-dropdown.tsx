@@ -65,6 +65,12 @@ export function NotificationsDropdown() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Fix hydration mismatch - only show badge after mount
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const loadNotifications = async () => {
     try {
@@ -142,7 +148,7 @@ export function NotificationsDropdown() {
           className="relative h-10 w-10 rounded-xl text-[#998577] hover:text-[#A67C52] hover:bg-[#A67C52]/10"
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
+          {isMounted && unreadCount > 0 && (
             <Badge className="absolute -right-0.5 -top-0.5 h-5 w-5 rounded-full p-0 text-[10px] bg-[#e8a0c0] text-white border-2 border-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
@@ -158,7 +164,7 @@ export function NotificationsDropdown() {
           <DropdownMenuLabel className="font-display text-[#3d3d3d] p-0">
             Notificaciones
           </DropdownMenuLabel>
-          {unreadCount > 0 && (
+          {isMounted && unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"

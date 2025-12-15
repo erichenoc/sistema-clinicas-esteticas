@@ -70,13 +70,14 @@ export function InjectableTreatmentTemplate({
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingPoint, setEditingPoint] = useState<InjectionPoint | null>(null)
 
-  const handleAddPoint = (x: number, y: number, view: FaceView) => {
+  const handleAddPoint = (x: number, y: number, view: FaceView, zone: InjectionZone) => {
     const newPoint: InjectionPoint = {
       ...emptyPoint,
       id: crypto.randomUUID(),
       x,
       y,
       view,
+      zone, // Use the auto-detected zone from FaceMapSVG
     }
     setEditingPoint(newPoint)
     setEditDialogOpen(true)
