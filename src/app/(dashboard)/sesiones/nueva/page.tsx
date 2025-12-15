@@ -68,6 +68,7 @@ interface PatientOption {
   id: string
   name: string
   phone: string
+  gender: 'male' | 'female' | null
 }
 
 interface ProfessionalOption {
@@ -128,6 +129,8 @@ function NuevaSesionContent() {
           id: p.id,
           name: `${p.first_name} ${p.last_name}`,
           phone: p.phone,
+          gender: p.gender === 'M' || p.gender === 'male' ? 'male' :
+                  p.gender === 'F' || p.gender === 'female' ? 'female' : null,
         })))
 
         // Transformar profesionales
@@ -205,6 +208,10 @@ function NuevaSesionContent() {
   })
 
   const watchTreatment = form.watch('treatmentId')
+  const watchPatientId = form.watch('patientId')
+
+  // Get selected patient's gender for 3D model
+  const selectedPatientGender = patients.find(p => p.id === watchPatientId)?.gender || undefined
 
   // Actualizar tratamiento seleccionado y parámetros
   useEffect(() => {
@@ -564,6 +571,8 @@ function NuevaSesionContent() {
                       data={templateData}
                       onChange={setTemplateData}
                       readOnly={false}
+                      patientId={watchPatientId}
+                      patientGender={selectedPatientGender}
                     />
                   </CardContent>
                 </Card>

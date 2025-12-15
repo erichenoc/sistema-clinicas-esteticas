@@ -30,3 +30,4 @@ export { FACIAL_ZONES_3D, detectZoneFromPosition } from './constants'
 
 // Re-export types separately to avoid module evaluation
 export type { FaceMap3DProps } from './FaceMap3D'
+export type { Gender } from './FaceModel'

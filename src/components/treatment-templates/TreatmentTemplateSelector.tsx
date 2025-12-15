@@ -11,12 +11,16 @@ import {
   type FacialTreatmentData,
   type InjectableTreatmentData,
 } from '@/types/treatment-templates'
+import type { Gender } from './FaceMap3D'
 
 interface TreatmentTemplateSelectorProps {
   treatmentName: string
   data: TreatmentTemplateData | null
   onChange: (data: TreatmentTemplateData) => void
   readOnly?: boolean
+  patientId?: string
+  patientGender?: Gender
+  currentSessionId?: string
 }
 
 const emptyFacialData: FacialTreatmentData = {
@@ -40,6 +44,9 @@ export function TreatmentTemplateSelector({
   data,
   onChange,
   readOnly = false,
+  patientId,
+  patientGender,
+  currentSessionId,
 }: TreatmentTemplateSelectorProps) {
   const templateType = useMemo(() => getTemplateType(treatmentName), [treatmentName])
 
@@ -103,6 +110,9 @@ export function TreatmentTemplateSelector({
           data={currentData as InjectableTreatmentData}
           onChange={(newData) => onChange(newData)}
           readOnly={readOnly}
+          patientId={patientId}
+          patientGender={patientGender}
+          currentSessionId={currentSessionId}
         />
       )}
     </div>

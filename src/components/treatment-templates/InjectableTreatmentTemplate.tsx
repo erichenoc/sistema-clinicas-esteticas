@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { FaceMap3D } from './FaceMap3D'
+import { FaceMap3D, type Gender } from './FaceMap3D'
 import type {
   InjectionPoint,
   InjectionZone,
@@ -50,6 +50,7 @@ interface InjectableTreatmentTemplateProps {
   onChange: (data: InjectableTreatmentData) => void
   readOnly?: boolean
   patientId?: string // Para cargar historial de tratamientos anteriores
+  patientGender?: Gender // Género del paciente para mostrar modelo 3D apropiado
   currentSessionId?: string // Para excluir la sesión actual del historial
 }
 
@@ -68,6 +69,7 @@ export function InjectableTreatmentTemplate({
   onChange,
   readOnly = false,
   patientId,
+  patientGender,
   currentSessionId,
 }: InjectableTreatmentTemplateProps) {
   const [selectedPoint, setSelectedPoint] = useState<InjectionPoint | null>(null)
@@ -192,6 +194,8 @@ export function InjectableTreatmentTemplate({
             selectedPointId={selectedPoint?.id}
             readOnly={readOnly}
             showHistory={showHistory}
+            gender={patientGender}
+            showWireframe={true}
             className="mx-auto"
           />
 

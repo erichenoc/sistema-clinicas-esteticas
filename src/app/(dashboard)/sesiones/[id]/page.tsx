@@ -91,6 +91,7 @@ const mockSession = {
     phone: '8095551234',
     email: 'maria.garcia@email.com',
     avatar: null,
+    gender: 'female' as const,
   },
   professional: {
     id: '1',
@@ -365,6 +366,8 @@ export default function SesionDetallePage() {
                   data={session.technicalParameters.treatmentTemplate}
                   onChange={() => {}} // Read-only in detail view
                   readOnly={true}
+                  patientId={session.patient.id}
+                  patientGender={session.patient.gender}
                 />
               </TabsContent>
             )}

@@ -5,7 +5,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { InjectionPoint, Point3D, InjectionZone } from '@/types/treatment-templates'
-import { FaceModel } from './FaceModel'
+import { FaceModel, type Gender } from './FaceModel'
 import { FacialZones3D } from './FacialZones3D'
 import { InjectionPoints3D } from './InjectionPoints3D'
 import { HistoryPoints3D } from './HistoryPoints3D'
@@ -20,6 +20,8 @@ export interface FaceMap3DProps {
   selectedPointId?: string | null
   readOnly?: boolean
   showHistory?: boolean
+  gender?: Gender
+  showWireframe?: boolean
   className?: string
 }
 
@@ -102,6 +104,8 @@ function Scene({
   selectedPointId,
   readOnly,
   showHistory,
+  gender,
+  showWireframe,
 }: Omit<FaceMap3DProps, 'className'>) {
   const [hoveredZone, setHoveredZone] = useState<InjectionZone | null>(null)
 
@@ -126,7 +130,7 @@ function Scene({
 
       {/* Face model */}
       <Suspense fallback={<LoadingFallback />}>
-        <FaceModel />
+        <FaceModel gender={gender} showWireframe={showWireframe} />
       </Suspense>
 
       {/* Facial zones overlay */}
@@ -171,6 +175,8 @@ export function FaceMap3D({
   selectedPointId,
   readOnly = false,
   showHistory = true,
+  gender = 'female',
+  showWireframe = true,
   className = '',
 }: FaceMap3DProps) {
   return (
@@ -190,6 +196,8 @@ export function FaceMap3D({
             selectedPointId={selectedPointId}
             readOnly={readOnly}
             showHistory={showHistory}
+            gender={gender}
+            showWireframe={showWireframe}
           />
         </Canvas>
       </div>
