@@ -1,3 +1,5 @@
+'use client'
+
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
 
@@ -14,14 +16,17 @@ function FaceMap3DLoader() {
 }
 
 // Lazy load the FaceMap3D component (Three.js is heavy, ~500KB+)
+// IMPORTANT: ssr: false prevents Three.js from running on the server
 export const FaceMap3D = dynamic(
   () => import('./FaceMap3D').then((mod) => mod.FaceMap3D),
   {
-    ssr: false, // Three.js requires browser APIs
+    ssr: false,
     loading: () => <FaceMap3DLoader />,
   }
 )
 
-// Re-export types and constants for convenience
+// Re-export constants (these are safe for SSR - no Three.js)
 export { FACIAL_ZONES_3D, detectZoneFromPosition } from './constants'
+
+// Re-export types separately to avoid module evaluation
 export type { FaceMap3DProps } from './FaceMap3D'
