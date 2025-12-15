@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useRef, useCallback, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { FaceView, InjectionPoint } from '@/types/treatment-templates'
 
@@ -12,6 +12,7 @@ interface FaceMapSVGProps {
   selectedPointId?: string | null
   readOnly?: boolean
   className?: string
+  gender?: 'male' | 'female'
 }
 
 export function FaceMapSVG({
@@ -22,18 +23,21 @@ export function FaceMapSVG({
   selectedPointId,
   readOnly = false,
   className,
+  gender = 'female',
 }: FaceMapSVGProps) {
-  const svgRef = useRef<SVGSVGElement>(null)
-  const [hoveredPoint, setHoveredPoint] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [imageError, setImageError] = useState(false)
 
   const filteredPoints = points.filter((p) => p.view === view)
 
-  const handleSvgClick = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
-      if (readOnly || !onAddPoint || !svgRef.current) return
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (readOnly || !onAddPoint || !containerRef.current) return
 
-      const svg = svgRef.current
-      const rect = svg.getBoundingClientRect()
+      const container = containerRef.current
+      const rect = container.getBoundingClientRect()
+
+      // Calculate position as percentage
       const x = ((e.clientX - rect.left) / rect.width) * 100
       const y = ((e.clientY - rect.top) / rect.height) * 100
 
@@ -50,225 +54,283 @@ export function FaceMapSVG({
     [onPointClick]
   )
 
-  return (
-    <div className={cn('relative aspect-[3/4] bg-muted/30 rounded-lg overflow-hidden', className)}>
-      <svg
-        ref={svgRef}
-        viewBox="0 0 100 133"
-        className={cn(
-          'w-full h-full',
-          !readOnly && 'cursor-crosshair'
-        )}
-        onClick={handleSvgClick}
-      >
-        {/* Face outline based on view */}
-        {view === 'frontal' && <FrontalFaceSVG />}
-        {view === 'left' && <LeftProfileSVG />}
-        {view === 'right' && <RightProfileSVG />}
+  // Get image URL based on view and gender
+  const getImageUrl = () => {
+    // Using high-quality medical illustration style images
+    // These are placeholder URLs - in production you would use actual image assets
+    const baseUrl = 'https://images.unsplash.com/photo-'
 
-        {/* Injection points */}
-        {filteredPoints.map((point) => (
-          <g key={point.id}>
-            {/* Outer ring for selection */}
-            {selectedPointId === point.id && (
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r={4}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth={1}
-                className="animate-pulse"
-              />
-            )}
-            {/* Point marker */}
-            <circle
-              cx={point.x}
-              cy={point.y}
-              r={2.5}
-              fill={selectedPointId === point.id ? '#3b82f6' : '#ef4444'}
-              stroke="white"
-              strokeWidth={0.5}
-              className={cn(
-                'transition-all cursor-pointer',
-                hoveredPoint === point.id && 'r-3'
-              )}
-              onClick={(e) => handlePointClick(e, point)}
-              onMouseEnter={() => setHoveredPoint(point.id)}
-              onMouseLeave={() => setHoveredPoint(null)}
-            />
-            {/* Label on hover */}
-            {hoveredPoint === point.id && (
-              <text
-                x={point.x}
-                y={point.y - 5}
-                textAnchor="middle"
-                fontSize={3}
-                fill="#374151"
-                className="pointer-events-none"
-              >
-                {point.zone}
-              </text>
-            )}
-          </g>
-        ))}
+    if (gender === 'female') {
+      switch (view) {
+        case 'frontal':
+          return `${baseUrl}1531746020798-e6953c6306f4?w=400&h=500&fit=crop&crop=face` // Woman frontal
+        case 'left':
+          return `${baseUrl}1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face` // Woman profile
+        case 'right':
+          return `${baseUrl}1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face&flip=h`
+      }
+    } else {
+      switch (view) {
+        case 'frontal':
+          return `${baseUrl}1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face` // Man frontal
+        case 'left':
+          return `${baseUrl}1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face` // Man profile
+        case 'right':
+          return `${baseUrl}1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face&flip=h`
+      }
+    }
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        'relative bg-gradient-to-b from-slate-100 to-slate-200 rounded-xl overflow-hidden border-2 border-slate-300 shadow-lg',
+        !readOnly && 'cursor-crosshair',
+        className
+      )}
+      onClick={handleClick}
+      style={{ minHeight: '350px', aspectRatio: '3/4' }}
+    >
+      {/* Background image or SVG fallback */}
+      {!imageError ? (
+        <img
+          src={getImageUrl()}
+          alt={`Vista ${view} - ${gender === 'female' ? 'Mujer' : 'Hombre'}`}
+          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          onError={() => setImageError(true)}
+        />
+      ) : null}
+
+      {/* Always show SVG overlay with zones */}
+      <svg
+        viewBox="0 0 100 133"
+        className="absolute inset-0 w-full h-full"
+        style={{ pointerEvents: 'none' }}
+      >
+        {view === 'frontal' && <FrontalZones />}
+        {view === 'left' && <LeftProfileZones />}
+        {view === 'right' && <RightProfileZones />}
       </svg>
 
+      {/* Injection points */}
+      {filteredPoints.map((point, index) => (
+        <div
+          key={point.id}
+          className={cn(
+            'absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200',
+            'cursor-pointer hover:scale-110',
+            selectedPointId === point.id && 'scale-125'
+          )}
+          style={{
+            left: `${point.x}%`,
+            top: `${point.y}%`,
+          }}
+          onClick={(e) => handlePointClick(e, point)}
+        >
+          {/* Glow effect for selected */}
+          {selectedPointId === point.id && (
+            <div className="absolute inset-0 -m-2 rounded-full bg-blue-400/50 animate-ping" />
+          )}
+          {/* Point marker */}
+          <div
+            className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white',
+              selectedPointId === point.id ? 'bg-blue-500' : 'bg-red-500'
+            )}
+          >
+            {index + 1}
+          </div>
+        </div>
+      ))}
+
       {/* View label */}
-      <div className="absolute bottom-2 left-2 text-xs font-medium text-muted-foreground bg-background/80 px-2 py-1 rounded">
+      <div className="absolute bottom-3 left-3 text-sm font-semibold text-slate-700 bg-white/95 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
         {view === 'frontal' && 'Vista Frontal'}
         {view === 'left' && 'Perfil Izquierdo'}
         {view === 'right' && 'Perfil Derecho'}
       </div>
 
       {/* Point count */}
-      <div className="absolute top-2 right-2 text-xs font-medium text-muted-foreground bg-background/80 px-2 py-1 rounded">
+      <div className="absolute top-3 right-3 text-sm font-semibold text-slate-700 bg-white/95 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
         {filteredPoints.length} punto{filteredPoints.length !== 1 ? 's' : ''}
       </div>
+
+      {/* Gender indicator */}
+      <div className="absolute top-3 left-3 text-xs font-medium text-slate-600 bg-white/95 px-2 py-1 rounded-full shadow-md backdrop-blur-sm">
+        {gender === 'female' ? 'Mujer' : 'Hombre'}
+      </div>
+
+      {/* Instructions */}
+      {!readOnly && filteredPoints.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/60 text-white px-5 py-3 rounded-xl text-sm font-medium shadow-xl">
+            Haz clic para agregar punto de inyeccion
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// Frontal face SVG paths
-function FrontalFaceSVG() {
+// SVG Zone overlays - These show the injection zones on top of any image
+function FrontalZones() {
   return (
-    <g stroke="#d1d5db" strokeWidth={0.5} fill="none">
-      {/* Face outline */}
-      <ellipse cx={50} cy={60} rx={35} ry={45} />
+    <g>
+      {/* Forehead zone */}
+      <rect x={25} y={8} width={50} height={18} rx={3} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={19} textAnchor="middle" fontSize={3.5} fill="#92400e" fontWeight="600">FRENTE</text>
 
-      {/* Hair line */}
-      <path d="M 20 35 Q 30 15, 50 12 Q 70 15, 80 35" />
+      {/* Glabella zone */}
+      <rect x={42} y={28} width={16} height={10} rx={2} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={35} textAnchor="middle" fontSize={2.5} fill="#92400e">ENTRECEJO</text>
 
-      {/* Left eyebrow */}
-      <path d="M 28 45 Q 35 42, 42 45" strokeWidth={0.8} />
+      {/* Left crow's feet */}
+      <circle cx={22} cy={42} r={6} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={22} y={43} textAnchor="middle" fontSize={2} fill="#92400e">PATA</text>
+      <text x={22} y={46} textAnchor="middle" fontSize={2} fill="#92400e">GALLO</text>
 
-      {/* Right eyebrow */}
-      <path d="M 58 45 Q 65 42, 72 45" strokeWidth={0.8} />
+      {/* Right crow's feet */}
+      <circle cx={78} cy={42} r={6} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={78} y={43} textAnchor="middle" fontSize={2} fill="#92400e">PATA</text>
+      <text x={78} y={46} textAnchor="middle" fontSize={2} fill="#92400e">GALLO</text>
 
-      {/* Left eye */}
-      <ellipse cx={35} cy={52} rx={6} ry={3} />
-      <circle cx={35} cy={52} r={1.5} fill="#d1d5db" />
+      {/* Left temple */}
+      <circle cx={18} cy={32} r={5} fill="rgba(147, 197, 253, 0.2)" stroke="#3b82f6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={18} y={33} textAnchor="middle" fontSize={2} fill="#1e40af">SIEN</text>
 
-      {/* Right eye */}
-      <ellipse cx={65} cy={52} rx={6} ry={3} />
-      <circle cx={65} cy={52} r={1.5} fill="#d1d5db" />
+      {/* Right temple */}
+      <circle cx={82} cy={32} r={5} fill="rgba(147, 197, 253, 0.2)" stroke="#3b82f6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={82} y={33} textAnchor="middle" fontSize={2} fill="#1e40af">SIEN</text>
 
-      {/* Nose */}
-      <path d="M 50 50 L 50 68" />
-      <path d="M 45 70 Q 50 73, 55 70" />
+      {/* Left nasolabial */}
+      <ellipse cx={35} cy={62} rx={5} ry={8} fill="rgba(167, 243, 208, 0.2)" stroke="#10b981" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={35} y={61} textAnchor="middle" fontSize={2} fill="#047857">SURCO</text>
+      <text x={35} y={64} textAnchor="middle" fontSize={2} fill="#047857">NASOG.</text>
 
-      {/* Nasolabial folds */}
-      <path d="M 40 70 Q 42 78, 43 82" strokeDasharray="1,1" />
-      <path d="M 60 70 Q 58 78, 57 82" strokeDasharray="1,1" />
+      {/* Right nasolabial */}
+      <ellipse cx={65} cy={62} rx={5} ry={8} fill="rgba(167, 243, 208, 0.2)" stroke="#10b981" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={65} y={61} textAnchor="middle" fontSize={2} fill="#047857">SURCO</text>
+      <text x={65} y={64} textAnchor="middle" fontSize={2} fill="#047857">NASOG.</text>
 
-      {/* Lips */}
-      <path d="M 40 85 Q 50 82, 60 85" />
-      <path d="M 40 85 Q 50 90, 60 85" />
+      {/* Left cheek */}
+      <ellipse cx={28} cy={55} rx={7} ry={9} fill="rgba(253, 186, 186, 0.2)" stroke="#f87171" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={28} y={56} textAnchor="middle" fontSize={2.5} fill="#b91c1c">MEJILLA</text>
+
+      {/* Right cheek */}
+      <ellipse cx={72} cy={55} rx={7} ry={9} fill="rgba(253, 186, 186, 0.2)" stroke="#f87171" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={72} y={56} textAnchor="middle" fontSize={2.5} fill="#b91c1c">MEJILLA</text>
+
+      {/* Lips zone */}
+      <ellipse cx={50} cy={73} rx={12} ry={5} fill="rgba(251, 207, 232, 0.3)" stroke="#ec4899" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={74} textAnchor="middle" fontSize={2.5} fill="#be185d">LABIOS</text>
+
+      {/* Marionette lines */}
+      <ellipse cx={38} cy={80} rx={4} ry={5} fill="rgba(196, 181, 253, 0.2)" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={38} y={80} textAnchor="middle" fontSize={1.8} fill="#6d28d9">MARIONET</text>
+
+      <ellipse cx={62} cy={80} rx={4} ry={5} fill="rgba(196, 181, 253, 0.2)" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={62} y={80} textAnchor="middle" fontSize={1.8} fill="#6d28d9">MARIONET</text>
 
       {/* Chin */}
-      <path d="M 45 95 Q 50 100, 55 95" strokeDasharray="1,1" />
+      <ellipse cx={50} cy={90} rx={10} ry={6} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={91} textAnchor="middle" fontSize={2.5} fill="#92400e">MENTON</text>
 
-      {/* Jawline markers */}
-      <path d="M 20 70 Q 25 90, 35 98" strokeDasharray="1,1" />
-      <path d="M 80 70 Q 75 90, 65 98" strokeDasharray="1,1" />
+      {/* Jawline left */}
+      <path d="M 18 70 Q 20 85, 30 95" fill="none" stroke="#f59e0b" strokeWidth={0.5} strokeDasharray="2,1" />
+      <text x={20} y={85} textAnchor="middle" fontSize={2} fill="#92400e" transform="rotate(-45 20 85)">MANDIB.</text>
 
-      {/* Ears */}
-      <ellipse cx={15} cy={55} rx={4} ry={8} />
-      <ellipse cx={85} cy={55} rx={4} ry={8} />
+      {/* Jawline right */}
+      <path d="M 82 70 Q 80 85, 70 95" fill="none" stroke="#f59e0b" strokeWidth={0.5} strokeDasharray="2,1" />
+      <text x={80} y={85} textAnchor="middle" fontSize={2} fill="#92400e" transform="rotate(45 80 85)">MANDIB.</text>
 
       {/* Neck */}
-      <path d="M 35 105 L 35 125" />
-      <path d="M 65 105 L 65 125" />
+      <rect x={35} y={100} width={30} height={20} rx={3} fill="rgba(209, 213, 219, 0.2)" stroke="#6b7280" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={112} textAnchor="middle" fontSize={3} fill="#374151">CUELLO</text>
     </g>
   )
 }
 
-// Left profile SVG paths
-function LeftProfileSVG() {
+function LeftProfileZones() {
   return (
-    <g stroke="#d1d5db" strokeWidth={0.5} fill="none">
-      {/* Head outline - left profile */}
-      <path d="M 70 20 Q 30 25, 25 55 Q 20 75, 30 90 Q 40 105, 50 110 L 50 130" />
-
-      {/* Back of head */}
-      <path d="M 70 20 Q 85 35, 85 60 Q 85 85, 75 100 L 65 130" />
-
+    <g>
       {/* Forehead */}
-      <path d="M 70 20 L 35 35" strokeDasharray="1,1" />
+      <path d="M 35 15 Q 50 10, 65 18 L 65 30 Q 50 25, 35 30 Z" fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={23} textAnchor="middle" fontSize={3} fill="#92400e">FRENTE</text>
 
-      {/* Eyebrow */}
-      <path d="M 35 43 Q 42 40, 48 43" strokeWidth={0.8} />
+      {/* Temple */}
+      <circle cx={70} cy={35} r={7} fill="rgba(147, 197, 253, 0.2)" stroke="#3b82f6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={70} y={36} textAnchor="middle" fontSize={2.5} fill="#1e40af">SIEN</text>
 
-      {/* Eye */}
-      <path d="M 38 50 Q 45 48, 48 50 Q 45 52, 38 50" />
-      <circle cx={43} cy={50} r={1} fill="#d1d5db" />
+      {/* Crow's feet */}
+      <circle cx={62} cy={45} r={5} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={62} y={46} textAnchor="middle" fontSize={2} fill="#92400e">PATA G.</text>
 
-      {/* Nose */}
-      <path d="M 48 50 L 25 65 L 35 70" />
+      {/* Cheek */}
+      <ellipse cx={55} cy={58} rx={10} ry={12} fill="rgba(253, 186, 186, 0.2)" stroke="#f87171" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={55} y={59} textAnchor="middle" fontSize={2.5} fill="#b91c1c">MEJILLA</text>
 
-      {/* Nasolabial fold */}
-      <path d="M 35 70 Q 38 78, 40 85" strokeDasharray="1,1" />
+      {/* Nasolabial */}
+      <ellipse cx={40} cy={65} rx={5} ry={8} fill="rgba(167, 243, 208, 0.2)" stroke="#10b981" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={40} y={65} textAnchor="middle" fontSize={2} fill="#047857">SURCO</text>
 
       {/* Lips */}
-      <path d="M 35 85 Q 42 82, 45 85 Q 42 88, 35 85" />
+      <ellipse cx={35} cy={75} rx={8} ry={4} fill="rgba(251, 207, 232, 0.3)" stroke="#ec4899" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={35} y={76} textAnchor="middle" fontSize={2} fill="#be185d">LABIOS</text>
 
       {/* Chin */}
-      <path d="M 35 85 Q 30 95, 35 100" />
+      <ellipse cx={40} cy={88} rx={8} ry={6} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={40} y={89} textAnchor="middle" fontSize={2.5} fill="#92400e">MENTON</text>
 
-      {/* Jaw */}
-      <path d="M 35 100 Q 55 105, 75 100" strokeDasharray="1,1" />
-
-      {/* Ear */}
-      <ellipse cx={75} cy={55} rx={5} ry={10} />
+      {/* Jawline */}
+      <path d="M 50 85 Q 60 92, 75 90" fill="none" stroke="#f59e0b" strokeWidth={0.5} strokeDasharray="2,1" />
+      <text x={62} y={92} textAnchor="middle" fontSize={2} fill="#92400e">MANDIBULA</text>
 
       {/* Neck */}
-      <path d="M 50 110 L 50 130" />
-      <path d="M 65 105 L 65 130" />
+      <rect x={50} y={100} width={25} height={20} rx={3} fill="rgba(209, 213, 219, 0.2)" stroke="#6b7280" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={62} y={112} textAnchor="middle" fontSize={2.5} fill="#374151">CUELLO</text>
     </g>
   )
 }
 
-// Right profile SVG paths (mirror of left)
-function RightProfileSVG() {
+function RightProfileZones() {
   return (
-    <g stroke="#d1d5db" strokeWidth={0.5} fill="none" transform="scale(-1, 1) translate(-100, 0)">
-      {/* Head outline - right profile (mirrored left) */}
-      <path d="M 70 20 Q 30 25, 25 55 Q 20 75, 30 90 Q 40 105, 50 110 L 50 130" />
-
-      {/* Back of head */}
-      <path d="M 70 20 Q 85 35, 85 60 Q 85 85, 75 100 L 65 130" />
-
+    <g>
       {/* Forehead */}
-      <path d="M 70 20 L 35 35" strokeDasharray="1,1" />
+      <path d="M 65 15 Q 50 10, 35 18 L 35 30 Q 50 25, 65 30 Z" fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={50} y={23} textAnchor="middle" fontSize={3} fill="#92400e">FRENTE</text>
 
-      {/* Eyebrow */}
-      <path d="M 35 43 Q 42 40, 48 43" strokeWidth={0.8} />
+      {/* Temple */}
+      <circle cx={30} cy={35} r={7} fill="rgba(147, 197, 253, 0.2)" stroke="#3b82f6" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={30} y={36} textAnchor="middle" fontSize={2.5} fill="#1e40af">SIEN</text>
 
-      {/* Eye */}
-      <path d="M 38 50 Q 45 48, 48 50 Q 45 52, 38 50" />
-      <circle cx={43} cy={50} r={1} fill="#d1d5db" />
+      {/* Crow's feet */}
+      <circle cx={38} cy={45} r={5} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={38} y={46} textAnchor="middle" fontSize={2} fill="#92400e">PATA G.</text>
 
-      {/* Nose */}
-      <path d="M 48 50 L 25 65 L 35 70" />
+      {/* Cheek */}
+      <ellipse cx={45} cy={58} rx={10} ry={12} fill="rgba(253, 186, 186, 0.2)" stroke="#f87171" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={45} y={59} textAnchor="middle" fontSize={2.5} fill="#b91c1c">MEJILLA</text>
 
-      {/* Nasolabial fold */}
-      <path d="M 35 70 Q 38 78, 40 85" strokeDasharray="1,1" />
+      {/* Nasolabial */}
+      <ellipse cx={60} cy={65} rx={5} ry={8} fill="rgba(167, 243, 208, 0.2)" stroke="#10b981" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={60} y={65} textAnchor="middle" fontSize={2} fill="#047857">SURCO</text>
 
       {/* Lips */}
-      <path d="M 35 85 Q 42 82, 45 85 Q 42 88, 35 85" />
+      <ellipse cx={65} cy={75} rx={8} ry={4} fill="rgba(251, 207, 232, 0.3)" stroke="#ec4899" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={65} y={76} textAnchor="middle" fontSize={2} fill="#be185d">LABIOS</text>
 
       {/* Chin */}
-      <path d="M 35 85 Q 30 95, 35 100" />
+      <ellipse cx={60} cy={88} rx={8} ry={6} fill="rgba(251, 191, 36, 0.2)" stroke="#f59e0b" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={60} y={89} textAnchor="middle" fontSize={2.5} fill="#92400e">MENTON</text>
 
-      {/* Jaw */}
-      <path d="M 35 100 Q 55 105, 75 100" strokeDasharray="1,1" />
-
-      {/* Ear */}
-      <ellipse cx={75} cy={55} rx={5} ry={10} />
+      {/* Jawline */}
+      <path d="M 50 85 Q 40 92, 25 90" fill="none" stroke="#f59e0b" strokeWidth={0.5} strokeDasharray="2,1" />
+      <text x={38} y={92} textAnchor="middle" fontSize={2} fill="#92400e">MANDIBULA</text>
 
       {/* Neck */}
-      <path d="M 50 110 L 50 130" />
-      <path d="M 65 105 L 65 130" />
+      <rect x={25} y={100} width={25} height={20} rx={3} fill="rgba(209, 213, 219, 0.2)" stroke="#6b7280" strokeWidth={0.3} strokeDasharray="2,1" />
+      <text x={38} y={112} textAnchor="middle" fontSize={2.5} fill="#374151">CUELLO</text>
     </g>
   )
 }
