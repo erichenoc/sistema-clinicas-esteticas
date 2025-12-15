@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { InjectionPoint } from '@/types/treatment-templates'
 
 // Tipos
 export type SessionStatus = 'in_progress' | 'completed' | 'cancelled' | 'incomplete'
@@ -570,4 +571,99 @@ export async function createClinicalNote(
     revalidatePath(`/sesiones/${input.session_id}`)
   }
   return { data: data as ClinicalNoteData, error: null }
+}
+
+// =============================================
+// HISTORIAL DE TRATAMIENTOS (Para modelo 3D)
+// =============================================
+
+/**
+ * Obtiene el historial de puntos de inyección de sesiones anteriores de un paciente.
+ * Usado para mostrar en el modelo 3D los tratamientos previos.
+ */
+export async function getPatientTreatmentHistory(
+  patientId: string,
+  options?: {
+    treatmentType?: 'injectable' | 'facial'
+    limit?: number
+    excludeSessionId?: string // Excluir sesión actual
+  }
+): Promise<InjectionPoint[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from('sessions')
+    .select('id, started_at, technical_parameters, treatment_name')
+    .eq('patient_id', patientId)
+    .eq('status', 'completed')
+    .order('started_at', { ascending: false })
+    .limit(options?.limit || 10)
+
+  // Excluir sesión actual si se especifica
+  if (options?.excludeSessionId) {
+    query = query.neq('id', options.excludeSessionId)
+  }
+
+  const { data: sessions, error } = await query
+
+  if (error) {
+    console.error('Error fetching treatment history:', error)
+    return []
+  }
+
+  if (!sessions || sessions.length === 0) {
+    return []
+  }
+
+  // Extraer puntos de inyección de cada sesión
+  const allPoints: InjectionPoint[] = []
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const session of sessions as any[]) {
+    const template = session.technical_parameters?.treatmentTemplate
+
+    // Verificar si es un tratamiento inyectable con puntos
+    if (template?.templateType === 'injectable' && template?.injectionPoints) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const points = template.injectionPoints.map((point: any) => ({
+        ...point,
+        sessionId: session.id,
+        sessionDate: session.started_at,
+      }))
+      allPoints.push(...points)
+    }
+  }
+
+  return allPoints
+}
+
+/**
+ * Obtiene un resumen del historial de zonas tratadas de un paciente.
+ * Útil para mostrar estadísticas o frecuencia de tratamiento por zona.
+ */
+export async function getPatientTreatmentZoneSummary(
+  patientId: string
+): Promise<Map<string, { count: number; lastTreated: string }>> {
+  const points = await getPatientTreatmentHistory(patientId, { limit: 50 })
+
+  const zoneSummary = new Map<string, { count: number; lastTreated: string }>()
+
+  for (const point of points) {
+    const existing = zoneSummary.get(point.zone)
+    if (existing) {
+      existing.count++
+      // Actualizar lastTreated si esta fecha es más reciente
+      if (point.sessionDate && point.sessionDate > existing.lastTreated) {
+        existing.lastTreated = point.sessionDate
+      }
+    } else {
+      zoneSummary.set(point.zone, {
+        count: 1,
+        lastTreated: point.sessionDate || '',
+      })
+    }
+  }
+
+  return zoneSummary
 }

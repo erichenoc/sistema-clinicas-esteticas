@@ -58,7 +58,7 @@ function TagInput({
   readOnly = false,
 }: {
   label: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   values: string[]
   onChange: (values: string[]) => void
   placeholder: string

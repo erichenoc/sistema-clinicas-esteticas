@@ -252,7 +252,7 @@ export function MedicalHistoryEnhanced({
     alertBadge,
     iconColor,
   }: {
-    icon: React.ElementType
+    icon: React.ComponentType<{ className?: string }>
     title: string
     subtitle?: string
     status?: SectionStatus

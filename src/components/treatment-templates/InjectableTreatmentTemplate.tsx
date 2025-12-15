@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Trash2, Edit, Eye } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Trash2, Edit, Eye, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -29,28 +30,30 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { FaceMapSVG } from './FaceMapSVG'
+import { FaceMap3D } from './FaceMap3D'
 import type {
-  FaceView,
   InjectionPoint,
   InjectionZone,
   InjectableTreatmentData,
+  Point3D,
 } from '@/types/treatment-templates'
 import {
   INJECTION_ZONES,
   INJECTION_TECHNIQUES,
   INJECTABLE_PRODUCTS,
 } from '@/types/treatment-templates'
+import { getPatientTreatmentHistory } from '@/actions/sessions'
 
 interface InjectableTreatmentTemplateProps {
   data: InjectableTreatmentData
   onChange: (data: InjectableTreatmentData) => void
   readOnly?: boolean
+  patientId?: string // Para cargar historial de tratamientos anteriores
+  currentSessionId?: string // Para excluir la sesión actual del historial
 }
 
-const emptyPoint: Omit<InjectionPoint, 'id' | 'x' | 'y' | 'view'> = {
+const emptyPoint: Omit<InjectionPoint, 'id' | 'position3D'> = {
   zone: 'frente',
   product: '',
   dilution: null,
@@ -64,20 +67,44 @@ export function InjectableTreatmentTemplate({
   data,
   onChange,
   readOnly = false,
+  patientId,
+  currentSessionId,
 }: InjectableTreatmentTemplateProps) {
-  const [activeView, setActiveView] = useState<FaceView>('frontal')
   const [selectedPoint, setSelectedPoint] = useState<InjectionPoint | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingPoint, setEditingPoint] = useState<InjectionPoint | null>(null)
+  const [historyPoints, setHistoryPoints] = useState<InjectionPoint[]>([])
+  const [showHistory, setShowHistory] = useState(true)
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
-  const handleAddPoint = (x: number, y: number, view: FaceView, zone: InjectionZone) => {
+  // Cargar historial de tratamientos del paciente
+  useEffect(() => {
+    async function loadHistory() {
+      if (!patientId) return
+
+      setLoadingHistory(true)
+      try {
+        const history = await getPatientTreatmentHistory(patientId, {
+          excludeSessionId: currentSessionId,
+          limit: 10,
+        })
+        setHistoryPoints(history)
+      } catch (error) {
+        console.error('Error loading treatment history:', error)
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
+    loadHistory()
+  }, [patientId, currentSessionId])
+
+  const handleAddPoint = (position: Point3D, zone: InjectionZone) => {
     const newPoint: InjectionPoint = {
       ...emptyPoint,
       id: crypto.randomUUID(),
-      x,
-      y,
-      view,
-      zone, // Use the auto-detected zone from FaceMapSVG
+      position3D: position,
+      zone, // Use the auto-detected zone from FaceMap3D
     }
     setEditingPoint(newPoint)
     setEditDialogOpen(true)
@@ -130,76 +157,53 @@ export function InjectableTreatmentTemplate({
   }
 
   const totalPoints = data.injectionPoints.length
-  const pointsByView = {
-    frontal: data.injectionPoints.filter((p) => p.view === 'frontal').length,
-    left: data.injectionPoints.filter((p) => p.view === 'left').length,
-    right: data.injectionPoints.filter((p) => p.view === 'right').length,
-  }
 
   return (
     <div className="space-y-6">
-      {/* Face Map Section */}
+      {/* 3D Face Map Section */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
-            <span>Mapa de Inyecciones</span>
-            <Badge variant="outline">{totalPoints} puntos totales</Badge>
+            <span>Mapa de Inyecciones 3D</span>
+            <div className="flex items-center gap-4">
+              {patientId && historyPoints.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="show-history" className="text-sm font-normal cursor-pointer">
+                    Mostrar historial ({historyPoints.length})
+                  </Label>
+                  <Switch
+                    id="show-history"
+                    checked={showHistory}
+                    onCheckedChange={setShowHistory}
+                  />
+                </div>
+              )}
+              <Badge variant="outline">{totalPoints} puntos</Badge>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeView} onValueChange={(v) => setActiveView(v as FaceView)}>
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="frontal">
-                Frontal ({pointsByView.frontal})
-              </TabsTrigger>
-              <TabsTrigger value="left">
-                Izquierdo ({pointsByView.left})
-              </TabsTrigger>
-              <TabsTrigger value="right">
-                Derecho ({pointsByView.right})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="frontal" className="mt-0">
-              <FaceMapSVG
-                view="frontal"
-                points={data.injectionPoints}
-                onPointClick={handlePointClick}
-                onAddPoint={readOnly ? undefined : handleAddPoint}
-                selectedPointId={selectedPoint?.id}
-                readOnly={readOnly}
-                className="max-w-md mx-auto"
-              />
-            </TabsContent>
-
-            <TabsContent value="left" className="mt-0">
-              <FaceMapSVG
-                view="left"
-                points={data.injectionPoints}
-                onPointClick={handlePointClick}
-                onAddPoint={readOnly ? undefined : handleAddPoint}
-                selectedPointId={selectedPoint?.id}
-                readOnly={readOnly}
-                className="max-w-md mx-auto"
-              />
-            </TabsContent>
-
-            <TabsContent value="right" className="mt-0">
-              <FaceMapSVG
-                view="right"
-                points={data.injectionPoints}
-                onPointClick={handlePointClick}
-                onAddPoint={readOnly ? undefined : handleAddPoint}
-                selectedPointId={selectedPoint?.id}
-                readOnly={readOnly}
-                className="max-w-md mx-auto"
-              />
-            </TabsContent>
-          </Tabs>
+          <FaceMap3D
+            points={data.injectionPoints}
+            historyPoints={showHistory ? historyPoints : []}
+            onPointClick={handlePointClick}
+            onAddPoint={readOnly ? undefined : handleAddPoint}
+            selectedPointId={selectedPoint?.id}
+            readOnly={readOnly}
+            showHistory={showHistory}
+            className="mx-auto"
+          />
 
           {!readOnly && (
             <p className="text-sm text-muted-foreground text-center mt-4">
-              Haz clic en el rostro para agregar puntos de inyección
+              Arrastra para rotar el modelo, scroll para zoom, clic para agregar punto
+            </p>
+          )}
+
+          {loadingHistory && (
+            <p className="text-sm text-muted-foreground text-center mt-2">
+              Cargando historial...
             </p>
           )}
         </CardContent>
@@ -213,26 +217,26 @@ export function InjectableTreatmentTemplate({
         <CardContent>
           {data.injectionPoints.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No hay puntos de inyección registrados.
-              {!readOnly && ' Haz clic en el mapa facial para agregar.'}
+              No hay puntos de inyeccion registrados.
+              {!readOnly && ' Haz clic en el modelo 3D para agregar.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Vista</TableHead>
+                    <TableHead>#</TableHead>
                     <TableHead>Zona</TableHead>
                     <TableHead>Producto</TableHead>
-                    <TableHead>Dilución</TableHead>
+                    <TableHead>Dilucion</TableHead>
                     <TableHead>Lote</TableHead>
                     <TableHead>Dosis</TableHead>
-                    <TableHead>Técnica</TableHead>
+                    <TableHead>Tecnica</TableHead>
                     <TableHead className="w-20">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.injectionPoints.map((point) => (
+                  {data.injectionPoints.map((point, index) => (
                     <TableRow
                       key={point.id}
                       className={`cursor-pointer ${
@@ -241,12 +245,8 @@ export function InjectableTreatmentTemplate({
                       onClick={() => setSelectedPoint(point)}
                     >
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {point.view === 'frontal'
-                            ? 'Frontal'
-                            : point.view === 'left'
-                            ? 'Izq'
-                            : 'Der'}
+                        <Badge variant="secondary" className="font-mono">
+                          {index + 1}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">{getZoneLabel(point.zone)}</TableCell>
@@ -291,7 +291,6 @@ export function InjectableTreatmentTemplate({
                               className="h-7 w-7"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setActiveView(point.view)
                                 setSelectedPoint(point)
                               }}
                             >
@@ -343,7 +342,7 @@ export function InjectableTreatmentTemplate({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Número de Lote
+              Numero de Lote
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -418,8 +417,8 @@ export function InjectableTreatmentTemplate({
           <DialogHeader>
             <DialogTitle>
               {editingPoint && data.injectionPoints.find((p) => p.id === editingPoint.id)
-                ? 'Editar Punto de Inyección'
-                : 'Nuevo Punto de Inyección'}
+                ? 'Editar Punto de Inyeccion'
+                : 'Nuevo Punto de Inyeccion'}
             </DialogTitle>
           </DialogHeader>
 
@@ -471,7 +470,7 @@ export function InjectableTreatmentTemplate({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Dilución</Label>
+                  <Label>Dilucion</Label>
                   <Input
                     value={editingPoint.dilution || ''}
                     onChange={(e) =>
@@ -512,7 +511,7 @@ export function InjectableTreatmentTemplate({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Técnica</Label>
+                  <Label>Tecnica</Label>
                   <Select
                     value={editingPoint.technique}
                     onValueChange={(value) =>

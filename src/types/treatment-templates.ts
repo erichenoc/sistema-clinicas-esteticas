@@ -1,5 +1,22 @@
 // Types for Treatment Templates
 
+// 3D Coordinate Types
+export interface Point3D {
+  x: number
+  y: number
+  z: number
+}
+
+// 3D Facial Zone Definition
+export interface FacialZone3D {
+  id: InjectionZone
+  label: string
+  center: Point3D
+  color: string
+  // Bounding sphere for zone detection
+  radius: number
+}
+
 // Facial Treatment Template Types
 export interface FacialSession {
   id: string
@@ -27,9 +44,14 @@ export type FaceView = 'frontal' | 'left' | 'right'
 
 export interface InjectionPoint {
   id: string
-  x: number // percentage 0-100
-  y: number // percentage 0-100
-  view: FaceView
+  // 3D coordinates (primary for new data)
+  position3D: Point3D
+  normal3D?: Point3D // Surface normal at injection point
+  // Legacy 2D coordinates (for backward compatibility)
+  x?: number // percentage 0-100
+  y?: number // percentage 0-100
+  view?: FaceView
+  // Zone and treatment details
   zone: InjectionZone
   product: string
   dilution: string | null
@@ -37,6 +59,9 @@ export interface InjectionPoint {
   dose: string
   technique: string
   notes: string
+  // History tracking (for showing previous session points)
+  sessionId?: string
+  sessionDate?: string
 }
 
 export type InjectionZone =
