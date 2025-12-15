@@ -49,6 +49,12 @@ import { toast } from 'sonner'
 import { sessionSchema, type SessionFormData } from '@/lib/validations/sessions'
 import { BODY_ZONES } from '@/types/patients'
 import { getParametersForTreatmentType } from '@/types/sessions'
+import {
+  TreatmentTemplateSelector,
+  hasTreatmentTemplate,
+  getEmptyTemplateData,
+} from '@/components/treatment-templates'
+import type { TreatmentTemplateData } from '@/types/treatment-templates'
 
 // Actions
 import { getPatients, type PatientData } from '@/actions/patients'
@@ -100,6 +106,7 @@ function NuevaSesionContent() {
   const [selectedTreatment, setSelectedTreatment] = useState<TreatmentOption | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [treatmentParameters, setTreatmentParameters] = useState<any[]>([])
+  const [templateData, setTemplateData] = useState<TreatmentTemplateData | null>(null)
 
   const appointmentId = searchParams.get('cita')
   const patientId = searchParams.get('paciente')
@@ -207,6 +214,13 @@ function NuevaSesionContent() {
         setSelectedTreatment(treatment)
         form.setValue('treatmentName', treatment.name)
         setTreatmentParameters(getParametersForTreatmentType(treatment.type))
+
+        // Initialize template data if treatment has a specialized template
+        if (hasTreatmentTemplate(treatment.name)) {
+          setTemplateData(getEmptyTemplateData(treatment.name))
+        } else {
+          setTemplateData(null)
+        }
       }
     }
   }, [watchTreatment, form, treatments])
@@ -220,6 +234,12 @@ function NuevaSesionContent() {
     toast.loading('Iniciando sesión...', { id: 'create-session' })
 
     try {
+      // Merge template data into technical parameters
+      const technicalParams = {
+        ...data.technicalParameters,
+        ...(templateData ? { treatmentTemplate: templateData } : {}),
+      }
+
       const result = await createSession({
         appointment_id: data.appointmentId || undefined,
         patient_id: data.patientId,
@@ -228,7 +248,7 @@ function NuevaSesionContent() {
         treatment_name: data.treatmentName,
         observations: data.observations || undefined,
         treated_zones: data.treatedZones,
-        technical_parameters: data.technicalParameters,
+        technical_parameters: technicalParams,
       })
 
       toast.dismiss('create-session')
@@ -525,6 +545,26 @@ function NuevaSesionContent() {
                         />
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Plantilla especializada de tratamiento */}
+              {selectedTreatment && hasTreatmentTemplate(selectedTreatment.name) && templateData && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Plantilla Especializada</CardTitle>
+                    <CardDescription>
+                      Documentación específica para este tipo de tratamiento
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TreatmentTemplateSelector
+                      treatmentName={selectedTreatment.name}
+                      data={templateData}
+                      onChange={setTemplateData}
+                      readOnly={false}
+                    />
                   </CardContent>
                 </Card>
               )}
