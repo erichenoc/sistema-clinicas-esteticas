@@ -17,6 +17,7 @@ import {
   Star,
   Edit,
   Printer,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +32,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { SESSION_STATUS_OPTIONS, formatSessionDuration } from '@/types/sessions'
+import { FacialTreatmentTemplate, InjectableTreatmentTemplate } from '@/components/treatment-templates'
+import type { FacialTreatmentData, InjectableTreatmentData, TreatmentTemplateData } from '@/types/treatment-templates'
 
 // Mock session data
 const mockSession = {
@@ -158,6 +161,10 @@ export default function SesionDetallePage() {
     0
   )
 
+  // Verificar si hay datos de plantilla de tratamiento
+  const templateData = session.technicalParameters?.treatmentTemplate as TreatmentTemplateData | undefined
+  const hasTemplate = !!templateData
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -197,6 +204,12 @@ export default function SesionDetallePage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="resumen">Resumen</TabsTrigger>
+              {hasTemplate && (
+                <TabsTrigger value="plantilla">
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Plantilla
+                </TabsTrigger>
+              )}
               <TabsTrigger value="notas">Notas Clínicas</TabsTrigger>
               <TabsTrigger value="productos">Productos</TabsTrigger>
               <TabsTrigger value="fotos">Fotos</TabsTrigger>
@@ -341,6 +354,25 @@ export default function SesionDetallePage() {
                 </Card>
               )}
             </TabsContent>
+
+            {/* Plantilla de Tratamiento */}
+            {hasTemplate && templateData && (
+              <TabsContent value="plantilla" className="space-y-6">
+                {templateData.templateType === 'facial' ? (
+                  <FacialTreatmentTemplate
+                    data={templateData as FacialTreatmentData}
+                    onChange={() => {}}
+                    readOnly={true}
+                  />
+                ) : templateData.templateType === 'injectable' ? (
+                  <InjectableTreatmentTemplate
+                    data={templateData as InjectableTreatmentData}
+                    onChange={() => {}}
+                    readOnly={true}
+                  />
+                ) : null}
+              </TabsContent>
+            )}
 
             <TabsContent value="notas" className="space-y-4">
               <Card>

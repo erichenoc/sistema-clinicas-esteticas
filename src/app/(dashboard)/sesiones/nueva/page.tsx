@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, useFieldArray } from 'react-hook-form'
@@ -16,6 +16,7 @@ import {
   X,
   Camera,
   Play,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,10 +46,15 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { sessionSchema, type SessionFormData } from '@/lib/validations/sessions'
 import { BODY_ZONES } from '@/types/patients'
 import { getParametersForTreatmentType } from '@/types/sessions'
+import { TreatmentTemplateSelector } from '@/components/treatment-templates'
+import type { TreatmentTemplateData } from '@/types/treatment-templates'
+import { inferTemplateType } from '@/types/treatment-templates'
 
 // Actions
 import { getPatients, type PatientData } from '@/actions/patients'
@@ -100,6 +106,11 @@ function NuevaSesionContent() {
   const [selectedTreatment, setSelectedTreatment] = useState<TreatmentOption | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [treatmentParameters, setTreatmentParameters] = useState<any[]>([])
+
+  // Estado para plantillas de tratamiento
+  const [useTemplate, setUseTemplate] = useState(false)
+  const [templateData, setTemplateData] = useState<TreatmentTemplateData | null>(null)
+  const [detectedTemplateType, setDetectedTemplateType] = useState<'facial' | 'injectable' | null>(null)
 
   const appointmentId = searchParams.get('cita')
   const patientId = searchParams.get('paciente')
@@ -207,9 +218,27 @@ function NuevaSesionContent() {
         setSelectedTreatment(treatment)
         form.setValue('treatmentName', treatment.name)
         setTreatmentParameters(getParametersForTreatmentType(treatment.type))
+
+        // Detectar tipo de plantilla
+        const templateType = inferTemplateType(treatment.name, treatment.category)
+        setDetectedTemplateType(templateType)
+
+        // Auto-activar plantilla si se detecta un tipo
+        if (templateType) {
+          setUseTemplate(true)
+        }
       }
+    } else {
+      setDetectedTemplateType(null)
+      setUseTemplate(false)
+      setTemplateData(null)
     }
   }, [watchTreatment, form, treatments])
+
+  // Callback para manejar cambios en la plantilla
+  const handleTemplateChange = useCallback((data: TreatmentTemplateData) => {
+    setTemplateData(data)
+  }, [])
 
   const handleAddZone = () => {
     appendZone({ zone: '', notes: '' })
@@ -220,6 +249,12 @@ function NuevaSesionContent() {
     toast.loading('Iniciando sesión...', { id: 'create-session' })
 
     try {
+      // Combinar parámetros técnicos con datos de plantilla
+      const combinedParameters = {
+        ...data.technicalParameters,
+        ...(useTemplate && templateData ? { treatmentTemplate: templateData } : {}),
+      }
+
       const result = await createSession({
         appointment_id: data.appointmentId || undefined,
         patient_id: data.patientId,
@@ -228,7 +263,7 @@ function NuevaSesionContent() {
         treatment_name: data.treatmentName,
         observations: data.observations || undefined,
         treated_zones: data.treatedZones,
-        technical_parameters: data.technicalParameters,
+        technical_parameters: combinedParameters,
       })
 
       toast.dismiss('create-session')
@@ -399,6 +434,23 @@ function NuevaSesionContent() {
                       >
                         {selectedTreatment.category}
                       </Badge>
+                    </div>
+                  )}
+
+                  {/* Opción de usar plantilla de tratamiento */}
+                  {detectedTemplateType && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-[#A67C52]/10 border border-[#A67C52]/20">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-[#A67C52]" />
+                        <Label htmlFor="use-template" className="cursor-pointer">
+                          Usar plantilla de {detectedTemplateType === 'facial' ? 'tratamiento facial' : 'inyectables'}
+                        </Label>
+                      </div>
+                      <Switch
+                        id="use-template"
+                        checked={useTemplate}
+                        onCheckedChange={setUseTemplate}
+                      />
                     </div>
                   )}
                 </CardContent>
@@ -663,6 +715,25 @@ function NuevaSesionContent() {
               </Card>
             </div>
           </div>
+
+          {/* Plantilla de Tratamiento */}
+          {useTemplate && selectedTreatment && (
+            <div className="mt-6">
+              <TreatmentTemplateSelector
+                treatmentName={selectedTreatment.name}
+                categoryName={selectedTreatment.category}
+                patientName={
+                  patients.find((p) => p.id === form.watch('patientId'))?.name || ''
+                }
+                professionalName={
+                  professionals.find((p) => p.id === form.watch('professionalId'))?.name || ''
+                }
+                onChange={handleTemplateChange}
+                forceTemplateType={detectedTemplateType}
+                sessionNumber={1}
+              />
+            </div>
+          )}
 
           {/* Botones de acción */}
           <div className="flex justify-end gap-4">
