@@ -176,7 +176,7 @@ export function FaceMap3D({
   readOnly = false,
   showHistory = true,
   gender = 'female',
-  showWireframe = true,
+  showWireframe = false,
   className = '',
 }: FaceMap3DProps) {
   return (

@@ -126,12 +126,17 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
     })
   }, [colors.primary])
 
+  // Create a simpler geometry for wireframe (less dense)
+  const wireframeGeometry = useMemo(() => {
+    return new THREE.SphereGeometry(0.5, 16, 16) // Much less dense for cleaner wireframe
+  }, [])
+
   const wireframeMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: new THREE.Color('#4a6fa5'),
       wireframe: true,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.15, // Much more subtle
     })
   }, [])
 
@@ -164,13 +169,13 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
         scale={headScale}
       />
 
-      {/* Wireframe overlay for clinical look */}
+      {/* Wireframe overlay for clinical look - uses simpler geometry */}
       {showWireframe && (
         <mesh
-          geometry={geometry}
+          geometry={wireframeGeometry}
           material={wireframeMaterial}
           position={[0, 0.2, 0]}
-          scale={headScale.map(s => s * 1.002) as [number, number, number]}
+          scale={headScale.map(s => s * 1.01) as [number, number, number]}
         />
       )}
 

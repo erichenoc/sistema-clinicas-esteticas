@@ -195,7 +195,6 @@ export function InjectableTreatmentTemplate({
             readOnly={readOnly}
             showHistory={showHistory}
             gender={patientGender}
-            showWireframe={true}
             className="mx-auto"
           />
 
