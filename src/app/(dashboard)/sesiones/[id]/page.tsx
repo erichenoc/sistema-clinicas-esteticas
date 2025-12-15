@@ -17,6 +17,7 @@ import {
   Star,
   Edit,
   Printer,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +32,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { SESSION_STATUS_OPTIONS, formatSessionDuration } from '@/types/sessions'
+import {
+  TreatmentTemplateSelector,
+  hasTreatmentTemplate,
+} from '@/components/treatment-templates'
+import type { TreatmentTemplateData } from '@/types/treatment-templates'
 
 // Mock session data
 const mockSession = {
@@ -56,6 +62,7 @@ const mockSession = {
     skinType: 'Mixta',
     protocol: 'Limpieza profunda con extracción',
     products: 'Espuma limpiadora, Tónico, Mascarilla purificante',
+    treatmentTemplate: null as TreatmentTemplateData | null, // Will be populated when template is used
   },
   productsUsed: [
     { id: '1', name: 'Espuma Limpiadora Premium', quantity: 1, lot: 'LOT2024-001', unitCost: 15 },
@@ -197,6 +204,12 @@ export default function SesionDetallePage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="resumen">Resumen</TabsTrigger>
+              {hasTreatmentTemplate(session.treatmentName) && (
+                <TabsTrigger value="plantilla">
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Plantilla
+                </TabsTrigger>
+              )}
               <TabsTrigger value="notas">Notas Clínicas</TabsTrigger>
               <TabsTrigger value="productos">Productos</TabsTrigger>
               <TabsTrigger value="fotos">Fotos</TabsTrigger>
@@ -278,12 +291,14 @@ export default function SesionDetallePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {Object.entries(session.technicalParameters).map(([key, value]) => (
+                    {Object.entries(session.technicalParameters)
+                      .filter(([key]) => key !== 'treatmentTemplate')
+                      .map(([key, value]) => (
                       <div key={key}>
                         <p className="text-sm text-muted-foreground capitalize">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
                         </p>
-                        <p className="font-medium">{value}</p>
+                        <p className="font-medium">{String(value)}</p>
                       </div>
                     ))}
                   </div>
@@ -341,6 +356,18 @@ export default function SesionDetallePage() {
                 </Card>
               )}
             </TabsContent>
+
+            {/* Treatment Template Tab */}
+            {hasTreatmentTemplate(session.treatmentName) && (
+              <TabsContent value="plantilla" className="space-y-4">
+                <TreatmentTemplateSelector
+                  treatmentName={session.treatmentName}
+                  data={session.technicalParameters.treatmentTemplate}
+                  onChange={() => {}} // Read-only in detail view
+                  readOnly={true}
+                />
+              </TabsContent>
+            )}
 
             <TabsContent value="notas" className="space-y-4">
               <Card>

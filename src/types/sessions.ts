@@ -2,11 +2,24 @@
 // TIPOS - Módulo de Sesiones Clínicas
 // =============================================
 
+import type { TreatmentTemplateData } from './treatment-templates'
+
 // Enums
 export type SessionStatus = 'in_progress' | 'completed' | 'cancelled' | 'incomplete'
 export type ClinicalNoteType = 'general' | 'pre_treatment' | 'post_treatment' | 'follow_up' | 'adverse_reaction' | 'private'
 export type PrescriptionType = 'treatment' | 'medication' | 'care_instructions' | 'referral'
 export type SessionImageType = 'before' | 'during' | 'after'
+
+// =============================================
+// TECHNICAL PARAMETERS - Parámetros Técnicos
+// =============================================
+export interface TechnicalParameters {
+  skinType?: string
+  protocol?: string
+  products?: string
+  treatmentTemplate?: TreatmentTemplateData
+  [key: string]: unknown
+}
 
 // =============================================
 // SESSION - Sesión Clínica
@@ -26,7 +39,7 @@ export interface Session {
   durationMinutes: number | null
   status: SessionStatus
   treatedZones: TreatedZone[]
-  technicalParameters: Record<string, unknown>
+  technicalParameters: TechnicalParameters
   productsUsed: ProductUsed[]
   observations: string | null
   patientFeedback: string | null
@@ -80,7 +93,7 @@ export interface SessionInput {
   treatmentId?: string | null
   treatmentName: string
   treatedZones?: TreatedZone[]
-  technicalParameters?: Record<string, unknown>
+  technicalParameters?: TechnicalParameters
   observations?: string | null
   patientFeedback?: string | null
   adverseReactions?: string | null
