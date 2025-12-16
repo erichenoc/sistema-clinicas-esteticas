@@ -195,9 +195,10 @@ export const ZONE_COLORS = {
 
 // Point colors
 export const POINT_COLORS = {
-  current: '#ef4444', // Red for current session points
+  current: '#ffffff', // White for current session points
   selected: '#3b82f6', // Blue for selected point
   history: '#9ca3af', // Gray for history points
+  outline: '#000000', // Black outline for visibility
 }
 
 // Treatment type to valid zones mapping

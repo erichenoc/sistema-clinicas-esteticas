@@ -50,7 +50,13 @@ function PointMarker({
 
   return (
     <group position={[point.position3D.x, point.position3D.y, point.position3D.z]}>
-      {/* Main point sphere */}
+      {/* Outer ring for better visibility on skin */}
+      <mesh>
+        <sphereGeometry args={[0.03, 16, 16]} />
+        <meshBasicMaterial color="#000000" />
+      </mesh>
+
+      {/* Main point sphere (white) */}
       <mesh
         ref={meshRef}
         onClick={(e) => {
@@ -71,8 +77,8 @@ function PointMarker({
         <sphereGeometry args={[0.025, 16, 16]} />
         <meshStandardMaterial
           color={color}
-          emissive={color}
-          emissiveIntensity={isSelected ? 0.5 : 0.2}
+          emissive={isSelected ? POINT_COLORS.selected : '#ffffff'}
+          emissiveIntensity={isSelected ? 0.8 : 0.4}
         />
       </mesh>
 
@@ -85,8 +91,8 @@ function PointMarker({
         <div
           className={`
             px-1.5 py-0.5 rounded-full text-xs font-bold
-            ${isSelected ? 'bg-blue-500' : 'bg-red-500'} text-white
-            shadow-md
+            ${isSelected ? 'bg-blue-500' : 'bg-slate-800'} text-white
+            shadow-lg border border-white/50
           `}
         >
           {index + 1}
