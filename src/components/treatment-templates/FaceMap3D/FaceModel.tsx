@@ -33,10 +33,10 @@ const modelScales = {
 }
 
 // Rotation adjustment per model (Sketchfab models often have different orientation)
-// Female model: adjusted X rotation to face straight ahead, -90° Y to face camera
+// Female model: X rotation to make head upright, Y=180° to face camera
 const modelRotations = {
   male: [0, 0, 0] as [number, number, number],
-  female: [-Math.PI / 2 + 0.3, -Math.PI / 2, 0] as [number, number, number], // Adjusted X for level face + -90° Y (face camera)
+  female: [-Math.PI / 2 + 0.3, Math.PI, 0] as [number, number, number], // X: upright & level, Y: 180° to face front
 }
 
 export function FaceModel({ gender = 'female', showWireframe = false, onMeshReady }: FaceModelProps) {
