@@ -33,10 +33,10 @@ const modelScales = {
 }
 
 // Rotation adjustment per model (Sketchfab models often have different orientation)
-// Female model: -90° X to make upright, -90° Y to face camera
+// Female model: Built-in -90° X in GLB file, only need Y rotation to face camera
 const modelRotations = {
   male: [0, 0, 0] as [number, number, number],
-  female: [-Math.PI / 2, -Math.PI / 2, 0] as [number, number, number], // X: upright, Y: face camera
+  female: [0, -Math.PI / 2, 0] as [number, number, number], // Model has built-in X rotation, only adjust Y
 }
 
 export function FaceModel({ gender = 'female', showWireframe = false, onMeshReady }: FaceModelProps) {
