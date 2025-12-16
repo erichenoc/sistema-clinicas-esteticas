@@ -26,9 +26,10 @@ const skinTones = {
 
 // Scale adjustment per model (different models have different sizes)
 // These scales are calibrated to match the facial zones coordinates in constants.ts
+// Female model from Sketchfab is ~30-50 units, needs significant scaling down
 const modelScales = {
   male: 1.2,
-  female: 1.5, // Female model needs this scale to match facial zones
+  female: 0.04, // Female model is ~30-50 units, scale to ~1-2 units
 }
 
 export function FaceModel({ gender = 'female', showWireframe = false, onMeshReady }: FaceModelProps) {
