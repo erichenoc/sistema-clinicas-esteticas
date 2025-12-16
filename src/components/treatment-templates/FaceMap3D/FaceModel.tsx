@@ -29,7 +29,13 @@ const skinTones = {
 // Female model from Sketchfab is ~30-50 units, needs significant scaling down
 const modelScales = {
   male: 1.2,
-  female: 0.04, // Female model is ~30-50 units, scale to ~1-2 units
+  female: 0.05, // Female model is ~30-50 units, scale to ~1.5-2.5 units
+}
+
+// Rotation adjustment per model (Sketchfab models often have different orientation)
+const modelRotations = {
+  male: [0, 0, 0] as [number, number, number],
+  female: [-Math.PI / 2, 0, 0] as [number, number, number], // Rotate -90 degrees on X axis
 }
 
 export function FaceModel({ gender = 'female', showWireframe = false, onMeshReady }: FaceModelProps) {
@@ -39,6 +45,7 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
 
   const skinColor = skinTones[gender]
   const modelScale = modelScales[gender]
+  const modelRotation = modelRotations[gender]
 
   // Clone the scene to avoid modifying the cached original
   const clonedScene = useMemo(() => {
@@ -100,6 +107,7 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
         <primitive
           object={clonedScene}
           scale={modelScale}
+          rotation={modelRotation}
         />
       </Center>
 
@@ -109,6 +117,7 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
           <primitive
             object={wireframeScene}
             scale={modelScale * 1.01}
+            rotation={modelRotation}
           />
         </Center>
       )}
