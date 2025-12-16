@@ -213,11 +213,27 @@ export type TreatmentTemplateData = FacialTreatmentData | InjectableTreatmentDat
 export function getTemplateType(treatmentName: string): 'facial' | 'injectable' | null {
   const name = treatmentName.toLowerCase()
 
-  // Injectable treatments
+  // Injectable treatments - Expanded list
   const injectableKeywords = [
-    'botox', 'toxina', 'relleno', 'filler', 'ácido hialurónico',
-    'radiesse', 'sculptra', 'profhilo', 'bioestimulador',
-    'hilo', 'tensor', 'facetem', 'long lasting', 'inyectable'
+    // Toxina Botulínica
+    'botox', 'toxina', 'botulínica', 'botulinica', 'neuronox',
+    // Rellenos y Ácido Hialurónico
+    'relleno', 'filler', 'ácido hialurónico', 'acido hialuronico',
+    'surcos nasogenianos', 'nasogeniano', 'aumento de labios',
+    'hidratación de labios', 'diseño de labios', 'perfilado de nariz',
+    'aumento de mentón', 'aumento de menton', 'ojeras',
+    // Bioestimuladores
+    'radiesse', 'sculptra', 'profhilo', 'bioestimulador', 'pdrn',
+    'skin booster', 'hyalift', 'sunekos',
+    // Hilos
+    'hilo', 'tensor', 'hilos tensores',
+    // Otros inyectables
+    'facetem', 'long lasting', 'inyectable',
+    'armonización', 'lifting', 'sostén tercio',
+    // PRP y similares
+    'prp', 'plasma rico', 'o-shot',
+    // Lipolíticos
+    'enzimas quemadoras', 'lipoescultura química', 'lipolítico'
   ]
 
   if (injectableKeywords.some(keyword => name.includes(keyword))) {
@@ -227,8 +243,9 @@ export function getTemplateType(treatmentName: string): 'facial' | 'injectable' 
   // Facial treatments
   const facialKeywords = [
     'facial', 'limpieza', 'dermapen', 'mesoterapia', 'peeling',
-    'hidrafacial', 'microdermoabrasión', 'radiofrecuencia',
-    'oxigenoterapia', 'led', 'mascarilla'
+    'hidrafacial', 'hydrafacial', 'microdermoabrasión', 'radiofrecuencia',
+    'oxigenoterapia', 'led', 'mascarilla', 'dermaplaning',
+    'exfoliación', 'envoltura', 'vitamina c'
   ]
 
   if (facialKeywords.some(keyword => name.includes(keyword))) {
