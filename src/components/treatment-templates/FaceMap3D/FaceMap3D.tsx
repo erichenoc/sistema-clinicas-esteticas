@@ -66,7 +66,14 @@ function ClickHandler({
           z: hit.point.z,
         }
 
+        // Debug: Log actual 3D coordinates
+        console.log('=== 3D Click Debug ===')
+        console.log(`Position: x=${position.x.toFixed(3)}, y=${position.y.toFixed(3)}, z=${position.z.toFixed(3)}`)
+
         const zone = detectZoneFromPosition(position)
+        console.log(`Detected zone: ${zone}`)
+        console.log('=====================')
+
         if (zone) {
           onAddPoint(position, zone)
         }
