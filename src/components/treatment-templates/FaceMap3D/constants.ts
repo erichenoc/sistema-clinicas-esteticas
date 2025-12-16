@@ -53,9 +53,9 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
   {
     id: 'nariz',
     label: 'Nariz',
-    center: { x: 0, y: 0.18, z: 0.40 },
+    center: { x: 0, y: 0.22, z: 0.38 },
     color: '#ef4444', // Red
-    radius: 0.04,
+    radius: 0.035,
   },
   // Cheeks
   {
@@ -76,14 +76,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
   {
     id: 'surco_nasogeniano_der',
     label: 'Surco Nasogeniano (Der)',
-    center: { x: 0.15, y: 0.02, z: 0.35 },
+    center: { x: 0.12, y: 0.08, z: 0.36 },
     color: '#f9a8d4', // Light pink
     radius: 0.035,
   },
   {
     id: 'surco_nasogeniano_izq',
     label: 'Surco Nasogeniano (Izq)',
-    center: { x: -0.15, y: 0.02, z: 0.35 },
+    center: { x: -0.12, y: 0.08, z: 0.36 },
     color: '#f9a8d4', // Light pink
     radius: 0.035,
   },
@@ -91,31 +91,31 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
   {
     id: 'labio_superior',
     label: 'Labio Superior',
-    center: { x: 0, y: -0.02, z: 0.38 },
+    center: { x: 0, y: 0.02, z: 0.42 },
     color: '#ef4444', // Red
-    radius: 0.035,
+    radius: 0.045,
   },
   {
     id: 'labio_inferior',
     label: 'Labio Inferior',
-    center: { x: 0, y: -0.08, z: 0.36 },
+    center: { x: 0, y: -0.05, z: 0.40 },
     color: '#ef4444', // Red
-    radius: 0.035,
+    radius: 0.045,
   },
   {
     id: 'comisuras',
     label: 'Comisuras',
-    center: { x: 0.12, y: -0.05, z: 0.32 },
+    center: { x: 0.14, y: -0.02, z: 0.36 },
     color: '#ec4899', // Pink
-    radius: 0.03,
+    radius: 0.035,
   },
   // Chin and jawline
   {
     id: 'menton',
     label: 'Menton',
-    center: { x: 0, y: -0.18, z: 0.32 },
+    center: { x: 0, y: -0.15, z: 0.35 },
     color: '#fbbf24', // Yellow
-    radius: 0.05,
+    radius: 0.045,
   },
   {
     id: 'linea_mandibular_der',
