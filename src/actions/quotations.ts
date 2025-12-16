@@ -67,17 +67,29 @@ export interface CreateQuotationInput {
 async function generateQuoteNumber(): Promise<string> {
   const supabase = createAdminClient()
   const year = new Date().getFullYear()
+  const prefix = `COT-${year}-`
 
-  // Get count of quotes this year
+  // Get the highest quote number for this year
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count } = await (supabase as any)
+  const { data } = await (supabase as any)
     .from('quotations')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', `${year}-01-01`)
-    .lte('created_at', `${year}-12-31`)
+    .select('quote_number')
+    .like('quote_number', `${prefix}%`)
+    .order('quote_number', { ascending: false })
+    .limit(1)
 
-  const nextNumber = (count || 0) + 1
-  return `COT-${year}-${nextNumber.toString().padStart(4, '0')}`
+  let nextNumber = 1
+
+  if (data && data.length > 0) {
+    // Extract the number from the last quote_number (e.g., "COT-2025-0005" -> 5)
+    const lastQuoteNumber = data[0].quote_number
+    const match = lastQuoteNumber.match(/COT-\d{4}-(\d+)/)
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1
+    }
+  }
+
+  return `${prefix}${nextNumber.toString().padStart(4, '0')}`
 }
 
 // Create quotation
