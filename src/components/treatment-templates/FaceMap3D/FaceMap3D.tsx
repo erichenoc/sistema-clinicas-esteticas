@@ -184,7 +184,7 @@ export function FaceMap3D({
       {/* 3D Canvas */}
       <div className="w-full h-[500px] bg-gradient-to-b from-slate-100 to-slate-200 rounded-xl overflow-hidden">
         <Canvas
-          camera={{ position: [0, 0.5, 2.5], fov: 45 }}
+          camera={{ position: [0, 0.2, 2.5], fov: 45 }}
           gl={{ antialias: true, alpha: true }}
           dpr={[1, 2]}
         >
