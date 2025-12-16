@@ -2,7 +2,7 @@ import type { FacialZone3D, InjectionZone } from '@/types/treatment-templates'
 
 // 18 Facial Zones defined in 3D space
 // Coordinates are relative to a head model centered at origin
-// Head scale: approximately 1 unit = 10cm
+// Radii are sized to be proportional to the scaled 3D head model
 export const FACIAL_ZONES_3D: FacialZone3D[] = [
   // Upper face
   {
@@ -10,14 +10,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Frente',
     center: { x: 0, y: 0.85, z: 0.35 },
     color: '#fbbf24', // Yellow
-    radius: 0.25,
+    radius: 0.06,
   },
   {
     id: 'entrecejo',
     label: 'Entrecejo',
     center: { x: 0, y: 0.55, z: 0.45 },
     color: '#22c55e', // Green
-    radius: 0.12,
+    radius: 0.035,
   },
   // Temples
   {
@@ -25,14 +25,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Sien Derecha',
     center: { x: 0.45, y: 0.6, z: 0.15 },
     color: '#f97316', // Orange
-    radius: 0.12,
+    radius: 0.035,
   },
   {
     id: 'sien_izq',
     label: 'Sien Izquierda',
     center: { x: -0.45, y: 0.6, z: 0.15 },
     color: '#f97316', // Orange
-    radius: 0.12,
+    radius: 0.035,
   },
   // Crow's feet
   {
@@ -40,14 +40,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Patas de Gallo (Der)',
     center: { x: 0.42, y: 0.4, z: 0.25 },
     color: '#f97316', // Orange
-    radius: 0.1,
+    radius: 0.03,
   },
   {
     id: 'patas_gallo_izq',
     label: 'Patas de Gallo (Izq)',
     center: { x: -0.42, y: 0.4, z: 0.25 },
     color: '#f97316', // Orange
-    radius: 0.1,
+    radius: 0.03,
   },
   // Nose
   {
@@ -55,7 +55,7 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Nariz',
     center: { x: 0, y: 0.25, z: 0.55 },
     color: '#ef4444', // Red
-    radius: 0.12,
+    radius: 0.035,
   },
   // Cheeks
   {
@@ -63,14 +63,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Mejilla Derecha',
     center: { x: 0.35, y: 0.15, z: 0.35 },
     color: '#ec4899', // Pink
-    radius: 0.18,
+    radius: 0.05,
   },
   {
     id: 'mejilla_izq',
     label: 'Mejilla Izquierda',
     center: { x: -0.35, y: 0.15, z: 0.35 },
     color: '#ec4899', // Pink
-    radius: 0.18,
+    radius: 0.05,
   },
   // Nasolabial folds
   {
@@ -78,14 +78,14 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Surco Nasogeniano (Der)',
     center: { x: 0.18, y: 0.0, z: 0.48 },
     color: '#f9a8d4', // Light pink
-    radius: 0.1,
+    radius: 0.03,
   },
   {
     id: 'surco_nasogeniano_izq',
     label: 'Surco Nasogeniano (Izq)',
     center: { x: -0.18, y: 0.0, z: 0.48 },
     color: '#f9a8d4', // Light pink
-    radius: 0.1,
+    radius: 0.03,
   },
   // Lips
   {
@@ -93,21 +93,21 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Labio Superior',
     center: { x: 0, y: -0.1, z: 0.52 },
     color: '#ef4444', // Red
-    radius: 0.1,
+    radius: 0.03,
   },
   {
     id: 'labio_inferior',
     label: 'Labio Inferior',
     center: { x: 0, y: -0.2, z: 0.5 },
     color: '#ef4444', // Red
-    radius: 0.1,
+    radius: 0.03,
   },
   {
     id: 'comisuras',
     label: 'Comisuras',
     center: { x: 0.15, y: -0.15, z: 0.48 },
     color: '#ec4899', // Pink
-    radius: 0.08,
+    radius: 0.025,
   },
   // Chin and jawline
   {
@@ -115,21 +115,21 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Menton',
     center: { x: 0, y: -0.4, z: 0.4 },
     color: '#fbbf24', // Yellow
-    radius: 0.15,
+    radius: 0.04,
   },
   {
     id: 'linea_mandibular_der',
     label: 'Linea Mandibular (Der)',
     center: { x: 0.4, y: -0.25, z: 0.15 },
     color: '#86efac', // Light green
-    radius: 0.15,
+    radius: 0.04,
   },
   {
     id: 'linea_mandibular_izq',
     label: 'Linea Mandibular (Izq)',
     center: { x: -0.4, y: -0.25, z: 0.15 },
     color: '#86efac', // Light green
-    radius: 0.15,
+    radius: 0.04,
   },
   // Neck
   {
@@ -137,7 +137,7 @@ export const FACIAL_ZONES_3D: FacialZone3D[] = [
     label: 'Cuello',
     center: { x: 0, y: -0.7, z: 0.1 },
     color: '#fcd34d', // Yellow
-    radius: 0.25,
+    radius: 0.06,
   },
 ]
 

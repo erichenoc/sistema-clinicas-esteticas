@@ -12,9 +12,11 @@ interface FaceModelProps {
   onMeshReady?: (mesh: THREE.Mesh) => void
 }
 
-// Use male head model for both genders for now (it's simpler and loads reliably)
-// The female model has 445 meshes which is very complex
-const MODEL_PATH = '/models/heads/male-head.glb'
+// Model paths by gender
+const MODEL_PATHS = {
+  male: '/models/heads/male-head.glb',
+  female: '/models/heads/female-head.glb',
+}
 
 // Skin tone material colors
 const skinTones = {
@@ -22,11 +24,20 @@ const skinTones = {
   female: '#f5d5c8',
 }
 
+// Scale adjustment per model (different models have different sizes)
+// These scales are calibrated to match the facial zones coordinates in constants.ts
+const modelScales = {
+  male: 1.2,
+  female: 1.5, // Female model needs this scale to match facial zones
+}
+
 export function FaceModel({ gender = 'female', showWireframe = false, onMeshReady }: FaceModelProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const { scene } = useGLTF(MODEL_PATH)
+  const modelPath = MODEL_PATHS[gender]
+  const { scene } = useGLTF(modelPath)
 
   const skinColor = skinTones[gender]
+  const modelScale = modelScales[gender]
 
   // Clone the scene to avoid modifying the cached original
   const clonedScene = useMemo(() => {
@@ -87,7 +98,7 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
       <Center position={[0, 0.2, 0]}>
         <primitive
           object={clonedScene}
-          scale={0.08}
+          scale={modelScale}
         />
       </Center>
 
@@ -96,7 +107,7 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
         <Center position={[0, 0.2, 0]}>
           <primitive
             object={wireframeScene}
-            scale={0.081}
+            scale={modelScale * 1.01}
           />
         </Center>
       )}
@@ -104,7 +115,8 @@ export function FaceModel({ gender = 'female', showWireframe = false, onMeshRead
   )
 }
 
-// Preload model
-useGLTF.preload(MODEL_PATH)
+// Preload both models
+useGLTF.preload(MODEL_PATHS.male)
+useGLTF.preload(MODEL_PATHS.female)
 
 export default FaceModel
