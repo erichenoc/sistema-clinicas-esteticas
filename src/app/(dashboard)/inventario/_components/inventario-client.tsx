@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { deleteProduct } from '@/actions/inventory'
 import {
   Package,
   Plus,
@@ -152,6 +154,7 @@ interface InventarioClientProps {
 }
 
 export function InventarioClient({ products, alerts, movements, stats }: InventarioClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('productos')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -205,13 +208,27 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
     }
   }
 
-  const handleDeleteProduct = async (productName: string) => {
-    setProcessingAction(`delete-${productName}`)
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    setProcessingAction(`delete-${productId}`)
     toast.loading('Eliminando producto...', { id: 'delete-product' })
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    toast.dismiss('delete-product')
-    toast.success(`Producto "${productName}" eliminado`)
-    setProcessingAction(null)
+
+    try {
+      const result = await deleteProduct(productId)
+      toast.dismiss('delete-product')
+
+      if (result.success) {
+        toast.success(`Producto "${productName}" eliminado`)
+        router.refresh() // Refresh to show updated list
+      } else {
+        toast.error(result.error || 'Error al eliminar el producto')
+      }
+    } catch (error) {
+      toast.dismiss('delete-product')
+      toast.error('Error al eliminar el producto')
+      console.error('Error deleting product:', error)
+    } finally {
+      setProcessingAction(null)
+    }
   }
 
   const handleResolveAlert = async (productName: string, alertType: string) => {
@@ -524,7 +541,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-red-600"
-                                onClick={() => handleDeleteProduct(product.name)}
+                                onClick={() => handleDeleteProduct(product.id, product.name)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Eliminar
