@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -18,6 +19,8 @@ import {
   Edit,
   Printer,
   ClipboardList,
+  Loader2,
+  ImagePlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,12 +34,19 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { SESSION_STATUS_OPTIONS, formatSessionDuration } from '@/types/sessions'
 import {
   TreatmentTemplateSelector,
   hasTreatmentTemplate,
 } from '@/components/treatment-templates'
 import type { TreatmentTemplateData } from '@/types/treatment-templates'
+import { getSessionById, getSessionImages, type SessionImageData } from '@/actions/sessions'
 
 // Mock session data
 const mockSession = {
@@ -130,10 +140,55 @@ const mockSession = {
   ],
 }
 
+// Body zones mapping
+const BODY_ZONES: Record<string, string> = {
+  face_full: 'Rostro completo',
+  face_forehead: 'Frente',
+  face_cheeks: 'Mejillas',
+  face_chin: 'Menton',
+  face_nose: 'Nariz',
+  face_perioral: 'Zona Perioral',
+  face_periocular: 'Zona Periocular',
+  neck: 'Cuello',
+  decolletage: 'Escote',
+  hands: 'Manos',
+  arms: 'Brazos',
+  abdomen: 'Abdomen',
+  back: 'Espalda',
+  legs: 'Piernas',
+  other: 'Otra zona',
+}
+
 export default function SesionDetallePage() {
   const params = useParams()
   const router = useRouter()
+  const sessionId = params.id as string
   const [activeTab, setActiveTab] = useState('resumen')
+  const [sessionImages, setSessionImages] = useState<SessionImageData[]>([])
+  const [selectedImage, setSelectedImage] = useState<SessionImageData | null>(null)
+  const [isLoadingImages, setIsLoadingImages] = useState(true)
+
+  // Load session images
+  useEffect(() => {
+    async function loadImages() {
+      setIsLoadingImages(true)
+      try {
+        const images = await getSessionImages(sessionId)
+        setSessionImages(images)
+      } catch (error) {
+        console.error('Error loading images:', error)
+      } finally {
+        setIsLoadingImages(false)
+      }
+    }
+
+    loadImages()
+  }, [sessionId])
+
+  // Group images by type
+  const beforeImages = sessionImages.filter(img => img.type === 'before')
+  const duringImages = sessionImages.filter(img => img.type === 'during')
+  const afterImages = sessionImages.filter(img => img.type === 'after')
 
   const session = mockSession
 
@@ -433,32 +488,118 @@ export default function SesionDetallePage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Camera className="h-5 w-5" />
-                    Fotografías
+                    Fotografias
                   </CardTitle>
-                  <CardDescription>Registro visual antes y después</CardDescription>
+                  <CardDescription>
+                    Registro visual del antes, durante y despues
+                    {sessionImages.length > 0 && ` (${sessionImages.length} fotos)`}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {session.images.length > 0 ? (
-                      session.images.map((image) => (
-                        <div key={image.id} className="border rounded-lg overflow-hidden">
-                          <div className="aspect-square bg-muted flex items-center justify-center">
-                            <Camera className="h-12 w-12 text-muted-foreground" />
-                          </div>
-                          <div className="p-2 text-sm">
-                            <Badge variant={image.type === 'before' ? 'secondary' : 'default'}>
-                              {image.type === 'before' ? 'Antes' : 'Después'}
-                            </Badge>
-                            <p className="mt-1 text-muted-foreground">{image.zone}</p>
+                <CardContent className="space-y-6">
+                  {isLoadingImages ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : sessionImages.length > 0 ? (
+                    <>
+                      {/* Before Images */}
+                      {beforeImages.length > 0 && (
+                        <div className="space-y-3">
+                          <Badge variant="secondary">Antes ({beforeImages.length})</Badge>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {beforeImages.map((image) => (
+                              <button
+                                key={image.id}
+                                className="aspect-square rounded-lg overflow-hidden bg-muted border hover:border-primary transition-colors relative group"
+                                onClick={() => setSelectedImage(image)}
+                              >
+                                <Image
+                                  src={image.thumbnail_url || image.image_url}
+                                  alt={image.caption || 'Antes'}
+                                  fill
+                                  className="object-cover"
+                                />
+                                {image.body_zone && (
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs px-1 py-0.5 truncate">
+                                    {BODY_ZONES[image.body_zone] || image.body_zone}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="col-span-2 text-center py-8 text-muted-foreground">
-                        No hay fotografías registradas
-                      </p>
-                    )}
-                  </div>
+                      )}
+
+                      {/* During Images */}
+                      {duringImages.length > 0 && (
+                        <div className="space-y-3">
+                          <Badge variant="outline">Durante ({duringImages.length})</Badge>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {duringImages.map((image) => (
+                              <button
+                                key={image.id}
+                                className="aspect-square rounded-lg overflow-hidden bg-muted border hover:border-primary transition-colors relative group"
+                                onClick={() => setSelectedImage(image)}
+                              >
+                                <Image
+                                  src={image.thumbnail_url || image.image_url}
+                                  alt={image.caption || 'Durante'}
+                                  fill
+                                  className="object-cover"
+                                />
+                                {image.body_zone && (
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs px-1 py-0.5 truncate">
+                                    {BODY_ZONES[image.body_zone] || image.body_zone}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* After Images */}
+                      {afterImages.length > 0 && (
+                        <div className="space-y-3">
+                          <Badge>Despues ({afterImages.length})</Badge>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {afterImages.map((image) => (
+                              <button
+                                key={image.id}
+                                className="aspect-square rounded-lg overflow-hidden bg-muted border hover:border-primary transition-colors relative group"
+                                onClick={() => setSelectedImage(image)}
+                              >
+                                <Image
+                                  src={image.thumbnail_url || image.image_url}
+                                  alt={image.caption || 'Despues'}
+                                  fill
+                                  className="object-cover"
+                                />
+                                {image.body_zone && (
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs px-1 py-0.5 truncate">
+                                    {BODY_ZONES[image.body_zone] || image.body_zone}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Camera className="h-12 w-12 mb-4" />
+                      <p>No hay fotografias registradas</p>
+                      {session.status === 'in_progress' && (
+                        <Link href={`/sesiones/${sessionId}/completar`}>
+                          <Button variant="outline" size="sm" className="mt-4">
+                            <ImagePlus className="h-4 w-4 mr-2" />
+                            Agregar fotos
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -576,6 +717,44 @@ export default function SesionDetallePage() {
           </Card>
         </div>
       </div>
+
+      {/* Image Lightbox Dialog */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Badge variant={selectedImage?.type === 'before' ? 'secondary' : selectedImage?.type === 'after' ? 'default' : 'outline'}>
+                {selectedImage?.type === 'before' ? 'Antes' : selectedImage?.type === 'during' ? 'Durante' : 'Despues'}
+              </Badge>
+              {selectedImage?.body_zone && (
+                <span className="text-muted-foreground font-normal">
+                  - {BODY_ZONES[selectedImage.body_zone] || selectedImage.body_zone}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedImage && (
+            <div className="relative aspect-[4/3] w-full">
+              <Image
+                src={selectedImage.image_url}
+                alt={selectedImage.caption || 'Foto de sesion'}
+                fill
+                className="object-contain"
+              />
+            </div>
+          )}
+          {selectedImage?.caption && (
+            <p className="text-sm text-muted-foreground text-center">
+              {selectedImage.caption}
+            </p>
+          )}
+          {selectedImage?.taken_at && (
+            <p className="text-xs text-muted-foreground text-center">
+              Tomada el {new Date(selectedImage.taken_at).toLocaleString('es-DO')}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -34,13 +34,16 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { SessionPhotoUploader } from '@/components/session-photos'
+import { getSessionById, getSessionImages, completeSession, type SessionImageData } from '@/actions/sessions'
 
-// Mock session data
-const mockSession = {
-  id: '1',
-  patientName: 'Maria Garcia Lopez',
-  treatmentName: 'Limpieza Facial Profunda',
-  professionalName: 'Dra. Maria Garcia',
+// Default session data (used while loading)
+const defaultSession = {
+  id: '',
+  patientName: '',
+  patientId: '',
+  treatmentName: '',
+  professionalName: '',
   startedAt: new Date().toISOString(),
 }
 
@@ -82,6 +85,9 @@ export default function CompletarSesionPage() {
   const router = useRouter()
   const sessionId = params.id as string
 
+  const [isLoading, setIsLoading] = useState(true)
+  const [session, setSession] = useState(defaultSession)
+  const [sessionImages, setSessionImages] = useState<SessionImageData[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedZones, setSelectedZones] = useState<string[]>([])
   const [productsUsed, setProductsUsed] = useState<ProductUsed[]>([])
@@ -97,6 +103,50 @@ export default function CompletarSesionPage() {
     followUpNotes: '',
     nextSessionDate: '',
   })
+
+  // Load session data
+  useEffect(() => {
+    async function loadSession() {
+      setIsLoading(true)
+      try {
+        const [sessionData, images] = await Promise.all([
+          getSessionById(sessionId),
+          getSessionImages(sessionId),
+        ])
+
+        if (sessionData) {
+          setSession({
+            id: sessionData.id,
+            patientName: sessionData.patient_name || 'Paciente',
+            patientId: sessionData.patient_id,
+            treatmentName: sessionData.treatment_name || 'Tratamiento',
+            professionalName: sessionData.professional_name || 'Profesional',
+            startedAt: sessionData.started_at,
+          })
+
+          // Pre-fill zones if they exist
+          if (sessionData.treated_zones && Array.isArray(sessionData.treated_zones)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setSelectedZones((sessionData.treated_zones as any[]).map((z: { zone?: string }) => z.zone || '').filter(Boolean))
+          }
+
+          // Pre-fill observations
+          if (sessionData.observations) {
+            setFormData(prev => ({ ...prev, observations: sessionData.observations || '' }))
+          }
+        }
+
+        setSessionImages(images)
+      } catch (error) {
+        console.error('Error loading session:', error)
+        toast.error('Error al cargar la sesion')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadSession()
+  }, [sessionId])
 
   const toggleZone = (zone: string) => {
     setSelectedZones((prev) =>
@@ -142,18 +192,42 @@ export default function CompletarSesionPage() {
     toast.loading('Completando sesion...', { id: 'complete-session' })
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const result = await completeSession(sessionId, {
+        observations: formData.observations || undefined,
+        result_rating: rating,
+        result_notes: formData.resultNotes || undefined,
+        follow_up_required: formData.followUpRequired,
+        follow_up_notes: formData.followUpNotes || undefined,
+        next_session_recommended_at: formData.nextSessionDate || undefined,
+      })
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al completar')
+      }
 
       toast.dismiss('complete-session')
       toast.success('Sesion completada exitosamente')
+
+      if (result.commissionGenerated) {
+        toast.success('Comision generada automaticamente', { duration: 3000 })
+      }
+
       router.push(`/sesiones/${sessionId}`)
     } catch (error) {
       toast.dismiss('complete-session')
-      toast.error('Error al completar la sesion')
+      toast.error(error instanceof Error ? error.message : 'Error al completar la sesion')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -169,7 +243,7 @@ export default function CompletarSesionPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Completar Sesion</h1>
             <p className="text-muted-foreground">
-              {mockSession.treatmentName} - {mockSession.patientName}
+              {session.treatmentName} - {session.patientName}
             </p>
           </div>
         </div>
@@ -278,6 +352,16 @@ export default function CompletarSesionPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Session Photos */}
+        {session.patientId && (
+          <SessionPhotoUploader
+            sessionId={sessionId}
+            patientId={session.patientId}
+            images={sessionImages}
+            onImagesChange={setSessionImages}
+          />
+        )}
 
         {/* Observations */}
         <Card>

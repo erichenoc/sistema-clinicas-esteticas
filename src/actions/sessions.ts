@@ -667,3 +667,274 @@ export async function getPatientTreatmentZoneSummary(
 
   return zoneSummary
 }
+
+// =============================================
+// SESSION IMAGES
+// =============================================
+
+export type SessionImageType = 'before' | 'during' | 'after'
+
+export interface SessionImageData {
+  id: string
+  session_id: string
+  patient_id: string
+  type: SessionImageType
+  body_zone: string | null
+  image_url: string
+  thumbnail_url: string | null
+  caption: string | null
+  taken_at: string
+  sort_order: number
+  is_consent_image: boolean
+  created_at: string
+  created_by: string | null
+}
+
+export interface CreateSessionImageInput {
+  session_id: string
+  patient_id: string
+  type: SessionImageType
+  body_zone?: string
+  image_url: string
+  thumbnail_url?: string
+  caption?: string
+  sort_order?: number
+  is_consent_image?: boolean
+}
+
+/**
+ * Get all images for a session
+ */
+export async function getSessionImages(sessionId: string): Promise<SessionImageData[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('session_images')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('type', { ascending: true })
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching session images:', error)
+    return []
+  }
+
+  return (data || []) as SessionImageData[]
+}
+
+/**
+ * Get all images for a patient (across all sessions)
+ */
+export async function getPatientImages(
+  patientId: string,
+  options?: {
+    type?: SessionImageType
+    limit?: number
+  }
+): Promise<(SessionImageData & { session_treatment_name?: string; session_started_at?: string })[]> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from('session_images')
+    .select(`
+      *,
+      sessions (
+        treatment_name,
+        started_at
+      )
+    `)
+    .eq('patient_id', patientId)
+    .order('taken_at', { ascending: false })
+
+  if (options?.type) {
+    query = query.eq('type', options.type)
+  }
+
+  if (options?.limit) {
+    query = query.limit(options.limit)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching patient images:', error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((img: any) => ({
+    ...img,
+    session_treatment_name: img.sessions?.treatment_name || null,
+    session_started_at: img.sessions?.started_at || null,
+  }))
+}
+
+/**
+ * Create a new session image record
+ */
+export async function createSessionImage(
+  input: CreateSessionImageInput,
+  userId?: string
+): Promise<{ data: SessionImageData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('session_images')
+    .insert({
+      ...input,
+      taken_at: new Date().toISOString(),
+      created_by: userId || null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating session image:', error)
+    return { data: null, error: 'Error al guardar la imagen' }
+  }
+
+  revalidatePath(`/sesiones/${input.session_id}`)
+  revalidatePath(`/pacientes/${input.patient_id}`)
+
+  return { data: data as SessionImageData, error: null }
+}
+
+/**
+ * Update a session image
+ */
+export async function updateSessionImage(
+  id: string,
+  input: Partial<Pick<SessionImageData, 'caption' | 'body_zone' | 'sort_order'>>
+): Promise<{ data: SessionImageData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('session_images')
+    .update(input)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating session image:', error)
+    return { data: null, error: 'Error al actualizar la imagen' }
+  }
+
+  if (data) {
+    revalidatePath(`/sesiones/${data.session_id}`)
+  }
+
+  return { data: data as SessionImageData, error: null }
+}
+
+/**
+ * Delete a session image
+ */
+export async function deleteSessionImage(
+  id: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  // First get the image to know which session to revalidate
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: image } = await (supabase as any)
+    .from('session_images')
+    .select('session_id, patient_id')
+    .eq('id', id)
+    .single()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('session_images')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting session image:', error)
+    return { success: false, error: 'Error al eliminar la imagen' }
+  }
+
+  if (image) {
+    revalidatePath(`/sesiones/${image.session_id}`)
+    revalidatePath(`/pacientes/${image.patient_id}`)
+  }
+
+  return { success: true, error: null }
+}
+
+/**
+ * Get image count summary for a session
+ */
+export async function getSessionImageCounts(sessionId: string): Promise<{
+  before: number
+  during: number
+  after: number
+  total: number
+}> {
+  const images = await getSessionImages(sessionId)
+
+  return {
+    before: images.filter(img => img.type === 'before').length,
+    during: images.filter(img => img.type === 'during').length,
+    after: images.filter(img => img.type === 'after').length,
+    total: images.length,
+  }
+}
+
+/**
+ * Get patient photo history grouped by session
+ */
+export async function getPatientPhotoHistory(
+  patientId: string
+): Promise<{
+  sessions: Array<{
+    sessionId: string
+    treatmentName: string
+    date: string
+    images: SessionImageData[]
+  }>
+  totalImages: number
+}> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessions, error } = await (supabase as any)
+    .from('sessions')
+    .select(`
+      id,
+      treatment_name,
+      started_at,
+      session_images (*)
+    `)
+    .eq('patient_id', patientId)
+    .not('session_images', 'is', null)
+    .order('started_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching patient photo history:', error)
+    return { sessions: [], totalImages: 0 }
+  }
+
+  let totalImages = 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const groupedSessions = (sessions || [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((s: any) => s.session_images && s.session_images.length > 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((s: any) => {
+      totalImages += s.session_images.length
+      return {
+        sessionId: s.id,
+        treatmentName: s.treatment_name,
+        date: s.started_at,
+        images: s.session_images as SessionImageData[],
+      }
+    })
+
+  return { sessions: groupedSessions, totalImages }
+}

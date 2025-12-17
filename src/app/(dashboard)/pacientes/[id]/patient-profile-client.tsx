@@ -46,6 +46,7 @@ import { MedicalHistoryDialog, type MedicalHistoryData } from '../_components/me
 export type { MedicalHistoryData }
 import { toast } from 'sonner'
 import { saveMedicalHistory } from '@/actions/medical-history'
+import { PatientPhotoHistory } from '@/components/session-photos'
 
 export interface PatientData {
   id: string
@@ -268,7 +269,7 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
                   Ver consentimientos
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info('Galeria de fotos proximamente disponible')}>
+              <DropdownMenuItem onClick={() => setActiveTab('fotos')}>
                 <Camera className="mr-2 h-4 w-4" />
                 Galeria de fotos
               </DropdownMenuItem>
@@ -772,22 +773,7 @@ export function PatientProfileClient({ patient, medicalHistory }: PatientProfile
 
         {/* Tab: Fotos */}
         <TabsContent value="fotos" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Galeria de Fotos</CardTitle>
-              <Button variant="outline">
-                <Camera className="mr-2 h-4 w-4" />
-                Agregar Foto
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hay fotos registradas</p>
-                <p className="text-sm">Las fotos antes/despues apareceran aqui</p>
-              </div>
-            </CardContent>
-          </Card>
+          <PatientPhotoHistory patientId={patient.id} />
         </TabsContent>
       </Tabs>
     </div>
