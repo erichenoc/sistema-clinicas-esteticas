@@ -732,24 +732,31 @@ export async function getPackages(): Promise<PackageData[]> {
     return []
   }
 
-  // Obtener tratamientos para mapear nombres
+  // Obtener tratamientos para mapear nombres y precios
   const treatments = await getTreatmentsForPackages()
   const treatmentMap = new Map(treatments.map(t => [t.id, t]))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (packages || []).map((p: any) => {
-    // items puede ser JSONB o array, asegurar que sea array
-    const rawItems = p.items || []
+    // La BD puede tener 'treatments' o 'items' dependiendo de como se creo
+    const rawItems = p.items || p.treatments || []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const items: PackageItemData[] = rawItems.map((item: any) => {
-      const treatment = treatmentMap.get(item.treatmentId || item.treatment_id)
+      const treatmentId = item.treatmentId || item.treatment_id
+      const treatment = treatmentMap.get(treatmentId)
       return {
-        treatmentId: item.treatmentId || item.treatment_id,
+        treatmentId,
         treatmentName: item.treatmentName || item.treatment_name || treatment?.name || 'Tratamiento',
         quantity: item.quantity || 1,
-        price: item.price || treatment?.price || 0,
+        price: item.price ?? treatment?.price ?? 0,
       }
     })
+
+    // Calcular precio regular desde los items si no existe
+    const calculatedRegularPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    // La BD puede tener 'sale_price', 'price', o 'regular_price'
+    const salePrice = p.sale_price ?? p.price ?? 0
+    const regularPrice = p.regular_price ?? calculatedRegularPrice ?? salePrice
 
     return {
       id: p.id,
@@ -757,8 +764,8 @@ export async function getPackages(): Promise<PackageData[]> {
       description: p.description,
       type: p.type || 'sessions_pack',
       items,
-      regularPrice: p.regular_price || 0,
-      salePrice: p.sale_price || 0,
+      regularPrice,
+      salePrice,
       validityDays: p.validity_days || 90,
       salesCount: p.sales_count || 0,
       isActive: p.is_active ?? true,
@@ -785,17 +792,24 @@ export async function getPackageById(id: string): Promise<PackageData | null> {
   const treatments = await getTreatmentsForPackages()
   const treatmentMap = new Map(treatments.map(t => [t.id, t]))
 
-  const rawItems = data.items || []
+  // La BD puede tener 'treatments' o 'items'
+  const rawItems = data.items || data.treatments || []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const items: PackageItemData[] = rawItems.map((item: any) => {
-    const treatment = treatmentMap.get(item.treatmentId || item.treatment_id)
+    const treatmentId = item.treatmentId || item.treatment_id
+    const treatment = treatmentMap.get(treatmentId)
     return {
-      treatmentId: item.treatmentId || item.treatment_id,
+      treatmentId,
       treatmentName: item.treatmentName || item.treatment_name || treatment?.name || 'Tratamiento',
       quantity: item.quantity || 1,
-      price: item.price || treatment?.price || 0,
+      price: item.price ?? treatment?.price ?? 0,
     }
   })
+
+  // Calcular precio regular desde los items si no existe
+  const calculatedRegularPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const salePrice = data.sale_price ?? data.price ?? 0
+  const regularPrice = data.regular_price ?? calculatedRegularPrice ?? salePrice
 
   return {
     id: data.id,
@@ -803,8 +817,8 @@ export async function getPackageById(id: string): Promise<PackageData | null> {
     description: data.description,
     type: data.type || 'sessions_pack',
     items,
-    regularPrice: data.regular_price || 0,
-    salePrice: data.sale_price || 0,
+    regularPrice,
+    salePrice,
     validityDays: data.validity_days || 90,
     salesCount: data.sales_count || 0,
     isActive: data.is_active ?? true,
@@ -825,6 +839,7 @@ export async function createPackage(
     const treatment = treatmentMap.get(item.treatmentId)
     return {
       treatmentId: item.treatmentId,
+      treatment_id: item.treatmentId, // Formato alternativo para compatibilidad
       treatmentName: treatment?.name || 'Tratamiento',
       quantity: item.quantity,
       price: treatment?.price || 0,
@@ -833,17 +848,17 @@ export async function createPackage(
 
   const totalSessions = items.reduce((sum, item) => sum + item.quantity, 0)
 
+  // Usar el esquema actual de la BD (treatments, price) con fallback al esperado
   const packageData = {
     clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
     name: input.name,
     description: input.description || null,
-    type: input.type,
-    items,
-    sale_price: input.salePrice,
-    regular_price: input.regularPrice,
+    // Guardar en ambos formatos para compatibilidad
+    treatments: items.map(i => ({ treatment_id: i.treatmentId, quantity: i.quantity })),
+    total_sessions: totalSessions,
+    price: input.salePrice,
     validity_days: input.validityDays || 90,
     is_active: input.isActive ?? true,
-    sales_count: 0,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -855,24 +870,27 @@ export async function createPackage(
 
   if (error) {
     console.error('Error creating package:', error)
-    return { data: null, error: 'Error al crear el paquete' }
+    return { data: null, error: 'Error al crear el paquete: ' + error.message }
   }
 
   revalidatePath('/tratamientos/paquetes')
   revalidatePath('/pos')
+
+  // Calcular regularPrice desde los items
+  const regularPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
   return {
     data: {
       id: data.id,
       name: data.name,
       description: data.description,
-      type: data.type,
+      type: data.type || 'sessions_pack',
       items,
-      regularPrice: data.regular_price,
-      salePrice: data.sale_price,
-      validityDays: data.validity_days,
+      regularPrice: input.regularPrice || regularPrice,
+      salePrice: data.price || input.salePrice,
+      validityDays: data.validity_days || 90,
       salesCount: data.sales_count || 0,
-      isActive: data.is_active,
+      isActive: data.is_active ?? true,
     },
     error: null,
   }
@@ -897,6 +915,7 @@ export async function updatePackage(
       const treatment = treatmentMap.get(item.treatmentId)
       return {
         treatmentId: item.treatmentId,
+        treatment_id: item.treatmentId,
         treatmentName: treatment?.name || 'Tratamiento',
         quantity: item.quantity,
         price: treatment?.price || 0,
@@ -906,16 +925,16 @@ export async function updatePackage(
     totalSessions = items.reduce((sum, item) => sum + item.quantity, 0)
   }
 
-  const updateData: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  }
+  const updateData: Record<string, unknown> = {}
 
   if (input.name !== undefined) updateData.name = input.name
   if (input.description !== undefined) updateData.description = input.description
-  if (input.type !== undefined) updateData.type = input.type
-  if (items !== undefined) updateData.items = items
-  if (input.regularPrice !== undefined) updateData.regular_price = input.regularPrice
-  if (input.salePrice !== undefined) updateData.sale_price = input.salePrice
+  // Usar el esquema actual de la BD
+  if (items !== undefined) {
+    updateData.treatments = items.map(i => ({ treatment_id: i.treatmentId, quantity: i.quantity }))
+    updateData.total_sessions = totalSessions
+  }
+  if (input.salePrice !== undefined) updateData.price = input.salePrice
   if (input.validityDays !== undefined) updateData.validity_days = input.validityDays
   if (input.isActive !== undefined) updateData.is_active = input.isActive
 
@@ -929,32 +948,46 @@ export async function updatePackage(
 
   if (error) {
     console.error('Error updating package:', error)
-    return { data: null, error: 'Error al actualizar el paquete' }
+    return { data: null, error: 'Error al actualizar el paquete: ' + error.message }
   }
 
   revalidatePath('/tratamientos/paquetes')
   revalidatePath('/pos')
 
-  // Reconstruir items del resultado si no los tenemos
-  const finalItems = items || (data.items || []).map((item: PackageItemData) => ({
-    treatmentId: item.treatmentId,
-    treatmentName: item.treatmentName,
-    quantity: item.quantity,
-    price: item.price,
-  }))
+  // Obtener tratamientos para reconstruir items
+  const treatments = await getTreatmentsForPackages()
+  const treatmentMap = new Map(treatments.map(t => [t.id, t]))
+
+  // Reconstruir items del resultado
+  const rawItems = data.items || data.treatments || []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finalItems: PackageItemData[] = rawItems.map((item: any) => {
+    const treatmentId = item.treatmentId || item.treatment_id
+    const treatment = treatmentMap.get(treatmentId)
+    return {
+      treatmentId,
+      treatmentName: item.treatmentName || treatment?.name || 'Tratamiento',
+      quantity: item.quantity || 1,
+      price: item.price ?? treatment?.price ?? 0,
+    }
+  })
+
+  // Calcular regularPrice
+  const calculatedRegularPrice = finalItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const salePrice = data.sale_price ?? data.price ?? 0
 
   return {
     data: {
       id: data.id,
       name: data.name,
       description: data.description,
-      type: data.type,
+      type: data.type || 'sessions_pack',
       items: finalItems,
-      regularPrice: data.regular_price,
-      salePrice: data.sale_price,
-      validityDays: data.validity_days,
+      regularPrice: input.regularPrice || calculatedRegularPrice,
+      salePrice,
+      validityDays: data.validity_days || 90,
       salesCount: data.sales_count || 0,
-      isActive: data.is_active,
+      isActive: data.is_active ?? true,
     },
     error: null,
   }
