@@ -34,9 +34,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
 
-  // Header bar (gold background)
+  // Header bar
   headerBar: {
-    height: 90,
+    height: 110,
     backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   headerLogo: {
-    width: 160,
-    height: 65,
+    width: 220,
+    height: 90,
   },
   headerTitleSection: {
     alignItems: 'flex-end',

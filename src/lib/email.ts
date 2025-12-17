@@ -106,11 +106,11 @@ export function generateQuotationEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #3c3731; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 25px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
-                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 60px; width: auto;" />
+                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 85px; width: auto;" />
               </td>
               <td style="width: 50%; text-align: right; vertical-align: middle;">
                 <p style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Cotización</p>
@@ -282,11 +282,11 @@ export function generateInvoiceEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #3c3731; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 25px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
-                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 60px; width: auto;" />
+                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 85px; width: auto;" />
               </td>
               <td style="width: 50%; text-align: right; vertical-align: middle;">
                 <p style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Factura</p>
@@ -443,11 +443,11 @@ export function generatePackageEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #3c3731; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 25px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
-                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 60px; width: auto;" />
+                <img src="${LOGO_URL}" alt="Med Luxe Logo" style="height: 85px; width: auto;" />
               </td>
               <td style="width: 50%; text-align: right; vertical-align: middle;">
                 <p style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Paquete</p>
