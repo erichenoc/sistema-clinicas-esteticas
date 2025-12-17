@@ -603,7 +603,7 @@ export default function NuevoProductoPage() {
                           />
                         </FormControl>
                         <FormDescription>
-                          IVA u otros impuestos aplicables
+                          ITBIS u otros impuestos aplicables
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
