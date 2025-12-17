@@ -254,6 +254,12 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button variant="outline" asChild className="w-full sm:w-auto">
+            <Link href="/inventario/reportes">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              <span className="truncate">Reportes</span>
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/inventario/ordenes-compra">
               <Truck className="h-4 w-4 mr-2" />
               <span className="truncate">Ordenes de Compra</span>
@@ -324,7 +330,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
           <Link href="/inventario/conteo">
             <ClipboardList className="h-5 w-5" />
@@ -347,6 +353,12 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
           <Link href="/inventario/lotes">
             <Box className="h-5 w-5" />
             <span>Lotes</span>
+          </Link>
+        </Button>
+        <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+          <Link href="/inventario/reportes">
+            <BarChart3 className="h-5 w-5" />
+            <span>Reportes</span>
           </Link>
         </Button>
       </div>
