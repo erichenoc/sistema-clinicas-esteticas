@@ -238,33 +238,24 @@ export async function getProducts(options?: {
 }): Promise<ProductListItemData[]> {
   const supabase = createAdminClient()
 
+  // Production schema: id, clinic_id, code, name, description, category, unit,
+  // cost, price, min_stock, is_consumable, is_for_sale, is_active, image_url
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from('products')
-    .select(`
-      *,
-      product_categories (
-        name,
-        color
-      ),
-      inventory (
-        quantity,
-        reserved_quantity,
-        available_quantity
-      ),
-      product_lots (
-        expiry_date,
-        status,
-        current_quantity
-      )
-    `)
+    .select('*')
     .order('name', { ascending: true })
 
   if (options?.categoryId) {
-    query = query.eq('category_id', options.categoryId)
+    query = query.eq('category', options.categoryId)
   }
   if (options?.type) {
-    query = query.eq('type', options.type)
+    // Map type to is_consumable boolean
+    if (options.type === 'consumable' || options.type === 'injectable') {
+      query = query.eq('is_consumable', true)
+    } else if (options.type === 'retail') {
+      query = query.eq('is_consumable', false)
+    }
   }
   if (options?.isActive !== undefined) {
     query = query.eq('is_active', options.isActive)
@@ -279,79 +270,64 @@ export async function getProducts(options?: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((p: any) => {
-    const inv = p.inventory?.[0] || {}
-    const currentStock = inv.quantity || 0
-    const reservedStock = inv.reserved_quantity || 0
-    const availableStock = inv.available_quantity || currentStock - reservedStock
+    // Production doesn't have inventory/stock tracking tables yet
+    // So we use 0 for stock values
+    const currentStock = 0
+    const stockStatus: StockStatus = 'not_tracked'
 
-    let stockStatus: StockStatus = 'in_stock'
-    if (!p.track_stock) {
-      stockStatus = 'not_tracked'
-    } else if (currentStock <= 0) {
-      stockStatus = 'out_of_stock'
-    } else if (currentStock <= p.min_stock) {
-      stockStatus = 'low_stock'
-    } else if (p.max_stock && currentStock >= p.max_stock) {
-      stockStatus = 'over_stock'
-    }
-
-    // Encontrar el vencimiento mas cercano de lotes activos
-    const activeLots = p.product_lots?.filter(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (lot: any) => lot.status === 'active' && lot.current_quantity > 0 && lot.expiry_date
-    ) || []
-    const nearestExpiry = activeLots.length > 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? activeLots.reduce((min: any, lot: any) => {
-          if (!min || new Date(lot.expiry_date) < new Date(min)) {
-            return lot.expiry_date
-          }
-          return min
-        }, null)
-      : null
-
-    // Filtrar por stock status si se especifica
-    if (options?.stockStatus && stockStatus !== options.stockStatus) {
-      return null
-    }
-
+    // Map production columns to expected interface
+    // Production: code, cost, price, is_consumable, is_for_sale
+    // Interface expects: sku, cost_price, sell_price, type, is_sellable
     return {
-      ...p,
-      category_name: p.product_categories?.name || null,
-      category_color: p.product_categories?.color || null,
+      id: p.id,
+      clinic_id: p.clinic_id,
+      category_id: p.category || null,
+      sku: p.code || null, // production uses 'code'
+      barcode: null,
+      name: p.name,
+      description: p.description,
+      type: p.is_consumable ? 'consumable' : 'retail', // derive type from is_consumable
+      unit: p.unit || 'unit',
+      unit_label: null,
+      cost_price: p.cost || 0, // production uses 'cost'
+      sell_price: p.price || 0, // production uses 'price'
+      tax_rate: 16,
+      track_stock: false, // production doesn't have track_stock
+      min_stock: p.min_stock || 0,
+      max_stock: null,
+      reorder_point: null,
+      reorder_quantity: null,
+      requires_lot_tracking: false,
+      requires_refrigeration: false,
+      shelf_life_days: null,
+      image_url: p.image_url || null,
+      thumbnail_url: null,
+      is_active: p.is_active,
+      is_sellable: p.is_for_sale, // production uses 'is_for_sale'
+      default_supplier_id: null,
+      notes: null,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+      category_name: p.category || null,
+      category_color: null,
       current_stock: currentStock,
-      reserved_stock: reservedStock,
-      available_stock: availableStock,
+      reserved_stock: 0,
+      available_stock: currentStock,
       stock_status: stockStatus,
-      nearest_expiry: nearestExpiry,
+      nearest_expiry: null,
     }
-  }).filter(Boolean) as ProductListItemData[]
+  }) as ProductListItemData[]
 }
 
 export async function getProductById(id: string): Promise<ProductListItemData | null> {
   const supabase = createAdminClient()
 
+  // Production schema: id, clinic_id, code, name, description, category, unit,
+  // cost, price, min_stock, is_consumable, is_for_sale, is_active, image_url
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('products')
-    .select(`
-      *,
-      product_categories (
-        name,
-        color
-      ),
-      inventory (
-        quantity,
-        reserved_quantity,
-        available_quantity,
-        average_cost,
-        total_value,
-        location
-      ),
-      product_lots (
-        *
-      )
-    `)
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -361,27 +337,43 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
   }
 
   const p = data
-  const inv = p.inventory?.[0] || {}
-  const currentStock = inv.quantity || 0
-  const reservedStock = inv.reserved_quantity || 0
-
-  let stockStatus: StockStatus = 'in_stock'
-  if (!p.track_stock) {
-    stockStatus = 'not_tracked'
-  } else if (currentStock <= 0) {
-    stockStatus = 'out_of_stock'
-  } else if (currentStock <= p.min_stock) {
-    stockStatus = 'low_stock'
-  }
-
+  // Map production columns to expected interface
   return {
-    ...p,
-    category_name: p.product_categories?.name || null,
-    category_color: p.product_categories?.color || null,
-    current_stock: currentStock,
-    reserved_stock: reservedStock,
-    available_stock: inv.available_quantity || currentStock - reservedStock,
-    stock_status: stockStatus,
+    id: p.id,
+    clinic_id: p.clinic_id,
+    category_id: p.category || null,
+    sku: p.code || null,
+    barcode: null,
+    name: p.name,
+    description: p.description,
+    type: p.is_consumable ? 'consumable' : 'retail',
+    unit: p.unit || 'unit',
+    unit_label: null,
+    cost_price: p.cost || 0,
+    sell_price: p.price || 0,
+    tax_rate: 16,
+    track_stock: false,
+    min_stock: p.min_stock || 0,
+    max_stock: null,
+    reorder_point: null,
+    reorder_quantity: null,
+    requires_lot_tracking: false,
+    requires_refrigeration: false,
+    shelf_life_days: null,
+    image_url: p.image_url || null,
+    thumbnail_url: null,
+    is_active: p.is_active,
+    is_sellable: p.is_for_sale,
+    default_supplier_id: null,
+    notes: null,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+    category_name: p.category || null,
+    category_color: null,
+    current_stock: 0,
+    reserved_stock: 0,
+    available_stock: 0,
+    stock_status: 'not_tracked' as StockStatus,
     nearest_expiry: null,
   }
 }
@@ -391,27 +383,22 @@ export async function createProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Map input fields to actual database columns (matching migration schema)
-  // Note: barcode column removed as it doesn't exist in production DB
+  // Map input fields to actual PRODUCTION database columns
+  // Production schema: id, clinic_id, code, name, description, category, unit,
+  // cost, price, min_stock, is_consumable, is_for_sale, is_active, image_url
   const productData = {
     clinic_id: '00000000-0000-0000-0000-000000000001',
     name: input.name,
-    sku: input.sku || null,
+    code: input.sku || null, // production uses 'code' not 'sku'
     description: input.description || null,
-    category_id: input.category_id || null,
-    type: input.type || 'consumable',
-    unit: input.unit || 'units',
-    cost_price: input.cost_price || 0,
-    sell_price: input.sell_price || 0,
-    tax_rate: input.tax_rate ?? 16,
-    track_stock: input.track_stock ?? true,
+    category: input.category_id || null, // production uses 'category' not 'category_id'
+    unit: input.unit || 'unit',
+    cost: input.cost_price || 0, // production uses 'cost' not 'cost_price'
+    price: input.sell_price || 0, // production uses 'price' not 'sell_price'
     min_stock: input.min_stock || 0,
-    max_stock: input.max_stock || null,
-    reorder_point: input.reorder_point || null,
-    reorder_quantity: input.reorder_quantity || null,
+    is_consumable: input.type === 'consumable' || input.type === 'injectable', // production uses 'is_consumable' not 'type'
+    is_for_sale: input.is_sellable ?? (input.type === 'retail'), // production uses 'is_for_sale' not 'is_sellable'
     is_active: input.is_active ?? true,
-    is_sellable: input.is_sellable ?? true,
-    notes: input.notes || null,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -436,28 +423,25 @@ export async function updateProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Map input fields to actual database columns (matching migration schema)
-  // Note: Some columns removed as they don't exist in production DB
+  // Map input fields to actual PRODUCTION database columns
+  // Production schema: code, name, description, category, unit, cost, price,
+  // min_stock, is_consumable, is_for_sale, is_active
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
   if (input.name !== undefined) updateData.name = input.name
-  if (input.sku !== undefined) updateData.sku = input.sku
+  if (input.sku !== undefined) updateData.code = input.sku // production uses 'code'
   if (input.description !== undefined) updateData.description = input.description
-  if (input.category_id !== undefined) updateData.category_id = input.category_id
-  if (input.type !== undefined) updateData.type = input.type
+  if (input.category_id !== undefined) updateData.category = input.category_id // production uses 'category'
+  if (input.type !== undefined) {
+    updateData.is_consumable = input.type === 'consumable' || input.type === 'injectable'
+  }
   if (input.unit !== undefined) updateData.unit = input.unit
-  if (input.cost_price !== undefined) updateData.cost_price = input.cost_price
-  if (input.sell_price !== undefined) updateData.sell_price = input.sell_price
-  if (input.tax_rate !== undefined) updateData.tax_rate = input.tax_rate
-  if (input.track_stock !== undefined) updateData.track_stock = input.track_stock
+  if (input.cost_price !== undefined) updateData.cost = input.cost_price // production uses 'cost'
+  if (input.sell_price !== undefined) updateData.price = input.sell_price // production uses 'price'
   if (input.min_stock !== undefined) updateData.min_stock = input.min_stock
-  if (input.max_stock !== undefined) updateData.max_stock = input.max_stock
-  if (input.reorder_point !== undefined) updateData.reorder_point = input.reorder_point
-  if (input.reorder_quantity !== undefined) updateData.reorder_quantity = input.reorder_quantity
   if (input.is_active !== undefined) updateData.is_active = input.is_active
-  if (input.is_sellable !== undefined) updateData.is_sellable = input.is_sellable
-  if (input.notes !== undefined) updateData.notes = input.notes
+  if (input.is_sellable !== undefined) updateData.is_for_sale = input.is_sellable // production uses 'is_for_sale'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
