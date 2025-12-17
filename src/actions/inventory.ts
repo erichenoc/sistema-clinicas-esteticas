@@ -123,6 +123,15 @@ export interface CreateProductInput {
 // CATEGORIAS DE PRODUCTOS
 // =============================================
 
+// Categorías por defecto para inicializar
+const DEFAULT_PRODUCT_CATEGORIES = [
+  { name: 'Productos para Venta', description: 'Productos que se venden directamente a pacientes (filtros solares, cremas, etc.)', color: '#22c55e', type: 'retail', sort_order: 1 },
+  { name: 'Uso Interno / Consumibles', description: 'Productos de uso interno en tratamientos (jeringas, gasas, etc.)', color: '#3b82f6', type: 'consumable', sort_order: 2 },
+  { name: 'Inyectables', description: 'Toxinas, ácido hialurónico y otros inyectables', color: '#a855f7', type: 'consumable', sort_order: 3 },
+  { name: 'Equipos', description: 'Equipos y maquinaria para tratamientos', color: '#f59e0b', type: 'equipment', sort_order: 4 },
+  { name: 'Desechables', description: 'Materiales desechables de un solo uso', color: '#6b7280', type: 'disposable', sort_order: 5 },
+]
+
 export async function getProductCategories(): Promise<ProductCategoryData[]> {
   const supabase = createAdminClient()
 
@@ -130,6 +139,7 @@ export async function getProductCategories(): Promise<ProductCategoryData[]> {
   const { data, error } = await (supabase as any)
     .from('product_categories')
     .select('*')
+    .eq('is_active', true)
     .order('sort_order', { ascending: true })
 
   if (error) {
@@ -138,6 +148,82 @@ export async function getProductCategories(): Promise<ProductCategoryData[]> {
   }
 
   return (data || []) as ProductCategoryData[]
+}
+
+export async function createProductCategory(
+  input: {
+    name: string
+    description?: string
+    color?: string
+    type?: string
+    parent_id?: string
+  }
+): Promise<{ data: ProductCategoryData | null; error: string | null }> {
+  const supabase = createAdminClient()
+
+  const categoryData = {
+    clinic_id: '00000000-0000-0000-0000-000000000001',
+    name: input.name,
+    description: input.description || null,
+    color: input.color || '#6366f1',
+    type: input.type || 'consumable',
+    parent_id: input.parent_id || null,
+    is_active: true,
+    sort_order: 0,
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('product_categories')
+    .insert(categoryData)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating product category:', error)
+    return { data: null, error: `Error al crear la categoría: ${error.message}` }
+  }
+
+  revalidatePath('/inventario')
+  return { data: data as ProductCategoryData, error: null }
+}
+
+export async function initializeDefaultCategories(): Promise<{ created: number; error: string | null }> {
+  const supabase = createAdminClient()
+  let created = 0
+
+  // Check existing categories
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('product_categories')
+    .select('name')
+
+  const existingNames = new Set((existing || []).map((c: { name: string }) => c.name))
+
+  for (const cat of DEFAULT_PRODUCT_CATEGORIES) {
+    if (!existingNames.has(cat.name)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('product_categories')
+        .insert({
+          clinic_id: '00000000-0000-0000-0000-000000000001',
+          ...cat,
+          is_active: true,
+        })
+
+      if (!error) {
+        created++
+      } else {
+        console.error(`Error creating category ${cat.name}:`, error)
+      }
+    }
+  }
+
+  if (created > 0) {
+    revalidatePath('/inventario')
+  }
+
+  return { created, error: null }
 }
 
 // =============================================
@@ -305,21 +391,33 @@ export async function createProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Map input fields to actual database columns
+  // Map input fields to actual database columns (matching migration schema)
   const productData = {
     clinic_id: '00000000-0000-0000-0000-000000000001',
     name: input.name,
-    code: input.sku || null,
+    sku: input.sku || null,
+    barcode: input.barcode || null,
     description: input.description || null,
-    category: input.category_id || null,
-    cost: input.cost_price || 0,
-    price: input.sell_price || 0,
-    unit: input.unit || 'unit',
+    category_id: input.category_id || null,
+    type: input.type || 'consumable',
+    unit: input.unit || 'units',
+    unit_label: input.unit_label || null,
+    cost_price: input.cost_price || 0,
+    sell_price: input.sell_price || 0,
+    tax_rate: input.tax_rate ?? 16,
+    track_stock: input.track_stock ?? true,
     min_stock: input.min_stock || 0,
-    is_consumable: input.type === 'consumable',
-    is_for_sale: input.is_sellable ?? true,
-    is_active: input.is_active ?? true,
+    max_stock: input.max_stock || null,
+    reorder_point: input.reorder_point || null,
+    reorder_quantity: input.reorder_quantity || null,
+    requires_lot_tracking: input.requires_lot_tracking ?? false,
+    requires_refrigeration: input.requires_refrigeration ?? false,
+    shelf_life_days: input.shelf_life_days || null,
     image_url: input.image_url || null,
+    is_active: input.is_active ?? true,
+    is_sellable: input.is_sellable ?? true,
+    default_supplier_id: input.default_supplier_id || null,
+    notes: input.notes || null,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -331,7 +429,7 @@ export async function createProduct(
 
   if (error) {
     console.error('Error creating product:', error)
-    return { data: null, error: 'Error al crear el producto' }
+    return { data: null, error: `Error al crear el producto: ${error.message}` }
   }
 
   revalidatePath('/inventario')
@@ -344,22 +442,34 @@ export async function updateProduct(
 ): Promise<{ data: ProductData | null; error: string | null }> {
   const supabase = createAdminClient()
 
-  // Map input fields to actual database columns
+  // Map input fields to actual database columns (matching migration schema)
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
   if (input.name !== undefined) updateData.name = input.name
-  if (input.sku !== undefined) updateData.code = input.sku
+  if (input.sku !== undefined) updateData.sku = input.sku
+  if (input.barcode !== undefined) updateData.barcode = input.barcode
   if (input.description !== undefined) updateData.description = input.description
-  if (input.category_id !== undefined) updateData.category = input.category_id
-  if (input.cost_price !== undefined) updateData.cost = input.cost_price
-  if (input.sell_price !== undefined) updateData.price = input.sell_price
+  if (input.category_id !== undefined) updateData.category_id = input.category_id
+  if (input.type !== undefined) updateData.type = input.type
   if (input.unit !== undefined) updateData.unit = input.unit
+  if (input.unit_label !== undefined) updateData.unit_label = input.unit_label
+  if (input.cost_price !== undefined) updateData.cost_price = input.cost_price
+  if (input.sell_price !== undefined) updateData.sell_price = input.sell_price
+  if (input.tax_rate !== undefined) updateData.tax_rate = input.tax_rate
+  if (input.track_stock !== undefined) updateData.track_stock = input.track_stock
   if (input.min_stock !== undefined) updateData.min_stock = input.min_stock
-  if (input.type !== undefined) updateData.is_consumable = input.type === 'consumable'
-  if (input.is_sellable !== undefined) updateData.is_for_sale = input.is_sellable
-  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (input.max_stock !== undefined) updateData.max_stock = input.max_stock
+  if (input.reorder_point !== undefined) updateData.reorder_point = input.reorder_point
+  if (input.reorder_quantity !== undefined) updateData.reorder_quantity = input.reorder_quantity
+  if (input.requires_lot_tracking !== undefined) updateData.requires_lot_tracking = input.requires_lot_tracking
+  if (input.requires_refrigeration !== undefined) updateData.requires_refrigeration = input.requires_refrigeration
+  if (input.shelf_life_days !== undefined) updateData.shelf_life_days = input.shelf_life_days
   if (input.image_url !== undefined) updateData.image_url = input.image_url
+  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (input.is_sellable !== undefined) updateData.is_sellable = input.is_sellable
+  if (input.default_supplier_id !== undefined) updateData.default_supplier_id = input.default_supplier_id
+  if (input.notes !== undefined) updateData.notes = input.notes
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
@@ -371,7 +481,7 @@ export async function updateProduct(
 
   if (error) {
     console.error('Error updating product:', error)
-    return { data: null, error: 'Error al actualizar el producto' }
+    return { data: null, error: `Error al actualizar el producto: ${error.message}` }
   }
 
   revalidatePath('/inventario')

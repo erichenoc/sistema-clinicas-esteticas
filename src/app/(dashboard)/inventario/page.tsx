@@ -20,6 +20,7 @@ export default async function InventarioPage() {
     sku: p.sku,
     categoryName: p.category_name,
     categoryColor: p.category_color,
+    type: p.type || 'consumable',
     unit: (p.unit || 'unit') as UnitType,
     costPrice: p.cost_price || 0,
     sellPrice: p.sell_price || 0,
@@ -31,6 +32,7 @@ export default async function InventarioPage() {
     stockStatus: p.stock_status,
     status: (p.is_active ? 'active' : 'inactive') as ProductStatus,
     trackStock: p.track_stock,
+    isSellable: p.is_sellable,
     nearestExpiry: p.nearest_expiry,
   }))
 

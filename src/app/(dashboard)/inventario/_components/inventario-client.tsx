@@ -75,6 +75,16 @@ import {
   getMovementTypeConfig,
 } from '@/types/inventory'
 
+// Product type options for filtering
+const PRODUCT_TYPE_FILTERS = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'retail', label: 'Para Venta', color: 'bg-green-100 text-green-800' },
+  { value: 'consumable', label: 'Uso Interno', color: 'bg-blue-100 text-blue-800' },
+  { value: 'injectable', label: 'Inyectable', color: 'bg-purple-100 text-purple-800' },
+  { value: 'equipment', label: 'Equipo', color: 'bg-amber-100 text-amber-800' },
+  { value: 'topical', label: 'Tópico', color: 'bg-pink-100 text-pink-800' },
+]
+
 // Tipos para los datos
 interface ProductItem {
   id: string
@@ -84,6 +94,7 @@ interface ProductItem {
   sku: string | null
   categoryName: string | null
   categoryColor: string | null
+  type: string
   unit: UnitType
   costPrice: number
   sellPrice: number
@@ -95,6 +106,7 @@ interface ProductItem {
   stockStatus: string
   status: ProductStatus
   trackStock: boolean
+  isSellable: boolean
   nearestExpiry: string | null
 }
 
@@ -143,6 +155,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
   const [activeTab, setActiveTab] = useState('productos')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null)
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add')
@@ -157,8 +170,14 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
       product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.brand?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || product.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesType = typeFilter === 'all' || product.type === typeFilter
+    return matchesSearch && matchesStatus && matchesType
   })
+
+  // Helper to get type display config
+  const getTypeConfig = (type: string) => {
+    return PRODUCT_TYPE_FILTERS.find(t => t.value === type) || PRODUCT_TYPE_FILTERS[0]
+  }
 
   const handleAdjustment = (product: ProductItem, type: 'add' | 'remove') => {
     setSelectedProduct(product)
@@ -350,6 +369,18 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                 className="pl-10"
               />
             </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {PRODUCT_TYPE_FILTERS.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Estado" />
@@ -375,6 +406,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                 <TableRow>
                   <TableHead>Producto</TableHead>
                   <TableHead>SKU</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Costo</TableHead>
@@ -386,7 +418,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
               <TableBody>
                 {filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-gray-500">
+                    <TableCell colSpan={9} className="h-32 text-center text-gray-500">
                       <PackageOpen className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                       No se encontraron productos
                     </TableCell>
@@ -394,6 +426,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                 ) : (
                   filteredProducts.map((product) => {
                     const statusConfig = getProductStatusConfig(product.status)
+                    const typeConfig = getTypeConfig(product.type)
                     const isLowStock = product.trackStock && product.currentStock <= product.minStock
                     return (
                       <TableRow key={product.id}>
@@ -404,6 +437,11 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm">{product.sku || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={`${typeConfig.color || ''} border`}>
+                            {typeConfig.label}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           {product.categoryName ? (
                             <Badge

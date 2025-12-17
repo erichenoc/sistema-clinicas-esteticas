@@ -45,11 +45,21 @@ import {
 } from '@/types/inventory'
 import { productSchema, ProductFormData } from '@/lib/validations/inventory'
 import { toast } from 'sonner'
-import { getProductCategories, createProduct, type ProductCategoryData } from '@/actions/inventory'
+import { getProductCategories, createProduct, initializeDefaultCategories, type ProductCategoryData } from '@/actions/inventory'
+
+// Product type options for clear selection
+const PRODUCT_TYPE_OPTIONS = [
+  { value: 'retail', label: 'Producto para Venta', description: 'Se vende directamente a pacientes', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'consumable', label: 'Uso Interno', description: 'Se consume en tratamientos', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'injectable', label: 'Inyectable', description: 'Toxinas, rellenos, etc.', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+  { value: 'equipment', label: 'Equipo', description: 'Maquinaria y equipos', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+]
 
 interface CategoryOption {
   id: string
   name: string
+  color: string
+  type: string
 }
 
 export default function NuevoProductoPage() {
@@ -59,15 +69,25 @@ export default function NuevoProductoPage() {
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
 
-  // Cargar categorías de la base de datos
+  // Cargar categorías de la base de datos (e inicializar si no existen)
   useEffect(() => {
     async function loadCategories() {
       setIsLoadingCategories(true)
       try {
-        const categoriesData = await getProductCategories()
+        // First, try to initialize default categories if none exist
+        let categoriesData = await getProductCategories()
+
+        if (categoriesData.length === 0) {
+          // Initialize default categories
+          await initializeDefaultCategories()
+          categoriesData = await getProductCategories()
+        }
+
         setCategories(categoriesData.map((c: ProductCategoryData) => ({
           id: c.id,
           name: c.name,
+          color: c.color,
+          type: c.type,
         })))
       } catch (error) {
         console.error('Error loading categories:', error)
@@ -78,6 +98,8 @@ export default function NuevoProductoPage() {
     }
     loadCategories()
   }, [])
+
+  const [selectedType, setSelectedType] = useState<string>('retail')
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -98,7 +120,7 @@ export default function NuevoProductoPage() {
       reorderQuantity: 10,
       trackLots: false,
       requiresPrescription: false,
-      isConsumable: true,
+      isConsumable: false,
       forSale: true,
       taxRate: 16,
       status: 'active',
@@ -106,6 +128,30 @@ export default function NuevoProductoPage() {
       notes: null,
     },
   })
+
+  // Update form values when type changes
+  const handleTypeChange = (type: string) => {
+    setSelectedType(type)
+    // Set sensible defaults based on type
+    if (type === 'retail') {
+      form.setValue('forSale', true)
+      form.setValue('isConsumable', false)
+      form.setValue('trackLots', false)
+    } else if (type === 'consumable') {
+      form.setValue('forSale', false)
+      form.setValue('isConsumable', true)
+      form.setValue('trackLots', false)
+    } else if (type === 'injectable') {
+      form.setValue('forSale', false)
+      form.setValue('isConsumable', true)
+      form.setValue('trackLots', true)
+      form.setValue('requiresPrescription', true)
+    } else if (type === 'equipment') {
+      form.setValue('forSale', false)
+      form.setValue('isConsumable', false)
+      form.setValue('trackLots', false)
+    }
+  }
 
   const watchCostPrice = form.watch('costPrice')
   const watchSellingPrice = form.watch('sellingPrice')
@@ -128,6 +174,9 @@ export default function NuevoProductoPage() {
     toast.loading('Creando producto...', { id: 'create-product' })
 
     try {
+      // Map selectedType to database type
+      const productType = selectedType as 'retail' | 'consumable' | 'injectable' | 'equipment'
+
       // Mapear campos del formulario a CreateProductInput
       const result = await createProduct({
         category_id: data.categoryId || undefined,
@@ -135,7 +184,7 @@ export default function NuevoProductoPage() {
         barcode: data.barcode || undefined,
         name: data.name,
         description: data.description || undefined,
-        type: data.isConsumable ? 'consumable' : 'retail',
+        type: productType,
         unit: data.unit,
         cost_price: data.costPrice,
         sell_price: data.sellingPrice,
@@ -207,6 +256,35 @@ export default function NuevoProductoPage() {
 
             {/* Tab General */}
             <TabsContent value="general" className="space-y-6">
+              {/* Product Type Selection - NEW */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tipo de Producto</CardTitle>
+                  <CardDescription>
+                    Selecciona si es un producto para venta o uso interno
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {PRODUCT_TYPE_OPTIONS.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => handleTypeChange(type.value)}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedType === type.value
+                            ? `${type.color} border-current ring-2 ring-offset-2`
+                            : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                        }`}
+                      >
+                        <p className="font-medium">{type.label}</p>
+                        <p className="text-xs opacity-75">{type.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Información Básica</CardTitle>
@@ -296,7 +374,10 @@ export default function NuevoProductoPage() {
                             <SelectContent>
                               {isLoadingCategories ? (
                                 <SelectItem value="loading" disabled>
-                                  Cargando categorías...
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Cargando categorías...
+                                  </div>
                                 </SelectItem>
                               ) : categories.length === 0 ? (
                                 <SelectItem value="none" disabled>
@@ -305,7 +386,13 @@ export default function NuevoProductoPage() {
                               ) : (
                                 categories.map((cat) => (
                                   <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.name}
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="w-3 h-3 rounded-full shrink-0"
+                                        style={{ backgroundColor: cat.color }}
+                                      />
+                                      {cat.name}
+                                    </div>
                                   </SelectItem>
                                 ))
                               )}
