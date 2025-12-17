@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,6 +17,10 @@ import {
   Clock,
   Mail,
   Download,
+  Search,
+  UserPlus,
+  User,
+  Phone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,7 +81,15 @@ import {
   type PackageData,
   type TreatmentForPackage,
 } from '@/actions/treatments'
+import {
+  searchPatients,
+  createPatient,
+  type PatientData,
+  type CreatePatientInput,
+} from '@/actions/patients'
 import { DownloadPackagePDF } from '@/components/pdf/download-package-pdf'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
 
 // Schema para el formulario
 const packageFormSchema = z.object({
@@ -112,6 +124,22 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
   const [selectedPackageForEmail, setSelectedPackageForEmail] = useState<PackageData | null>(null)
   const [emailForm, setEmailForm] = useState({ email: '', name: '' })
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+
+  // Patient search state
+  const [patientSearchQuery, setPatientSearchQuery] = useState('')
+  const [patientSearchResults, setPatientSearchResults] = useState<PatientData[]>([])
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false)
+  const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(null)
+  const [emailDialogTab, setEmailDialogTab] = useState<'existing' | 'new'>('existing')
+
+  // New patient form state
+  const [newPatientForm, setNewPatientForm] = useState<CreatePatientInput>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+  })
+  const [isCreatingPatient, setIsCreatingPatient] = useState(false)
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageFormSchema),
@@ -200,7 +228,70 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
   const openEmailDialog = (pkg: PackageData) => {
     setSelectedPackageForEmail(pkg)
     setEmailForm({ email: '', name: '' })
+    setSelectedPatient(null)
+    setPatientSearchQuery('')
+    setPatientSearchResults([])
+    setEmailDialogTab('existing')
+    setNewPatientForm({ first_name: '', last_name: '', email: '', phone: '' })
     setIsEmailDialogOpen(true)
+  }
+
+  // Debounced patient search
+  const handlePatientSearch = useCallback(async (query: string) => {
+    setPatientSearchQuery(query)
+    if (query.length < 2) {
+      setPatientSearchResults([])
+      return
+    }
+
+    setIsSearchingPatients(true)
+    try {
+      const results = await searchPatients(query)
+      setPatientSearchResults(results)
+    } catch (error) {
+      console.error('Error searching patients:', error)
+      setPatientSearchResults([])
+    } finally {
+      setIsSearchingPatients(false)
+    }
+  }, [])
+
+  const selectPatient = (patient: PatientData) => {
+    setSelectedPatient(patient)
+    setEmailForm({
+      name: `${patient.first_name} ${patient.last_name}`,
+      email: patient.email || '',
+    })
+    setPatientSearchResults([])
+    setPatientSearchQuery('')
+  }
+
+  const clearSelectedPatient = () => {
+    setSelectedPatient(null)
+    setEmailForm({ email: '', name: '' })
+  }
+
+  const handleCreateNewPatient = async () => {
+    if (!newPatientForm.first_name || !newPatientForm.last_name || !newPatientForm.email || !newPatientForm.phone) {
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    setIsCreatingPatient(true)
+    try {
+      const result = await createPatient(newPatientForm)
+      if (result.data) {
+        toast.success('Paciente creado exitosamente')
+        selectPatient(result.data)
+        setEmailDialogTab('existing')
+      } else {
+        toast.error(result.error || 'Error al crear el paciente')
+      }
+    } catch (error) {
+      toast.error('Error al crear el paciente')
+    } finally {
+      setIsCreatingPatient(false)
+    }
   }
 
   const handleSendEmail = async () => {
@@ -833,55 +924,219 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
 
       {/* Email Dialog */}
       <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Enviar paquete por email</DialogTitle>
             <DialogDescription>
               {selectedPackageForEmail?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="recipient-name" className="text-sm font-medium">
-                Nombre del destinatario
-              </label>
-              <Input
-                id="recipient-name"
-                placeholder="Nombre del paciente"
-                value={emailForm.name}
-                onChange={(e) =>
-                  setEmailForm({ ...emailForm, name: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="recipient-email" className="text-sm font-medium">
-                Email del destinatario
-              </label>
-              <Input
-                id="recipient-email"
-                type="email"
-                placeholder="paciente@email.com"
-                value={emailForm.email}
-                onChange={(e) =>
-                  setEmailForm({ ...emailForm, email: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsEmailDialogOpen(false)}
-            >
+
+          <Tabs value={emailDialogTab} onValueChange={(v) => setEmailDialogTab(v as 'existing' | 'new')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing">
+                <User className="mr-2 h-4 w-4" />
+                Paciente Existente
+              </TabsTrigger>
+              <TabsTrigger value="new">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Nuevo Paciente
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="existing" className="space-y-4 mt-4">
+              {/* Selected patient display */}
+              {selectedPatient ? (
+                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/20 rounded-full">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{selectedPatient.first_name} {selectedPatient.last_name}</p>
+                      <p className="text-sm text-muted-foreground">{selectedPatient.email}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearSelectedPatient}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Patient search */}
+                  <div className="space-y-2">
+                    <Label>Buscar paciente</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por nombre, email o teléfono..."
+                        value={patientSearchQuery}
+                        onChange={(e) => handlePatientSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                      {isSearchingPatients && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />
+                      )}
+                    </div>
+
+                    {/* Search results */}
+                    {patientSearchResults.length > 0 && (
+                      <div className="border rounded-lg max-h-48 overflow-y-auto">
+                        {patientSearchResults.map((patient) => (
+                          <button
+                            key={patient.id}
+                            type="button"
+                            onClick={() => selectPatient(patient)}
+                            className="w-full p-3 text-left hover:bg-muted transition-colors border-b last:border-b-0 flex items-center gap-3"
+                          >
+                            <div className="p-1.5 bg-muted rounded-full">
+                              <User className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">
+                                {patient.first_name} {patient.last_name}
+                              </p>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {patient.email || patient.phone}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {patientSearchQuery.length >= 2 && patientSearchResults.length === 0 && !isSearchingPatients && (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        No se encontraron pacientes. Puedes crear uno nuevo.
+                      </p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Manual entry fallback */}
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">O ingresa los datos manualmente:</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-name">Nombre</Label>
+                      <Input
+                        id="manual-name"
+                        placeholder="Nombre del destinatario"
+                        value={emailForm.name}
+                        onChange={(e) => setEmailForm({ ...emailForm, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-email">Email</Label>
+                      <Input
+                        id="manual-email"
+                        type="email"
+                        placeholder="email@ejemplo.com"
+                        value={emailForm.email}
+                        onChange={(e) => setEmailForm({ ...emailForm, email: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="new" className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="new-first-name">Nombre *</Label>
+                  <Input
+                    id="new-first-name"
+                    placeholder="Nombre"
+                    value={newPatientForm.first_name}
+                    onChange={(e) => setNewPatientForm({ ...newPatientForm, first_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-last-name">Apellido *</Label>
+                  <Input
+                    id="new-last-name"
+                    placeholder="Apellido"
+                    value={newPatientForm.last_name}
+                    onChange={(e) => setNewPatientForm({ ...newPatientForm, last_name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-email">Email *</Label>
+                <Input
+                  id="new-email"
+                  type="email"
+                  placeholder="email@ejemplo.com"
+                  value={newPatientForm.email}
+                  onChange={(e) => setNewPatientForm({ ...newPatientForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-phone">Teléfono *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="new-phone"
+                    placeholder="809-000-0000"
+                    value={newPatientForm.phone}
+                    onChange={(e) => setNewPatientForm({ ...newPatientForm, phone: e.target.value })}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="new-dob">Fecha de Nacimiento</Label>
+                  <Input
+                    id="new-dob"
+                    type="date"
+                    value={newPatientForm.date_of_birth || ''}
+                    onChange={(e) => setNewPatientForm({ ...newPatientForm, date_of_birth: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-gender">Género</Label>
+                  <Select
+                    value={newPatientForm.gender || ''}
+                    onValueChange={(v) => setNewPatientForm({ ...newPatientForm, gender: v })}
+                  >
+                    <SelectTrigger id="new-gender">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="female">Femenino</SelectItem>
+                      <SelectItem value="male">Masculino</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                className="w-full"
+                onClick={handleCreateNewPatient}
+                disabled={isCreatingPatient}
+              >
+                {isCreatingPatient && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <UserPlus className="mr-2 h-4 w-4" />
+                Crear Paciente y Seleccionar
+              </Button>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
-              {isSendingEmail && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+            <Button
+              onClick={handleSendEmail}
+              disabled={isSendingEmail || !emailForm.email || !emailForm.name}
+            >
+              {isSendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Mail className="mr-2 h-4 w-4" />
-              Enviar
+              Enviar Email
             </Button>
           </DialogFooter>
         </DialogContent>
