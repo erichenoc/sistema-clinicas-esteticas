@@ -392,16 +392,15 @@ export async function createProduct(
   const supabase = createAdminClient()
 
   // Map input fields to actual database columns (matching migration schema)
+  // Note: barcode column removed as it doesn't exist in production DB
   const productData = {
     clinic_id: '00000000-0000-0000-0000-000000000001',
     name: input.name,
     sku: input.sku || null,
-    barcode: input.barcode || null,
     description: input.description || null,
     category_id: input.category_id || null,
     type: input.type || 'consumable',
     unit: input.unit || 'units',
-    unit_label: input.unit_label || null,
     cost_price: input.cost_price || 0,
     sell_price: input.sell_price || 0,
     tax_rate: input.tax_rate ?? 16,
@@ -410,13 +409,8 @@ export async function createProduct(
     max_stock: input.max_stock || null,
     reorder_point: input.reorder_point || null,
     reorder_quantity: input.reorder_quantity || null,
-    requires_lot_tracking: input.requires_lot_tracking ?? false,
-    requires_refrigeration: input.requires_refrigeration ?? false,
-    shelf_life_days: input.shelf_life_days || null,
-    image_url: input.image_url || null,
     is_active: input.is_active ?? true,
     is_sellable: input.is_sellable ?? true,
-    default_supplier_id: input.default_supplier_id || null,
     notes: input.notes || null,
   }
 
@@ -443,17 +437,16 @@ export async function updateProduct(
   const supabase = createAdminClient()
 
   // Map input fields to actual database columns (matching migration schema)
+  // Note: Some columns removed as they don't exist in production DB
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
   if (input.name !== undefined) updateData.name = input.name
   if (input.sku !== undefined) updateData.sku = input.sku
-  if (input.barcode !== undefined) updateData.barcode = input.barcode
   if (input.description !== undefined) updateData.description = input.description
   if (input.category_id !== undefined) updateData.category_id = input.category_id
   if (input.type !== undefined) updateData.type = input.type
   if (input.unit !== undefined) updateData.unit = input.unit
-  if (input.unit_label !== undefined) updateData.unit_label = input.unit_label
   if (input.cost_price !== undefined) updateData.cost_price = input.cost_price
   if (input.sell_price !== undefined) updateData.sell_price = input.sell_price
   if (input.tax_rate !== undefined) updateData.tax_rate = input.tax_rate
@@ -462,13 +455,8 @@ export async function updateProduct(
   if (input.max_stock !== undefined) updateData.max_stock = input.max_stock
   if (input.reorder_point !== undefined) updateData.reorder_point = input.reorder_point
   if (input.reorder_quantity !== undefined) updateData.reorder_quantity = input.reorder_quantity
-  if (input.requires_lot_tracking !== undefined) updateData.requires_lot_tracking = input.requires_lot_tracking
-  if (input.requires_refrigeration !== undefined) updateData.requires_refrigeration = input.requires_refrigeration
-  if (input.shelf_life_days !== undefined) updateData.shelf_life_days = input.shelf_life_days
-  if (input.image_url !== undefined) updateData.image_url = input.image_url
   if (input.is_active !== undefined) updateData.is_active = input.is_active
   if (input.is_sellable !== undefined) updateData.is_sellable = input.is_sellable
-  if (input.default_supplier_id !== undefined) updateData.default_supplier_id = input.default_supplier_id
   if (input.notes !== undefined) updateData.notes = input.notes
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
