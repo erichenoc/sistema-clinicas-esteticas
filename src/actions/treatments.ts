@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendEmail, generatePackageEmailHTML } from '@/lib/email'
 
 // =============================================
 // DATOS DE DEMO - 39 Tratamientos de Dra. Pamela Moquete
@@ -722,7 +723,7 @@ export async function getPackages(): Promise<PackageData[]> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: packages, error } = await (supabase as any)
-    .from('treatment_packages')
+    .from('packages')
     .select('*')
     .order('name', { ascending: true })
 
@@ -756,8 +757,8 @@ export async function getPackages(): Promise<PackageData[]> {
       description: p.description,
       type: p.type || 'sessions_pack',
       items,
-      regularPrice: p.original_price || p.regular_price || 0,
-      salePrice: p.price || p.sale_price || 0,
+      regularPrice: p.regular_price || 0,
+      salePrice: p.sale_price || 0,
       validityDays: p.validity_days || 90,
       salesCount: p.sales_count || 0,
       isActive: p.is_active ?? true,
@@ -771,7 +772,7 @@ export async function getPackageById(id: string): Promise<PackageData | null> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
-    .from('treatment_packages')
+    .from('packages')
     .select('*')
     .eq('id', id)
     .single()
@@ -802,8 +803,8 @@ export async function getPackageById(id: string): Promise<PackageData | null> {
     description: data.description,
     type: data.type || 'sessions_pack',
     items,
-    regularPrice: data.original_price || data.regular_price || 0,
-    salePrice: data.price || data.sale_price || 0,
+    regularPrice: data.regular_price || 0,
+    salePrice: data.sale_price || 0,
     validityDays: data.validity_days || 90,
     salesCount: data.sales_count || 0,
     isActive: data.is_active ?? true,
@@ -838,17 +839,16 @@ export async function createPackage(
     description: input.description || null,
     type: input.type,
     items,
-    price: input.salePrice,
-    original_price: input.regularPrice,
+    sale_price: input.salePrice,
+    regular_price: input.regularPrice,
     validity_days: input.validityDays || 90,
-    total_sessions: totalSessions,
     is_active: input.isActive ?? true,
     sales_count: 0,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
-    .from('treatment_packages')
+    .from('packages')
     .insert(packageData)
     .select()
     .single()
@@ -868,8 +868,8 @@ export async function createPackage(
       description: data.description,
       type: data.type,
       items,
-      regularPrice: data.original_price,
-      salePrice: data.price,
+      regularPrice: data.regular_price,
+      salePrice: data.sale_price,
       validityDays: data.validity_days,
       salesCount: data.sales_count || 0,
       isActive: data.is_active,
@@ -914,15 +914,14 @@ export async function updatePackage(
   if (input.description !== undefined) updateData.description = input.description
   if (input.type !== undefined) updateData.type = input.type
   if (items !== undefined) updateData.items = items
-  if (input.regularPrice !== undefined) updateData.original_price = input.regularPrice
-  if (input.salePrice !== undefined) updateData.price = input.salePrice
+  if (input.regularPrice !== undefined) updateData.regular_price = input.regularPrice
+  if (input.salePrice !== undefined) updateData.sale_price = input.salePrice
   if (input.validityDays !== undefined) updateData.validity_days = input.validityDays
-  if (totalSessions !== undefined) updateData.total_sessions = totalSessions
   if (input.isActive !== undefined) updateData.is_active = input.isActive
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
-    .from('treatment_packages')
+    .from('packages')
     .update(updateData)
     .eq('id', id)
     .select()
@@ -951,8 +950,8 @@ export async function updatePackage(
       description: data.description,
       type: data.type,
       items: finalItems,
-      regularPrice: data.original_price,
-      salePrice: data.price,
+      regularPrice: data.regular_price,
+      salePrice: data.sale_price,
       validityDays: data.validity_days,
       salesCount: data.sales_count || 0,
       isActive: data.is_active,
@@ -967,7 +966,7 @@ export async function deletePackage(id: string): Promise<{ success: boolean; err
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
-    .from('treatment_packages')
+    .from('packages')
     .update({
       is_active: false,
       updated_at: new Date().toISOString(),
@@ -981,5 +980,49 @@ export async function deletePackage(id: string): Promise<{ success: boolean; err
 
   revalidatePath('/tratamientos/paquetes')
   revalidatePath('/pos')
+  return { success: true, error: null }
+}
+
+// Enviar paquete por email
+export async function sendPackageEmail(data: {
+  packageId: string
+  recipientEmail: string
+  recipientName: string
+}): Promise<{ success: boolean; error: string | null }> {
+  // Obtener el paquete
+  const pkg = await getPackageById(data.packageId)
+
+  if (!pkg) {
+    return { success: false, error: 'Paquete no encontrado' }
+  }
+
+  // Generar el HTML del email
+  const html = generatePackageEmailHTML({
+    packageName: pkg.name,
+    packageType: pkg.type,
+    description: pkg.description || undefined,
+    clientName: data.recipientName,
+    items: pkg.items.map((item) => ({
+      treatmentName: item.treatmentName,
+      quantity: item.quantity,
+      price: item.price,
+    })),
+    regularPrice: pkg.regularPrice,
+    salePrice: pkg.salePrice,
+    validityDays: pkg.validityDays,
+    currency: 'DOP',
+  })
+
+  // Enviar el email
+  const result = await sendEmail({
+    to: data.recipientEmail,
+    subject: `Paquete: ${pkg.name} - Med Luxe Aesthetics`,
+    html,
+  })
+
+  if (!result.success) {
+    return { success: false, error: result.error || 'Error al enviar el email' }
+  }
+
   return { success: true, error: null }
 }

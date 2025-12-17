@@ -15,6 +15,8 @@ import {
   Calendar,
   Percent,
   Clock,
+  Mail,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,9 +73,11 @@ import {
   createPackage,
   updatePackage,
   deletePackage,
+  sendPackageEmail,
   type PackageData,
   type TreatmentForPackage,
 } from '@/actions/treatments'
+import { DownloadPackagePDF } from '@/components/pdf/download-package-pdf'
 
 // Schema para el formulario
 const packageFormSchema = z.object({
@@ -102,6 +106,12 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingPackage, setEditingPackage] = useState<PackageData | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Email dialog state
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
+  const [selectedPackageForEmail, setSelectedPackageForEmail] = useState<PackageData | null>(null)
+  const [emailForm, setEmailForm] = useState({ email: '', name: '' })
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageFormSchema),
@@ -185,6 +195,44 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
         toast.error(result.error || 'Error al eliminar')
       }
     })
+  }
+
+  const openEmailDialog = (pkg: PackageData) => {
+    setSelectedPackageForEmail(pkg)
+    setEmailForm({ email: '', name: '' })
+    setIsEmailDialogOpen(true)
+  }
+
+  const handleSendEmail = async () => {
+    if (!selectedPackageForEmail || !emailForm.email || !emailForm.name) {
+      toast.error('Por favor completa todos los campos')
+      return
+    }
+
+    setIsSendingEmail(true)
+    toast.loading('Enviando email...', { id: 'send-email' })
+
+    try {
+      const result = await sendPackageEmail({
+        packageId: selectedPackageForEmail.id,
+        recipientEmail: emailForm.email,
+        recipientName: emailForm.name,
+      })
+
+      toast.dismiss('send-email')
+
+      if (result.success) {
+        toast.success('Email enviado exitosamente')
+        setIsEmailDialogOpen(false)
+      } else {
+        toast.error(result.error || 'Error al enviar el email')
+      }
+    } catch (error) {
+      toast.dismiss('send-email')
+      toast.error('Error al enviar el email')
+    } finally {
+      setIsSendingEmail(false)
+    }
   }
 
   const handleAutoPrice = () => {
@@ -690,14 +738,35 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
               </div>
 
               {/* Acciones */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  onClick={() => openEmailDialog(pkg)}
+                >
+                  <Mail className="mr-1 h-3 w-3" />
+                  Email
+                </Button>
+                <DownloadPackagePDF
+                  data={{
+                    name: pkg.name,
+                    description: pkg.description,
+                    type: pkg.type,
+                    items: pkg.items,
+                    regularPrice: pkg.regularPrice,
+                    salePrice: pkg.salePrice,
+                    validityDays: pkg.validityDays,
+                    currency: 'DOP',
+                  }}
+                  variant="outline"
+                  size="sm"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => openEditDialog(pkg)}
                 >
-                  <Pencil className="mr-2 h-3 w-3" />
+                  <Pencil className="mr-1 h-3 w-3" />
                   Editar
                 </Button>
 
@@ -761,6 +830,62 @@ export function PaquetesClient({ packages: initialPackages, treatments }: Paquet
           </Button>
         </div>
       )}
+
+      {/* Email Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Enviar paquete por email</DialogTitle>
+            <DialogDescription>
+              {selectedPackageForEmail?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="recipient-name" className="text-sm font-medium">
+                Nombre del destinatario
+              </label>
+              <Input
+                id="recipient-name"
+                placeholder="Nombre del paciente"
+                value={emailForm.name}
+                onChange={(e) =>
+                  setEmailForm({ ...emailForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="recipient-email" className="text-sm font-medium">
+                Email del destinatario
+              </label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="paciente@email.com"
+                value={emailForm.email}
+                onChange={(e) =>
+                  setEmailForm({ ...emailForm, email: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEmailDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
+              {isSendingEmail && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
