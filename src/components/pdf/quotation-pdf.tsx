@@ -7,8 +7,8 @@ const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/
 
 // Brand colors matching the email template
 const colors = {
-  primary: '#A67C52',       // Med Luxe Gold
-  primaryDark: '#8a6543',   // Gold dark for gradients
+  primary: '#3c3731',       // Med Luxe Dark Brown
+  primaryDark: '#2a2622',   // Dark brown for gradients
   dark: '#1f2937',          // Dark background (not used for header/footer now)
   text: '#333333',          // Main text
   gray: '#666666',          // Muted text

@@ -106,7 +106,7 @@ export function generateQuotationEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #A67C52; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 20px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
@@ -124,11 +124,11 @@ export function generateQuotationEmailHTML(data: {
         <div style="padding: 30px;">
           <!-- Client Info Box -->
           <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
-            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Cliente:</span> ${data.clientName}</p>
-            ${data.clientPhone ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Teléfono:</span> ${data.clientPhone}</p>` : ''}
-            ${data.clientEmail ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Correo:</span> ${data.clientEmail}</p>` : ''}
-            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Fecha:</span> ${new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p style="margin: 0;"><span style="color: #A67C52; font-weight: 600;">Válida hasta:</span> ${new Date(data.validUntil).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Cliente:</span> ${data.clientName}</p>
+            ${data.clientPhone ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Teléfono:</span> ${data.clientPhone}</p>` : ''}
+            ${data.clientEmail ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Correo:</span> ${data.clientEmail}</p>` : ''}
+            <p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Fecha:</span> ${new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="margin: 0;"><span style="color: #3c3731; font-weight: 600;">Válida hasta:</span> ${new Date(data.validUntil).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
 
           <!-- Items Table -->
@@ -170,7 +170,7 @@ export function generateQuotationEmailHTML(data: {
               </tr>
               <tr style="font-size: 18px; font-weight: bold;">
                 <td style="padding: 8px 0 0;">Total:</td>
-                <td style="padding: 8px 0 0; text-align: right; color: #A67C52;">${formatPrice(data.total)}</td>
+                <td style="padding: 8px 0 0; text-align: right; color: #3c3731;">${formatPrice(data.total)}</td>
               </tr>
             </table>
           </div>
@@ -191,7 +191,7 @@ export function generateQuotationEmailHTML(data: {
         </div>
 
         <!-- Footer - Gold background with white text -->
-        <div style="background-color: #A67C52; padding: 25px; text-align: center;">
+        <div style="background-color: #3c3731; padding: 25px; text-align: center;">
           <p style="margin: 0 0 10px; color: #ffffff; font-size: 14px;">
             ¿Tienes preguntas? Contáctanos
           </p>
@@ -258,7 +258,7 @@ export function generateInvoiceEmailHTML(data: {
       case 'cancelled': return '#666666'
       case 'overdue': return '#dc2626'
       case 'partial': return '#f59e0b'
-      default: return '#A67C52'
+      default: return '#3c3731'
     }
   }
 
@@ -282,7 +282,7 @@ export function generateInvoiceEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #A67C52; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 20px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
@@ -307,13 +307,13 @@ export function generateInvoiceEmailHTML(data: {
 
           <!-- Client Info Box -->
           <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
-            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Cliente:</span> ${data.clientName}</p>
-            ${data.clientRnc ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">RNC/Cedula:</span> ${data.clientRnc}</p>` : ''}
-            ${data.clientPhone ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Telefono:</span> ${data.clientPhone}</p>` : ''}
-            ${data.clientEmail ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Correo:</span> ${data.clientEmail}</p>` : ''}
-            <p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Fecha Emision:</span> ${new Date(data.issueDate).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            ${data.dueDate ? `<p style="margin: 0 0 8px;"><span style="color: #A67C52; font-weight: 600;">Vencimiento:</span> ${new Date(data.dueDate).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>` : ''}
-            ${data.ncf ? `<p style="margin: 0;"><span style="color: #A67C52; font-weight: 600;">NCF:</span> <strong>${data.ncf}</strong></p>` : ''}
+            <p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Cliente:</span> ${data.clientName}</p>
+            ${data.clientRnc ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">RNC/Cedula:</span> ${data.clientRnc}</p>` : ''}
+            ${data.clientPhone ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Telefono:</span> ${data.clientPhone}</p>` : ''}
+            ${data.clientEmail ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Correo:</span> ${data.clientEmail}</p>` : ''}
+            <p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Fecha Emision:</span> ${new Date(data.issueDate).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            ${data.dueDate ? `<p style="margin: 0 0 8px;"><span style="color: #3c3731; font-weight: 600;">Vencimiento:</span> ${new Date(data.dueDate).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>` : ''}
+            ${data.ncf ? `<p style="margin: 0;"><span style="color: #3c3731; font-weight: 600;">NCF:</span> <strong>${data.ncf}</strong></p>` : ''}
           </div>
 
           <!-- Items Table -->
@@ -355,7 +355,7 @@ export function generateInvoiceEmailHTML(data: {
               </tr>
               <tr style="font-size: 18px; font-weight: bold;">
                 <td style="padding: 8px 0 0;">Total:</td>
-                <td style="padding: 8px 0 0; text-align: right; color: #A67C52;">${formatPrice(data.total)}</td>
+                <td style="padding: 8px 0 0; text-align: right; color: #3c3731;">${formatPrice(data.total)}</td>
               </tr>
               ${data.paidAmount > 0 ? `
               <tr style="color: #16a34a;">
@@ -379,7 +379,7 @@ export function generateInvoiceEmailHTML(data: {
         </div>
 
         <!-- Footer - Gold background with white text -->
-        <div style="background-color: #A67C52; padding: 25px; text-align: center;">
+        <div style="background-color: #3c3731; padding: 25px; text-align: center;">
           <p style="margin: 0 0 10px; color: #ffffff; font-size: 14px;">
             Tienes preguntas? Contactanos
           </p>
@@ -443,7 +443,7 @@ export function generatePackageEmailHTML(data: {
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
       <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
         <!-- Header with Logo and Title -->
-        <div style="background-color: #A67C52; padding: 20px 30px;">
+        <div style="background-color: #3c3731; padding: 20px 30px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="width: 50%; vertical-align: middle;">
@@ -469,7 +469,7 @@ export function generatePackageEmailHTML(data: {
 
           <!-- Package Name Box -->
           <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 25px; text-align: center;">
-            <h2 style="margin: 0 0 10px; color: #A67C52; font-size: 20px;">${data.packageName}</h2>
+            <h2 style="margin: 0 0 10px; color: #3c3731; font-size: 20px;">${data.packageName}</h2>
             <span style="display: inline-block; background: #e5e5e5; padding: 4px 12px; border-radius: 4px; font-size: 12px; color: #666;">${typeLabel}</span>
             ${data.description ? `<p style="margin: 15px 0 0; color: #666; font-size: 14px;">${data.description}</p>` : ''}
           </div>
@@ -527,7 +527,7 @@ export function generatePackageEmailHTML(data: {
               </tr>
               <tr style="font-size: 18px; font-weight: bold;">
                 <td style="padding: 8px 0 0;">Precio Paquete:</td>
-                <td style="padding: 8px 0 0; text-align: right; color: #A67C52;">${formatPrice(data.salePrice)}</td>
+                <td style="padding: 8px 0 0; text-align: right; color: #3c3731;">${formatPrice(data.salePrice)}</td>
               </tr>
             </table>
           </div>
@@ -545,14 +545,14 @@ export function generatePackageEmailHTML(data: {
             <p style="margin: 0 0 15px; color: #666;">
               Para adquirir este paquete o agendar tu cita:
             </p>
-            <a href="https://wa.me/18095580911" style="display: inline-block; background: #A67C52; color: #fff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+            <a href="https://wa.me/18095580911" style="display: inline-block; background: #3c3731; color: #fff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-weight: bold;">
               Contactanos por WhatsApp
             </a>
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="background-color: #A67C52; padding: 25px; text-align: center;">
+        <div style="background-color: #3c3731; padding: 25px; text-align: center;">
           <p style="margin: 0 0 10px; color: #ffffff; font-size: 14px;">
             Tienes preguntas? Contactanos
           </p>

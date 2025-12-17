@@ -7,8 +7,8 @@ const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/
 
 // Brand colors
 const colors = {
-  primary: '#A67C52',
-  primaryDark: '#8a6543',
+  primary: '#3c3731',
+  primaryDark: '#2a2622',
   text: '#333333',
   gray: '#666666',
   border: '#e5e5e5',
