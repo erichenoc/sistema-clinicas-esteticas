@@ -1,4 +1,5 @@
 import { MedLuxeLogoSimple } from '@/components/shared/medluxe-logo'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function AuthLayout({
   children,
@@ -25,7 +26,7 @@ export default function AuthLayout({
               pacientes están más satisfechos que nunca.&rdquo;
             </p>
             <footer className="text-sm opacity-80 font-medium">
-              — Dra. María González, Directora Médica
+              — Dr. Pamela Moquete, Directora Médica
             </footer>
           </blockquote>
         </div>
@@ -39,6 +40,15 @@ export default function AuthLayout({
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2 bg-gradient-to-br from-[#FDFCFA] to-white">
         <div className="w-full max-w-md">{children}</div>
       </div>
+
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          classNames: {
+            toast: 'bg-card border-border shadow-luxury-lg',
+          },
+        }}
+      />
     </div>
   )
 }
