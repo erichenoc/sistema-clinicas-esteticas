@@ -3,6 +3,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { AppointmentStatus } from '@/types/appointments'
+import {
+  createGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  isGoogleCalendarConnected,
+} from '@/actions/google-calendar'
 
 // Tipos
 export interface AppointmentData {
@@ -32,6 +38,7 @@ export interface AppointmentData {
   created_at: string
   updated_at: string
   created_by: string | null
+  google_event_id: string | null
 }
 
 // Vista expandida con joins
@@ -101,6 +108,40 @@ export interface RoomData {
   is_active: boolean
 }
 
+// Helper: resolve patient name and professional name from their IDs
+async function resolveAppointmentNames(
+  patientId: string,
+  professionalId: string
+): Promise<{ patientName: string; professionalName: string }> {
+  const supabase = createAdminClient()
+
+  const [patientResult, professionalResult] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('patients')
+      .select('first_name, last_name')
+      .eq('id', patientId)
+      .single(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('users')
+      .select('first_name, last_name, full_name')
+      .eq('id', professionalId)
+      .single(),
+  ])
+
+  const patientName = patientResult.data
+    ? `${patientResult.data.first_name || ''} ${patientResult.data.last_name || ''}`.trim()
+    : 'Paciente'
+
+  const professionalName = professionalResult.data
+    ? professionalResult.data.full_name ||
+      `${professionalResult.data.first_name || ''} ${professionalResult.data.last_name || ''}`.trim()
+    : 'Profesional'
+
+  return { patientName, professionalName }
+}
+
 // Obtener todas las citas con datos expandidos
 export async function getAppointments(options?: {
   startDate?: string
@@ -142,6 +183,7 @@ export async function getAppointments(options?: {
       )
     `)
     .order('scheduled_at', { ascending: true })
+    .limit(500)
 
   // Aplicar filtros
   if (options?.startDate) {
@@ -352,8 +394,45 @@ export async function createAppointment(
     return { data: null, error: `Error al crear la cita: ${error.message}` }
   }
 
+  const created = data as AppointmentData
+
+  // Google Calendar sync - non-blocking
+  try {
+    const calendarConnected = await isGoogleCalendarConnected(input.professional_id)
+
+    if (calendarConnected) {
+      const { patientName, professionalName } = await resolveAppointmentNames(
+        input.patient_id,
+        input.professional_id
+      )
+
+      const gcalResult = await createGoogleCalendarEvent(input.professional_id, {
+        treatmentName: input.treatment_name || null,
+        patientName,
+        scheduledAt: input.scheduled_at,
+        durationMinutes: input.duration_minutes,
+        notes: input.notes || null,
+        professionalName,
+      })
+
+      if (gcalResult.eventId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('appointments')
+          .update({ google_event_id: gcalResult.eventId })
+          .eq('id', created.id)
+
+        created.google_event_id = gcalResult.eventId
+      } else if (gcalResult.error) {
+        console.error('Google Calendar sync failed on create:', gcalResult.error)
+      }
+    }
+  } catch (gcalError) {
+    console.error('Google Calendar sync error on create (non-blocking):', gcalError)
+  }
+
   revalidatePath('/agenda')
-  return { data: data as AppointmentData, error: null }
+  return { data: created, error: null }
 }
 
 // Actualizar una cita
@@ -362,6 +441,14 @@ export async function updateAppointment(
   input: UpdateAppointmentInput
 ): Promise<{ data: AppointmentData | null; error: string | null }> {
   const supabase = createAdminClient()
+
+  // Fetch existing appointment to retrieve google_event_id and current field values
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('appointments')
+    .select('google_event_id, patient_id, professional_id, treatment_name, scheduled_at, duration_minutes, notes')
+    .eq('id', id)
+    .single()
 
   // Build update object with only valid DB columns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -392,9 +479,44 @@ export async function updateAppointment(
     return { data: null, error: `Error al actualizar la cita: ${error.message}` }
   }
 
+  const updated = data as AppointmentData
+
+  // Google Calendar sync - non-blocking
+  try {
+    const professionalId = input.professional_id ?? existing?.professional_id
+    const googleEventId: string | null = existing?.google_event_id ?? null
+
+    if (professionalId && googleEventId) {
+      const calendarConnected = await isGoogleCalendarConnected(professionalId)
+
+      if (calendarConnected) {
+        const patientId = input.patient_id ?? existing?.patient_id
+        const { patientName, professionalName } = await resolveAppointmentNames(
+          patientId,
+          professionalId
+        )
+
+        const gcalResult = await updateGoogleCalendarEvent(professionalId, googleEventId, {
+          treatmentName: input.treatment_name ?? existing?.treatment_name ?? null,
+          patientName,
+          scheduledAt: input.scheduled_at ?? existing?.scheduled_at,
+          durationMinutes: input.duration_minutes ?? existing?.duration_minutes,
+          notes: input.notes ?? existing?.notes ?? null,
+          professionalName,
+        })
+
+        if (!gcalResult.success && gcalResult.error) {
+          console.error('Google Calendar sync failed on update:', gcalResult.error)
+        }
+      }
+    }
+  } catch (gcalError) {
+    console.error('Google Calendar sync error on update (non-blocking):', gcalError)
+  }
+
   revalidatePath('/agenda')
   revalidatePath(`/agenda/${id}`)
-  return { data: data as AppointmentData, error: null }
+  return { data: updated, error: null }
 }
 
 // Actualizar estado de una cita
@@ -404,6 +526,14 @@ export async function updateAppointmentStatus(
   cancellationReason?: string
 ): Promise<{ success: boolean; error: string | null }> {
   const supabase = createAdminClient()
+
+  // Fetch existing appointment to retrieve google_event_id and professional_id for GCal sync
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('appointments')
+    .select('google_event_id, professional_id')
+    .eq('id', id)
+    .single()
 
   const updateData: Record<string, unknown> = {
     status,
@@ -432,6 +562,28 @@ export async function updateAppointmentStatus(
     return { success: false, error: `Error al actualizar el estado de la cita: ${error.message}` }
   }
 
+  // Google Calendar sync on cancellation - non-blocking
+  if (status === 'cancelled') {
+    try {
+      const googleEventId: string | null = existing?.google_event_id ?? null
+      const professionalId: string | null = existing?.professional_id ?? null
+
+      if (professionalId && googleEventId) {
+        const calendarConnected = await isGoogleCalendarConnected(professionalId)
+
+        if (calendarConnected) {
+          const gcalResult = await deleteGoogleCalendarEvent(professionalId, googleEventId)
+
+          if (!gcalResult.success && gcalResult.error) {
+            console.error('Google Calendar sync failed on cancellation:', gcalResult.error)
+          }
+        }
+      }
+    } catch (gcalError) {
+      console.error('Google Calendar sync error on cancellation (non-blocking):', gcalError)
+    }
+  }
+
   revalidatePath('/agenda')
   revalidatePath(`/agenda/${id}`)
   return { success: true, error: null }
@@ -449,6 +601,14 @@ export async function cancelAppointment(
 export async function deleteAppointment(id: string): Promise<{ success: boolean; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Fetch existing appointment to retrieve google_event_id before deletion
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('appointments')
+    .select('google_event_id, professional_id')
+    .eq('id', id)
+    .single()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('appointments')
@@ -458,6 +618,26 @@ export async function deleteAppointment(id: string): Promise<{ success: boolean;
   if (error) {
     console.error('Error deleting appointment:', error)
     return { success: false, error: 'Error al eliminar la cita' }
+  }
+
+  // Google Calendar sync - non-blocking
+  try {
+    const googleEventId: string | null = existing?.google_event_id ?? null
+    const professionalId: string | null = existing?.professional_id ?? null
+
+    if (professionalId && googleEventId) {
+      const calendarConnected = await isGoogleCalendarConnected(professionalId)
+
+      if (calendarConnected) {
+        const gcalResult = await deleteGoogleCalendarEvent(professionalId, googleEventId)
+
+        if (!gcalResult.success && gcalResult.error) {
+          console.error('Google Calendar sync failed on delete:', gcalResult.error)
+        }
+      }
+    }
+  } catch (gcalError) {
+    console.error('Google Calendar sync error on delete (non-blocking):', gcalError)
   }
 
   revalidatePath('/agenda')
