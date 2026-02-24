@@ -14,8 +14,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MED LUXE - Sistema de Gestión",
-  description: "Sistema completo de gestión para clínicas estéticas - MED LUXE Aesthetics & Wellness",
+  title: "MED LUXE - Sistema de Gestion",
+  description: "Sistema completo de gestion para clinicas esteticas - MED LUXE Aesthetics & Wellness",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://medluxe.vercel.app'),
+  openGraph: {
+    title: "MED LUXE - Sistema de Gestion",
+    description: "Sistema completo de gestion para clinicas esteticas",
+    type: "website",
+    locale: "es_DO",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({
