@@ -389,7 +389,7 @@ export function InjectableTreatmentTemplate({
                     <SelectItem value="__add_new__" className="text-primary font-medium">
                       <div className="flex items-center gap-2">
                         <Plus className="h-3 w-3" />
-                        Agregar nuevo producto
+                        Gestionar productos
                       </div>
                     </SelectItem>
                   </div>
@@ -471,39 +471,58 @@ export function InjectableTreatmentTemplate({
         </Card>
       </div>
 
-      {/* Add Product Inline Dialog */}
+      {/* Manage Products Dialog */}
       <Dialog open={showAddProduct && !editDialogOpen} onOpenChange={setShowAddProduct}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+            <DialogTitle>Gestionar Productos Inyectables</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Add new product */}
             <div className="space-y-2">
-              <Label>Nombre del Producto</Label>
-              <Input
-                value={newProductName}
-                onChange={(e) => setNewProductName(e.target.value)}
-                placeholder="Ej: Juvederm Volux"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleAddProduct() }
-                }}
-                disabled={addingProduct}
-                autoFocus
-              />
+              <Label>Agregar Nuevo Producto</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  placeholder="Ej: Juvederm Volux"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddProduct() }
+                  }}
+                  disabled={addingProduct}
+                  autoFocus
+                />
+                <Button
+                  onClick={handleAddProduct}
+                  disabled={addingProduct || !newProductName.trim()}
+                  size="sm"
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar
+                </Button>
+              </div>
             </div>
+
+            {/* Existing products list */}
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Productos existentes</Label>
-              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-md p-2">
+              <Label className="text-sm text-muted-foreground">
+                Productos existentes ({products.length})
+              </Label>
+              <div className="max-h-64 overflow-y-auto space-y-1 border rounded-md p-2">
                 {products.map((product) => (
-                  <div key={product} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted group text-sm">
+                  <div
+                    key={product}
+                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted text-sm"
+                  >
                     <span>{product}</span>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
+                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemoveProduct(product)}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
@@ -511,10 +530,8 @@ export function InjectableTreatmentTemplate({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddProduct(false)}>Cerrar</Button>
-            <Button onClick={handleAddProduct} disabled={addingProduct || !newProductName.trim()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar
+            <Button variant="outline" onClick={() => setShowAddProduct(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -604,7 +621,7 @@ export function InjectableTreatmentTemplate({
                           <SelectItem value="__add_new__" className="text-primary font-medium">
                             <div className="flex items-center gap-2">
                               <Plus className="h-3 w-3" />
-                              Agregar nuevo producto
+                              Gestionar productos
                             </div>
                           </SelectItem>
                         </div>

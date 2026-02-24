@@ -16,9 +16,11 @@ import {
   X,
   Camera,
   Play,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Form,
@@ -45,6 +47,13 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { sessionSchema, type SessionFormData } from '@/lib/validations/sessions'
 import { BODY_ZONES } from '@/types/patients'
@@ -108,6 +117,18 @@ function NuevaSesionContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [treatmentParameters, setTreatmentParameters] = useState<any[]>([])
   const [templateData, setTemplateData] = useState<TreatmentTemplateData | null>(null)
+
+  // Session products (consumables from inventory)
+  interface SessionProduct {
+    productId: string
+    productName: string
+    quantity: number
+    unit: string
+  }
+  const [sessionProducts, setSessionProducts] = useState<SessionProduct[]>([])
+  const [showProductDialog, setShowProductDialog] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [productQuantity, setProductQuantity] = useState('1')
 
   const appointmentId = searchParams.get('cita')
   const patientId = searchParams.get('paciente')
@@ -236,15 +257,47 @@ function NuevaSesionContent() {
     appendZone({ zone: '', notes: '' })
   }
 
+  const handleAddSessionProduct = () => {
+    if (!selectedProductId) return
+    const product = products.find(p => p.id === selectedProductId)
+    if (!product) return
+
+    const qty = parseFloat(productQuantity) || 1
+    // Check if product already added
+    const existing = sessionProducts.find(sp => sp.productId === selectedProductId)
+    if (existing) {
+      setSessionProducts(prev =>
+        prev.map(sp =>
+          sp.productId === selectedProductId
+            ? { ...sp, quantity: sp.quantity + qty }
+            : sp
+        )
+      )
+    } else {
+      setSessionProducts(prev => [
+        ...prev,
+        { productId: product.id, productName: product.name, quantity: qty, unit: product.unit },
+      ])
+    }
+    setSelectedProductId('')
+    setProductQuantity('1')
+    setShowProductDialog(false)
+  }
+
+  const handleRemoveSessionProduct = (productId: string) => {
+    setSessionProducts(prev => prev.filter(sp => sp.productId !== productId))
+  }
+
   async function onSubmit(data: SessionFormData) {
     setIsLoading(true)
     toast.loading('Iniciando sesión...', { id: 'create-session' })
 
     try {
-      // Merge template data into technical parameters
+      // Merge template data and products into technical parameters
       const technicalParams = {
         ...data.technicalParameters,
         ...(templateData ? { treatmentTemplate: templateData } : {}),
+        ...(sessionProducts.length > 0 ? { productsUsed: sessionProducts } : {}),
       }
 
       const result = await createSession({
@@ -586,21 +639,121 @@ function NuevaSesionContent() {
                       <Package className="h-5 w-5" />
                       Productos
                     </CardTitle>
-                    <Button type="button" variant="outline" size="sm">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowProductDialog(true)}
+                    >
                       <Plus className="mr-1 h-3 w-3" />
                       Agregar producto
                     </Button>
                   </div>
                   <CardDescription>
-                    Se descontarán automáticamente del inventario
+                    Se descontaran automaticamente del inventario
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-center text-muted-foreground py-4">
-                    No hay productos agregados
-                  </p>
+                  {sessionProducts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">
+                      No hay productos agregados
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {sessionProducts.map((sp) => (
+                        <div
+                          key={sp.productId}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">{sp.productName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {sp.quantity} {sp.unit}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => handleRemoveSessionProduct(sp.productId)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Add Product Dialog */}
+              <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Agregar Producto</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label>Producto</Label>
+                      <Select
+                        value={selectedProductId}
+                        onValueChange={setSelectedProductId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar producto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.length === 0 ? (
+                            <SelectItem value="__none__" disabled>
+                              No hay productos en inventario
+                            </SelectItem>
+                          ) : (
+                            products.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <span>{product.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Stock: {product.stock} {product.unit}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cantidad</Label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={productQuantity}
+                        onChange={(e) => setProductQuantity(e.target.value)}
+                        placeholder="1"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowProductDialog(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleAddSessionProduct}
+                      disabled={!selectedProductId}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {/* Observaciones */}
               <Card>

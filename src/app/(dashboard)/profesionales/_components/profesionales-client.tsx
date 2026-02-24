@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Users,
   Plus,
@@ -18,10 +19,15 @@ import {
   Briefcase,
   TrendingUp,
   UserCheck,
+  Trash2,
+  Percent,
+  Save,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -48,6 +54,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
+import { deleteProfessional, updateProfessional } from '@/actions/professionals'
 import {
   ProfessionalSummary,
   CommissionWithDetails,
@@ -79,10 +95,23 @@ export function ProfesionalesClient({
   attendance,
   stats,
 }: ProfesionalesClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('equipo')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [todayDate, setTodayDate] = useState('')
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [professionalToDelete, setProfessionalToDelete] = useState<ProfessionalSummary | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Commission edit dialog state
+  const [commissionDialogOpen, setCommissionDialogOpen] = useState(false)
+  const [professionalToEdit, setProfessionalToEdit] = useState<ProfessionalSummary | null>(null)
+  const [editCommissionRate, setEditCommissionRate] = useState('')
+  const [editBaseSalary, setEditBaseSalary] = useState('')
+  const [isSavingCommission, setIsSavingCommission] = useState(false)
 
   useEffect(() => {
     setTodayDate(new Date().toLocaleDateString('es-MX', {
@@ -92,6 +121,61 @@ export function ProfesionalesClient({
       day: 'numeric',
     }))
   }, [])
+
+  const handleDeleteClick = (professional: ProfessionalSummary) => {
+    setProfessionalToDelete(professional)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!professionalToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteProfessional(professionalToDelete.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`${professionalToDelete.fullName} ha sido eliminado`)
+        router.refresh()
+      }
+    } catch {
+      toast.error('Error al eliminar el profesional')
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setProfessionalToDelete(null)
+    }
+  }
+
+  const handleEditCommissionClick = (professional: ProfessionalSummary) => {
+    setProfessionalToEdit(professional)
+    setEditCommissionRate(professional.defaultCommissionRate.toString())
+    setEditBaseSalary(professional.baseSalary?.toString() || '')
+    setCommissionDialogOpen(true)
+  }
+
+  const handleSaveCommission = async () => {
+    if (!professionalToEdit) return
+    setIsSavingCommission(true)
+    try {
+      const result = await updateProfessional(professionalToEdit.id, {
+        commissionRate: parseFloat(editCommissionRate) || 0,
+        baseSalary: editBaseSalary ? parseFloat(editBaseSalary) : undefined,
+      })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Compensacion de ${professionalToEdit.fullName} actualizada`)
+        router.refresh()
+      }
+    } catch {
+      toast.error('Error al actualizar la compensacion')
+    } finally {
+      setIsSavingCommission(false)
+      setCommissionDialogOpen(false)
+      setProfessionalToEdit(null)
+    }
+  }
 
   const filteredProfessionals = professionals.filter((professional) => {
     const matchesSearch =
@@ -319,6 +403,18 @@ export function ProfesionalesClient({
                                 <DollarSign className="h-4 w-4 mr-2" />
                                 Comisiones
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditCommissionClick(professional)}>
+                              <Percent className="h-4 w-4 mr-2" />
+                              Editar Compensacion
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() => handleDeleteClick(professional)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -574,6 +670,111 @@ export function ProfesionalesClient({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Profesional</DialogTitle>
+            <DialogDescription>
+              {professionalToDelete
+                ? `¿Esta seguro que desea eliminar a ${professionalToDelete.fullName}? Esta accion desactivara al profesional del sistema.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Commission Dialog */}
+      <Dialog open={commissionDialogOpen} onOpenChange={setCommissionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Compensacion</DialogTitle>
+            <DialogDescription>
+              {professionalToEdit
+                ? `Modificar la compensacion de ${professionalToEdit.fullName}`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-commission-rate">Tasa de Comision (%)</Label>
+              <Input
+                id="edit-commission-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={editCommissionRate}
+                onChange={(e) => setEditCommissionRate(e.target.value)}
+                placeholder="15"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-base-salary">Salario Base (RD$)</Label>
+              <Input
+                id="edit-base-salary"
+                type="number"
+                min="0"
+                value={editBaseSalary}
+                onChange={(e) => setEditBaseSalary(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCommissionDialogOpen(false)}
+              disabled={isSavingCommission}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveCommission}
+              disabled={isSavingCommission}
+            >
+              {isSavingCommission ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

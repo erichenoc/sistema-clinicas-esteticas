@@ -154,22 +154,22 @@ export async function getProfessionals(options?: {
       employment_type: 'employee',
       hire_date: null,
       termination_date: null,
-      base_salary: null,
-      salary_type: 'monthly',
-      default_commission_rate: 15,
-      commission_type: 'percentage',
-      max_daily_appointments: 20,
-      appointment_buffer_minutes: 15,
-      accepts_walk_ins: true,
-      can_view_all_patients: false,
-      can_modify_prices: false,
-      can_give_discounts: false,
-      max_discount_percent: 0,
+      base_salary: user.base_salary || null,
+      salary_type: user.salary_type || 'monthly',
+      default_commission_rate: user.commission_rate ?? 15,
+      commission_type: user.commission_type || 'percentage',
+      max_daily_appointments: user.max_daily_appointments || 20,
+      appointment_buffer_minutes: user.appointment_buffer_minutes || 15,
+      accepts_walk_ins: user.accepts_walk_ins ?? true,
+      can_view_all_patients: user.can_view_all_patients ?? false,
+      can_modify_prices: user.can_modify_prices ?? false,
+      can_give_discounts: user.can_give_discounts ?? false,
+      max_discount_percent: user.max_discount_percent || 0,
       status: user.is_active ? 'active' as ProfessionalStatus : 'inactive' as ProfessionalStatus,
       profile_image_url: user.avatar_url,
       signature_image_url: null,
       display_order: 0,
-      show_on_booking: true,
+      show_on_booking: user.show_on_booking ?? true,
       created_at: user.created_at,
       updated_at: user.updated_at,
       first_name: user.first_name || '',
@@ -307,6 +307,11 @@ export async function createProfessional(
         specialty: input.specialties?.join(', ') || null,
         license_number: input.licenseNumber || null,
         job_title: input.jobTitle || null,
+        base_salary: input.baseSalary || null,
+        salary_type: input.salaryType || 'monthly',
+        commission_rate: input.commissionRate ?? 15,
+        commission_type: input.commissionType || 'percentage',
+        employment_type: input.employmentType || 'employee',
       })
       .select()
       .single()
@@ -370,6 +375,37 @@ export async function createProfessional(
   } catch (error) {
     console.error('Error in createProfessional:', error)
     return { data: null, error: 'Error inesperado al crear el profesional' }
+  }
+}
+
+export async function deleteProfessional(
+  id: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = createAdminClient()
+
+  try {
+    // Soft delete: mark as not professional and inactive
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('users')
+      .update({
+        is_professional: false,
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('is_professional', true)
+
+    if (error) {
+      console.error('Error deleting professional:', error)
+      return { success: false, error: 'Error al eliminar el profesional' }
+    }
+
+    revalidatePath('/profesionales')
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error in deleteProfessional:', error)
+    return { success: false, error: 'Error inesperado al eliminar el profesional' }
   }
 }
 
