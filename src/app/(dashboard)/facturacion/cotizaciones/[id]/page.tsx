@@ -58,6 +58,7 @@ import {
   updateQuotationStatus,
   type QuotationData,
 } from '@/actions/quotations'
+import { getCurrentExchangeRate, type CurrencyConversion } from '@/actions/exchange-rates'
 import { DownloadQuotationPDF } from '@/components/pdf/download-quotation-pdf'
 
 const statusConfig = {
@@ -77,13 +78,18 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
   const [isSending, setIsSending] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [exchangeRate, setExchangeRate] = useState<CurrencyConversion | null>(null)
 
   useEffect(() => {
     async function loadQuotation() {
       setIsLoading(true)
       try {
-        const data = await getQuotationById(resolvedParams.id)
+        const [data, rateData] = await Promise.all([
+          getQuotationById(resolvedParams.id),
+          getCurrentExchangeRate('USD', 'DOP'),
+        ])
         setQuotation(data)
+        setExchangeRate(rateData)
       } catch (error) {
         console.error('Error loading quotation:', error)
         toast.error('Error al cargar la cotizacion')
@@ -278,6 +284,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               currency: quotation.currency,
               notes: quotation.notes,
               termsConditions: quotation.terms_conditions,
+              exchangeRate: exchangeRate?.rate,
             }}
           />
 

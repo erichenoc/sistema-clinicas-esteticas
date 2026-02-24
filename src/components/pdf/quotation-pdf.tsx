@@ -164,6 +164,53 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
+  // Bank accounts section
+  bankBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  bankTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#166534',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  bankGrid: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  bankAccount: {
+    width: '50%',
+    paddingHorizontal: 8,
+  },
+  bankType: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#166534',
+    marginBottom: 2,
+  },
+  bankName: {
+    fontSize: 9,
+    color: colors.text,
+    marginBottom: 1,
+  },
+  bankNumber: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 1,
+  },
+  bankHolder: {
+    fontSize: 9,
+    color: colors.gray,
+    marginBottom: 1,
+  },
+
   // Terms section (amber/cream box)
   termsBox: {
     backgroundColor: colors.cream,
@@ -183,6 +230,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.creamTextDark,
     lineHeight: 1.6,
+  },
+
+  // Exchange rate note
+  exchangeRateBox: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+  },
+  exchangeRateText: {
+    fontSize: 9,
+    color: '#1e40af',
+    lineHeight: 1.5,
   },
 
   // Footer (gold background with white text)
@@ -258,6 +320,7 @@ export interface QuotationPDFData {
   // Content
   notes?: string
   termsConditions?: string
+  exchangeRate?: number
 }
 
 const formatCurrency = (amount: number, currency: string = 'DOP') => {
@@ -385,6 +448,51 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
               <Text style={styles.grandTotalValue}>{formatCurrency(total, currency)}</Text>
             </View>
           </View>
+
+          {/* Bank Accounts */}
+          <View style={styles.bankBox}>
+            <Text style={styles.bankTitle}>Cuentas Bancarias para Deposito</Text>
+            <View style={styles.bankGrid}>
+              <View style={styles.bankAccount}>
+                <Text style={styles.bankType}>CUENTA DE AHORRO PESOS</Text>
+                <Text style={styles.bankName}>Banco Popular</Text>
+                <Text style={styles.bankNumber}>767971302</Text>
+                <Text style={styles.bankHolder}>Pamela Moquete</Text>
+              </View>
+              <View style={styles.bankAccount}>
+                <Text style={styles.bankType}>CUENTA DE AHORRO DOLARES</Text>
+                <Text style={styles.bankName}>Banco Popular</Text>
+                <Text style={styles.bankNumber}>796346815</Text>
+                <Text style={styles.bankHolder}>Pamela Moquete</Text>
+              </View>
+            </View>
+            <View style={styles.bankGrid}>
+              <View style={styles.bankAccount}>
+                <Text style={styles.bankType}>CUENTA DE AHORRO PESOS</Text>
+                <Text style={styles.bankName}>Banco BHD</Text>
+                <Text style={styles.bankNumber}>28002530016</Text>
+                <Text style={styles.bankHolder}>CED 03700989902</Text>
+                <Text style={styles.bankHolder}>Pamela Moquete</Text>
+              </View>
+              <View style={styles.bankAccount}>
+                <Text style={styles.bankType}>CUENTA CORRIENTE EN PESOS</Text>
+                <Text style={styles.bankName}>Banco de Reservas</Text>
+                <Text style={styles.bankNumber}>0330034138</Text>
+                <Text style={styles.bankHolder}>CED 03700989902</Text>
+                <Text style={styles.bankHolder}>Pamela Moquete</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Exchange Rate Note (USD only) */}
+          {currency === 'USD' && data.exchangeRate && (
+            <View style={styles.exchangeRateBox}>
+              <Text style={styles.exchangeRateText}>
+                Tasa de cambio aplicada: 1 USD = RD${data.exchangeRate.toFixed(2)}{'\n'}
+                Los precios en dolares (USD) pueden variar segun la tasa de cambio vigente al momento del pago.
+              </Text>
+            </View>
+          )}
 
           {/* Terms and Conditions */}
           {termsConditions && (

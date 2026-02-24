@@ -69,6 +69,7 @@ import { getPatients, type PatientData } from '@/actions/patients'
 import { getTreatments, getPackages, type TreatmentListItemData, type PackageData } from '@/actions/treatments'
 import { getProducts, type ProductListItemData } from '@/actions/inventory'
 import { createQuotation, sendQuotationEmail } from '@/actions/quotations'
+import { getCurrentExchangeRate, type CurrencyConversion } from '@/actions/exchange-rates'
 
 // Tipos para datos UI
 interface ClientData {
@@ -123,9 +124,10 @@ export default function NuevaCotizacionPage() {
   const [currency, setCurrency] = useState<'DOP' | 'USD'>('DOP')
   const [applyTax, setApplyTax] = useState(true)
   const [notes, setNotes] = useState('')
-  const [terms, setTerms] = useState('• Cotización válida por 30 días\n• Precios sujetos a cambio sin previo aviso\n• Se requiere 50% de anticipo para reservar cita')
+  const [terms, setTerms] = useState('• Cotizacion valida por 30 dias\n• Precios sujetos a cambio sin previo aviso\n• Los precios en dolares pueden variar segun la tasa de cambio del dia\n• Se requiere 50% de anticipo para reservar cita')
   const [validDays, setValidDays] = useState(30)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [exchangeRate, setExchangeRate] = useState<CurrencyConversion | null>(null)
 
   // Estados para datos cargados de la base de datos
   const [clients, setClients] = useState<ClientData[]>([])
@@ -139,12 +141,15 @@ export default function NuevaCotizacionPage() {
     async function loadData() {
       setIsLoading(true)
       try {
-        const [patientsData, treatmentsData, packagesData, productsData] = await Promise.all([
+        const [patientsData, treatmentsData, packagesData, productsData, rateData] = await Promise.all([
           getPatients(),
           getTreatments({ isActive: true }),
           getPackages(),
           getProducts({ isActive: true }),
+          getCurrentExchangeRate('USD', 'DOP'),
         ])
+
+        setExchangeRate(rateData)
 
         // Transformar pacientes a clientes
         setClients(patientsData.map((p: PatientData) => ({
@@ -208,15 +213,45 @@ export default function NuevaCotizacionPage() {
   const taxAmount = subtotal * (taxRate / 100)
   const total = subtotal + taxAmount
 
-  // Agregar item
+  // Cambiar moneda y convertir precios
+  const handleCurrencyChange = (newCurrency: 'DOP' | 'USD') => {
+    if (newCurrency === currency || !exchangeRate) {
+      setCurrency(newCurrency)
+      return
+    }
+
+    const rate = exchangeRate.rate
+    if (items.length > 0) {
+      const convertedItems = items.map(item => {
+        const convertedPrice = newCurrency === 'USD'
+          ? Number((item.unitPrice / rate).toFixed(2))
+          : Number((item.unitPrice * rate).toFixed(2))
+        const convertedDiscount = item.discountType === 'fixed'
+          ? (newCurrency === 'USD'
+            ? Number((item.discount / rate).toFixed(2))
+            : Number((item.discount * rate).toFixed(2)))
+          : item.discount
+        return { ...item, unitPrice: convertedPrice, discount: convertedDiscount }
+      })
+      setItems(convertedItems)
+    }
+    setCurrency(newCurrency)
+    toast.info(`Precios convertidos a ${newCurrency === 'USD' ? 'dolares' : 'pesos'} (Tasa: RD$${rate.toFixed(2)})`)
+  }
+
+  // Agregar item (convierte precio si la moneda es USD)
   const addItem = (type: ItemType, data: { id: string; name: string; price: number }) => {
+    const rate = exchangeRate?.rate || 60.50
+    const convertedPrice = currency === 'USD'
+      ? Number((data.price / rate).toFixed(2))
+      : data.price
     const newItem: QuoteItem = {
       id: crypto.randomUUID(),
       type,
       referenceId: data.id,
       description: data.name,
       quantity: 1,
-      unitPrice: data.price,
+      unitPrice: convertedPrice,
       discount: 0,
       discountType: 'percentage',
     }
@@ -733,15 +768,21 @@ export default function NuevaCotizacionPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Moneda</Label>
-                <Select value={currency} onValueChange={(v: 'DOP' | 'USD') => setCurrency(v)}>
+                <Select value={currency} onValueChange={(v: 'DOP' | 'USD') => handleCurrencyChange(v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DOP">Peso Dominicano (RD$)</SelectItem>
-                    <SelectItem value="USD">Dólar Estadounidense (US$)</SelectItem>
+                    <SelectItem value="USD">Dolar Estadounidense (US$)</SelectItem>
                   </SelectContent>
                 </Select>
+                {exchangeRate && (
+                  <p className="text-xs text-muted-foreground">
+                    Tasa: 1 USD = RD${exchangeRate.rate.toFixed(2)}
+                    <span className="ml-1">({exchangeRate.source === 'api' ? 'API' : 'Manual'})</span>
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Validez (días)</Label>

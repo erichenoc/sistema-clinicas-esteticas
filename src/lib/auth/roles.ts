@@ -189,3 +189,15 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   nurse: 'bg-teal-500',
   receptionist: 'bg-orange-500',
 }
+
+// Cuentas protegidas del sistema - no pueden ser eliminadas, desactivadas ni perder acceso
+// Esta proteccion es a nivel de aplicacion (no de base de datos)
+export const PROTECTED_ACCOUNTS = [
+  'erichenoc@gmail.com',       // Developer - cuenta protegida
+  '91f87232-385f-4890-a7ef-d2fa26f346b8', // Developer UUID
+]
+
+// Verificar si una cuenta es protegida (por email o UUID)
+export function isProtectedAccount(identifier: string): boolean {
+  return PROTECTED_ACCOUNTS.includes(identifier.toLowerCase())
+}

@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendEmail, generateQuotationEmailHTML } from '@/lib/email'
 import { notifyQuotationSent } from '@/actions/notifications'
+import { getCurrentExchangeRate } from '@/actions/exchange-rates'
 
 // Types
 export interface QuotationItem {
@@ -364,6 +365,13 @@ export async function sendQuotationEmail(id: string): Promise<{ success: boolean
     return { success: false, error: 'El cliente no tiene email registrado' }
   }
 
+  // Get exchange rate for USD quotations
+  let exchangeRateValue: number | undefined
+  if (quotation.currency === 'USD') {
+    const rate = await getCurrentExchangeRate('USD', 'DOP')
+    exchangeRateValue = rate?.rate
+  }
+
   // Generate email HTML
   const emailHTML = generateQuotationEmailHTML({
     quotationNumber: quotation.quote_number,
@@ -385,6 +393,7 @@ export async function sendQuotationEmail(id: string): Promise<{ success: boolean
     validUntil: quotation.valid_until,
     notes: quotation.notes,
     termsConditions: quotation.terms_conditions,
+    exchangeRate: exchangeRateValue,
   })
 
   // Send email

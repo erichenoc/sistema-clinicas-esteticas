@@ -381,9 +381,28 @@ export async function createProfessional(
 export async function deleteProfessional(
   id: string
 ): Promise<{ success: boolean; error: string | null }> {
+  const { isProtectedAccount } = await import('@/lib/auth/roles')
+
+  // Protect system accounts from deletion/deactivation
+  if (isProtectedAccount(id)) {
+    return { success: false, error: 'Esta cuenta esta protegida y no puede ser eliminada' }
+  }
+
   const supabase = createAdminClient()
 
   try {
+    // Verify the account is not protected by email
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: targetUser } = await (supabase as any)
+      .from('users')
+      .select('email')
+      .eq('id', id)
+      .single()
+
+    if (targetUser && isProtectedAccount(targetUser.email)) {
+      return { success: false, error: 'Esta cuenta esta protegida y no puede ser eliminada' }
+    }
+
     // Soft delete: mark as not professional and inactive
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)

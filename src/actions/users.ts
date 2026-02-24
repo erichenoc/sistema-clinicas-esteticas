@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Tipos
-export type UserRole = 'admin' | 'professional' | 'receptionist' | 'assistant'
+export type UserRole = 'owner' | 'admin' | 'professional' | 'receptionist' | 'assistant'
 
 export interface UserData {
   id: string

@@ -82,6 +82,7 @@ export function generateQuotationEmailHTML(data: {
   validUntil: string
   notes?: string
   termsConditions?: string
+  exchangeRate?: number
 }): string {
   const currencySymbol = data.currency === 'DOP' ? 'RD$' : 'US$'
   const formatPrice = (price: number) => `${currencySymbol}${price.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`
@@ -175,6 +176,55 @@ export function generateQuotationEmailHTML(data: {
             </table>
           </div>
 
+          <!-- Bank Accounts -->
+          <div style="margin-top: 25px; padding: 20px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+            <h3 style="margin: 0 0 15px; font-size: 15px; color: #166534; text-align: center;">Cuentas Bancarias para Deposito</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 10px; vertical-align: top; width: 50%; border-right: 1px solid #bbf7d0;">
+                  <p style="margin: 0 0 4px; font-size: 11px; color: #166534; font-weight: bold;">CUENTA DE AHORRO PESOS</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #333;">Banco Popular</p>
+                  <p style="margin: 0 0 2px; font-size: 13px; color: #333; font-weight: bold;">767971302</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Pamela Moquete</p>
+                </td>
+                <td style="padding: 10px; vertical-align: top; width: 50%;">
+                  <p style="margin: 0 0 4px; font-size: 11px; color: #166534; font-weight: bold;">CUENTA DE AHORRO DOLARES</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #333;">Banco Popular</p>
+                  <p style="margin: 0 0 2px; font-size: 13px; color: #333; font-weight: bold;">796346815</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Pamela Moquete</p>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 0;"><hr style="border: none; border-top: 1px solid #bbf7d0; margin: 0;" /></td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; vertical-align: top; width: 50%; border-right: 1px solid #bbf7d0;">
+                  <p style="margin: 0 0 4px; font-size: 11px; color: #166534; font-weight: bold;">CUENTA DE AHORRO PESOS</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #333;">Banco BHD</p>
+                  <p style="margin: 0 0 2px; font-size: 13px; color: #333; font-weight: bold;">28002530016</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #666;">CED 03700989902</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Pamela Moquete</p>
+                </td>
+                <td style="padding: 10px; vertical-align: top; width: 50%;">
+                  <p style="margin: 0 0 4px; font-size: 11px; color: #166534; font-weight: bold;">CUENTA CORRIENTE EN PESOS</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #333;">Banco de Reservas</p>
+                  <p style="margin: 0 0 2px; font-size: 13px; color: #333; font-weight: bold;">0330034138</p>
+                  <p style="margin: 0 0 2px; font-size: 12px; color: #666;">CED 03700989902</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Pamela Moquete</p>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          ${data.currency === 'USD' && data.exchangeRate ? `
+          <div style="margin-top: 25px; padding: 12px 15px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0; color: #1e40af; font-size: 12px;">
+              <strong>Tasa de cambio aplicada:</strong> 1 USD = RD$${data.exchangeRate.toFixed(2)}<br>
+              Los precios en dolares (USD) pueden variar segun la tasa de cambio vigente al momento del pago.
+            </p>
+          </div>
+          ` : ''}
+
           ${data.notes ? `
           <div style="margin-top: 25px;">
             <h3 style="margin: 0 0 10px; font-size: 14px; color: #374151;">Notas:</h3>
@@ -184,7 +234,7 @@ export function generateQuotationEmailHTML(data: {
 
           ${data.termsConditions ? `
           <div style="margin-top: 25px; padding: 15px; background: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b;">
-            <h3 style="margin: 0 0 10px; font-size: 14px; color: #92400e;">Términos y Condiciones:</h3>
+            <h3 style="margin: 0 0 10px; font-size: 14px; color: #92400e;">Terminos y Condiciones:</h3>
             <p style="margin: 0; color: #78350f; font-size: 13px; white-space: pre-line;">${data.termsConditions}</p>
           </div>
           ` : ''}
