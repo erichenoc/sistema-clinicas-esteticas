@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Trash2, Edit, Eye, History } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Trash2, Edit, Eye, History, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
 import {
   Select,
   SelectContent,
@@ -44,6 +45,11 @@ import {
   INJECTABLE_PRODUCTS,
 } from '@/types/treatment-templates'
 import { getPatientTreatmentHistory } from '@/actions/sessions'
+import {
+  getInjectableProducts,
+  addInjectableProduct,
+  removeInjectableProduct,
+} from '@/actions/injectable-products'
 
 interface InjectableTreatmentTemplateProps {
   data: InjectableTreatmentData
@@ -78,6 +84,43 @@ export function InjectableTreatmentTemplate({
   const [historyPoints, setHistoryPoints] = useState<InjectionPoint[]>([])
   const [showHistory, setShowHistory] = useState(true)
   const [loadingHistory, setLoadingHistory] = useState(false)
+
+  // Dynamic injectable products
+  const [products, setProducts] = useState<string[]>(INJECTABLE_PRODUCTS)
+  const [showAddProduct, setShowAddProduct] = useState(false)
+  const [newProductName, setNewProductName] = useState('')
+  const [addingProduct, setAddingProduct] = useState(false)
+  const newProductInputRef = useRef<HTMLInputElement>(null)
+
+  // Load products from DB
+  useEffect(() => {
+    getInjectableProducts().then(setProducts).catch(() => setProducts(INJECTABLE_PRODUCTS))
+  }, [])
+
+  const handleAddProduct = async () => {
+    if (!newProductName.trim()) return
+    setAddingProduct(true)
+    const result = await addInjectableProduct(newProductName.trim())
+    if (result.success) {
+      setProducts(prev => [...prev, newProductName.trim()])
+      setNewProductName('')
+      setShowAddProduct(false)
+      toast.success('Producto agregado')
+    } else {
+      toast.error(result.error || 'Error al agregar')
+    }
+    setAddingProduct(false)
+  }
+
+  const handleRemoveProduct = async (productName: string) => {
+    const result = await removeInjectableProduct(productName)
+    if (result.success) {
+      setProducts(prev => prev.filter(p => p !== productName))
+      toast.success('Producto eliminado')
+    } else {
+      toast.error(result.error || 'Error al eliminar')
+    }
+  }
 
   // Cargar historial de tratamientos del paciente
   useEffect(() => {
@@ -325,17 +368,31 @@ export function InjectableTreatmentTemplate({
             ) : (
               <Select
                 value={data.productUsed}
-                onValueChange={(value) => onChange({ ...data, productUsed: value })}
+                onValueChange={(value) => {
+                  if (value === '__add_new__') {
+                    setShowAddProduct(true)
+                    return
+                  }
+                  onChange({ ...data, productUsed: value })
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar producto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {INJECTABLE_PRODUCTS.map((product) => (
+                  {products.map((product) => (
                     <SelectItem key={product} value={product}>
                       {product}
                     </SelectItem>
                   ))}
+                  <div className="border-t mt-1 pt-1">
+                    <SelectItem value="__add_new__" className="text-primary font-medium">
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-3 w-3" />
+                        Agregar nuevo producto
+                      </div>
+                    </SelectItem>
+                  </div>
                 </SelectContent>
               </Select>
             )}
@@ -414,6 +471,55 @@ export function InjectableTreatmentTemplate({
         </Card>
       </div>
 
+      {/* Add Product Inline Dialog */}
+      <Dialog open={showAddProduct && !editDialogOpen} onOpenChange={setShowAddProduct}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre del Producto</Label>
+              <Input
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+                placeholder="Ej: Juvederm Volux"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleAddProduct() }
+                }}
+                disabled={addingProduct}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Productos existentes</Label>
+              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-md p-2">
+                {products.map((product) => (
+                  <div key={product} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted group text-sm">
+                    <span>{product}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
+                      onClick={() => handleRemoveProduct(product)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddProduct(false)}>Cerrar</Button>
+            <Button onClick={handleAddProduct} disabled={addingProduct || !newProductName.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Point Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -451,23 +557,60 @@ export function InjectableTreatmentTemplate({
 
                 <div className="space-y-2">
                   <Label>Producto</Label>
-                  <Select
-                    value={editingPoint.product}
-                    onValueChange={(value) =>
-                      setEditingPoint({ ...editingPoint, product: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INJECTABLE_PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {showAddProduct ? (
+                    <div className="flex gap-1">
+                      <Input
+                        ref={newProductInputRef}
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                        placeholder="Nombre del producto"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleAddProduct() }
+                          if (e.key === 'Escape') setShowAddProduct(false)
+                        }}
+                        disabled={addingProduct}
+                        autoFocus
+                      />
+                      <Button size="icon" variant="ghost" onClick={handleAddProduct} disabled={addingProduct}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => setShowAddProduct(false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select
+                      value={editingPoint.product}
+                      onValueChange={(value) => {
+                        if (value === '__add_new__') {
+                          setShowAddProduct(true)
+                          return
+                        }
+                        setEditingPoint({ ...editingPoint, product: value })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product} value={product}>
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span>{product}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                        <div className="border-t mt-1 pt-1">
+                          <SelectItem value="__add_new__" className="text-primary font-medium">
+                            <div className="flex items-center gap-2">
+                              <Plus className="h-3 w-3" />
+                              Agregar nuevo producto
+                            </div>
+                          </SelectItem>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 
