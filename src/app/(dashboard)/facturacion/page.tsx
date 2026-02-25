@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getInvoices, getBillingStats } from '@/actions/billing'
 import { getQuotations, getQuotationStats } from '@/actions/quotations'

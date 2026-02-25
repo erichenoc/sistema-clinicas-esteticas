@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getInventoryTransfers, getTransferStats, getBranches, getProducts } from '@/actions/inventory'
 import { TransferenciasClient } from './_components/transferencias-client'

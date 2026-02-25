@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getSuppliers, getSupplierStats } from '@/actions/inventory'
 import { ProveedoresClient } from './_components/proveedores-client'

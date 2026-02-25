@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import Link from 'next/link'
 import { ArrowLeft, Plus, Search, FileText, Clock, CheckCircle, XCircle, AlertCircle, MoreHorizontal, Download, Printer } from 'lucide-react'

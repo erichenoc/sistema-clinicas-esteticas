@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -14,6 +14,8 @@ import {
   Save,
   Camera,
   Building,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,20 +32,49 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { getProfile, updateProfile, changePassword } from '@/actions/auth'
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  owner: 'Propietario',
+  doctor: 'Doctor',
+  nurse: 'Enfermera',
+  receptionist: 'Recepcionista',
+}
 
 export default function PerfilPage() {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
 
-  // Mock user data - in production this would come from auth context
   const [user, setUser] = useState({
-    firstName: 'Admin',
-    lastName: 'Med Luxe',
-    email: 'admin@medluxe.com',
-    phone: '809-558-0911',
-    role: 'Administrador',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    role: 'receptionist',
     avatar: null as string | null,
   })
+
+  const [passwordFields, setPasswordFields] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
@@ -53,24 +84,124 @@ export default function PerfilPage() {
     darkMode: false,
   })
 
+  // Load real profile data on mount
+  useEffect(() => {
+    async function loadProfile() {
+      setIsLoadingProfile(true)
+      try {
+        const profile = await getProfile()
+        if (profile) {
+          setUser(prev => ({
+            ...prev,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            email: profile.email,
+            phone: profile.phone,
+            role: profile.role,
+          }))
+        }
+      } catch {
+        toast.error('Error al cargar el perfil')
+      } finally {
+        setIsLoadingProfile(false)
+      }
+    }
+    loadProfile()
+  }, [])
+
   const handleSaveProfile = async () => {
-    setIsLoading(true)
+    if (!user.firstName.trim() || !user.lastName.trim()) {
+      toast.error('El nombre y apellido son requeridos')
+      return
+    }
+    setIsSaving(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      toast.success('Perfil actualizado correctamente')
-    } catch (error) {
+      const result = await updateProfile({
+        firstName: user.firstName.trim(),
+        lastName: user.lastName.trim(),
+        phone: user.phone.trim(),
+      })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Perfil actualizado correctamente')
+      }
+    } catch {
       toast.error('Error al actualizar el perfil')
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
   const handleChangePassword = async () => {
-    toast.info('Funcionalidad de cambio de contrasena proximamente')
+    if (!passwordFields.currentPassword) {
+      toast.error('Ingresa tu contrasena actual')
+      return
+    }
+    if (passwordFields.newPassword.length < 8) {
+      toast.error('La nueva contrasena debe tener al menos 8 caracteres')
+      return
+    }
+    if (passwordFields.newPassword !== passwordFields.confirmPassword) {
+      toast.error('Las contrasenas no coinciden')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      const result = await changePassword({
+        currentPassword: passwordFields.currentPassword,
+        newPassword: passwordFields.newPassword,
+      })
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Contrasena actualizada correctamente')
+        setShowPasswordDialog(false)
+        setPasswordFields({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      }
+    } catch {
+      toast.error('Error al cambiar la contrasena')
+    } finally {
+      setIsChangingPassword(false)
+    }
   }
 
-  const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+  const handleClosePasswordDialog = () => {
+    if (isChangingPassword) return
+    setShowPasswordDialog(false)
+    setPasswordFields({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    setShowCurrentPassword(false)
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
+  }
+
+  const initials = user.firstName && user.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : '?'
+
+  const roleLabel = ROLE_LABELS[user.role] || user.role
+
+  if (isLoadingProfile) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Mi Perfil</h1>
+            <p className="text-muted-foreground">Cargando informacion...</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-48">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A67C52]" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -149,6 +280,7 @@ export default function PerfilPage() {
                     id="firstName"
                     value={user.firstName}
                     onChange={(e) => setUser({ ...user, firstName: e.target.value })}
+                    placeholder="Tu nombre"
                   />
                 </div>
                 <div className="space-y-2">
@@ -157,6 +289,7 @@ export default function PerfilPage() {
                     id="lastName"
                     value={user.lastName}
                     onChange={(e) => setUser({ ...user, lastName: e.target.value })}
+                    placeholder="Tu apellido"
                   />
                 </div>
                 <div className="space-y-2">
@@ -167,10 +300,13 @@ export default function PerfilPage() {
                       id="email"
                       type="email"
                       value={user.email}
-                      onChange={(e) => setUser({ ...user, email: e.target.value })}
-                      className="pl-10"
+                      disabled
+                      className="pl-10 bg-muted cursor-not-allowed"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    El correo no puede modificarse desde aqui
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefono</Label>
@@ -181,6 +317,7 @@ export default function PerfilPage() {
                       value={user.phone}
                       onChange={(e) => setUser({ ...user, phone: e.target.value })}
                       className="pl-10"
+                      placeholder="809-000-0000"
                     />
                   </div>
                 </div>
@@ -190,18 +327,18 @@ export default function PerfilPage() {
                 <Label>Rol</Label>
                 <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
                   <Building className="h-4 w-4 text-[#A67C52]" />
-                  <span className="font-medium">{user.role}</span>
+                  <span className="font-medium">{roleLabel}</span>
                 </div>
               </div>
 
               <div className="flex justify-end">
                 <Button
                   onClick={handleSaveProfile}
-                  disabled={isLoading}
+                  disabled={isSaving}
                   className="bg-[#A67C52] hover:bg-[#8a6543]"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {isLoading ? 'Guardando...' : 'Guardar cambios'}
+                  {isSaving ? 'Guardando...' : 'Guardar cambios'}
                 </Button>
               </div>
             </CardContent>
@@ -227,11 +364,14 @@ export default function PerfilPage() {
                     <div>
                       <p className="font-medium">Contrasena</p>
                       <p className="text-sm text-muted-foreground">
-                        Ultima actualizacion hace 30 dias
+                        Cambia tu contrasena de acceso
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={handleChangePassword}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPasswordDialog(true)}
+                  >
                     Cambiar contrasena
                   </Button>
                 </div>
@@ -409,6 +549,139 @@ export default function PerfilPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Change Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={handleClosePasswordDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar contrasena</DialogTitle>
+            <DialogDescription>
+              Ingresa tu contrasena actual y la nueva contrasena que deseas usar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Current Password */}
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Contrasena actual</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={passwordFields.currentPassword}
+                  onChange={(e) =>
+                    setPasswordFields({ ...passwordFields, currentPassword: e.target.value })
+                  }
+                  placeholder="Tu contrasena actual"
+                  disabled={isChangingPassword}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showCurrentPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* New Password */}
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Nueva contrasena</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={passwordFields.newPassword}
+                  onChange={(e) =>
+                    setPasswordFields({ ...passwordFields, newPassword: e.target.value })
+                  }
+                  placeholder="Minimo 8 caracteres"
+                  disabled={isChangingPassword}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {passwordFields.newPassword.length > 0 && passwordFields.newPassword.length < 8 && (
+                <p className="text-xs text-destructive">
+                  La contrasena debe tener al menos 8 caracteres
+                </p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar nueva contrasena</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={passwordFields.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordFields({ ...passwordFields, confirmPassword: e.target.value })
+                  }
+                  placeholder="Repite la nueva contrasena"
+                  disabled={isChangingPassword}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {passwordFields.confirmPassword.length > 0 &&
+                passwordFields.newPassword !== passwordFields.confirmPassword && (
+                  <p className="text-xs text-destructive">
+                    Las contrasenas no coinciden
+                  </p>
+                )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleClosePasswordDialog}
+              disabled={isChangingPassword}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword}
+              className="bg-[#A67C52] hover:bg-[#8a6543]"
+            >
+              <Key className="h-4 w-4 mr-2" />
+              {isChangingPassword ? 'Cambiando...' : 'Cambiar contrasena'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

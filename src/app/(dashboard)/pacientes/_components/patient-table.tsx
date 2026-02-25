@@ -131,7 +131,7 @@ export function PatientTable({ patients }: PatientTableProps) {
                         <span>{formatPhone(patient.phone)}</span>
                         <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
                           <a
-                            href={`https://wa.me/52${patient.phone.replace(/\D/g, '')}`}
+                            href={`https://wa.me/1${patient.phone.replace(/\D/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

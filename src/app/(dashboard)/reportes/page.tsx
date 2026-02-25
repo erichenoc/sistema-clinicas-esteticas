@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getAllReportData } from '@/actions/reports'
 import { ReportesClient } from './_components/reportes-client'

@@ -1,0 +1,22 @@
+# MED LUXE - Sistema de Gestion para Clinicas Esteticas
+User-agent: *
+Disallow: /agenda
+Disallow: /pacientes
+Disallow: /tratamientos
+Disallow: /sesiones
+Disallow: /facturacion
+Disallow: /inventario
+Disallow: /profesionales
+Disallow: /reportes
+Disallow: /configuracion
+Disallow: /pos
+Disallow: /nomina
+Disallow: /notificaciones
+Disallow: /consentimientos
+Disallow: /admin
+Disallow: /perfil
+
+Allow: /login
+Allow: /register
+
+Sitemap: https://medluxe.vercel.app/sitemap.xml

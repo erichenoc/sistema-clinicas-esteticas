@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getInventoryCounts, getInventoryCountStats } from '@/actions/inventory'
 import { ConteoClient } from './_components/conteo-client'

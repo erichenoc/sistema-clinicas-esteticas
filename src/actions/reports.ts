@@ -231,38 +231,38 @@ export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth()
 
-  const result: MonthlyRevenue[] = []
-
-  // Get last 6 months
-  for (let i = 5; i >= 0; i--) {
+  // Build date ranges for last 6 months
+  const monthRanges = Array.from({ length: 6 }, (_, idx) => {
+    const i = 5 - idx
     const monthIndex = (currentMonth - i + 12) % 12
     const year = currentMonth - i < 0 ? currentYear - 1 : currentYear
+    return {
+      monthIndex,
+      startDate: new Date(year, monthIndex, 1),
+      endDate: new Date(year, monthIndex + 1, 1),
+    }
+  })
 
-    const startDate = new Date(year, monthIndex, 1)
-    const endDate = new Date(year, monthIndex + 1, 1)
+  // Parallel fetch all 6 months at once (was sequential)
+  const salesResults = await Promise.all(
+    monthRanges.map(({ startDate, endDate }) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from('sales')
+        .select('total')
+        .eq('status', 'paid')
+        .gte('created_at', startDate.toISOString())
+        .lt('created_at', endDate.toISOString())
+    )
+  )
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sales } = await (supabase as any)
-      .from('sales')
-      .select('total')
-      .eq('status', 'paid')
-      .gte('created_at', startDate.toISOString())
-      .lt('created_at', endDate.toISOString())
-
+  return monthRanges.map(({ monthIndex }, idx) => {
+    const { data: sales } = salesResults[idx]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const revenue = (sales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
-
-    // Set a reasonable target based on average or fixed amount
-    const target = 300000 + (monthIndex * 10000) // Increasing targets
-
-    result.push({
-      month: months[monthIndex],
-      revenue,
-      target,
-    })
-  }
-
-  return result
+    const target = 300000 + (monthIndex * 10000)
+    return { month: months[monthIndex], revenue, target }
+  })
 }
 
 // =============================================
@@ -276,72 +276,40 @@ export async function getPatientStats(): Promise<PatientStats> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 
-  // Total active patients
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: totalActive } = await (supabase as any)
-    .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-
-  // New patients this month
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: newThisMonth } = await (supabase as any)
-    .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startOfMonth.toISOString())
-
-  // New patients previous month
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: previousNew } = await (supabase as any)
-    .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startOfPrevMonth.toISOString())
-    .lt('created_at', startOfMonth.toISOString())
-
-  // Patients with appointments this month (returning)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: appointmentsThisMonth } = await (supabase as any)
-    .from('appointments')
-    .select('patient_id')
-    .gte('start_time', startOfMonth.toISOString())
-
-  const uniquePatientsThisMonth = new Set(
+  // Parallel fetch all stats at once (was 7 sequential queries)
+  const [
+    { count: totalActive },
+    { count: newThisMonth },
+    { count: previousNew },
+    { data: appointmentsThisMonth },
+    { data: appointmentsPrevMonth },
+    { count: totalAppointments },
+    { count: referrals },
+  ] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appointmentsThisMonth || []).map((a: any) => a.patient_id)
-  ).size
+    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).gte('created_at', startOfPrevMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfMonth.toISOString()),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfPrevMonth.toISOString()).lt('start_time', startOfMonth.toISOString()),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).eq('referral_source', 'referral').gte('created_at', startOfMonth.toISOString()),
+  ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: appointmentsPrevMonth } = await (supabase as any)
-    .from('appointments')
-    .select('patient_id')
-    .gte('start_time', startOfPrevMonth.toISOString())
-    .lt('start_time', startOfMonth.toISOString())
+  const uniquePatientsThisMonth = new Set((appointmentsThisMonth || []).map((a: any) => a.patient_id)).size
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uniquePatientsPrevMonth = new Set((appointmentsPrevMonth || []).map((a: any) => a.patient_id)).size
 
-  const uniquePatientsPrevMonth = new Set(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appointmentsPrevMonth || []).map((a: any) => a.patient_id)
-  ).size
-
-  // Calculate retention rate (returning / total active)
   const retentionRate = totalActive ? Math.round((uniquePatientsThisMonth / totalActive) * 100) : 0
   const previousRetention = totalActive ? Math.round((uniquePatientsPrevMonth / totalActive) * 100) : 0
-
-  // Average visits per patient
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: totalAppointments } = await (supabase as any)
-    .from('appointments')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'completed')
-
   const averageVisits = totalActive ? Number(((totalAppointments || 0) / totalActive).toFixed(1)) : 0
-
-  // Referrals (patients with referral source)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: referrals } = await (supabase as any)
-    .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .eq('referral_source', 'referral')
-    .gte('created_at', startOfMonth.toISOString())
 
   return {
     totalActive: totalActive || 0,

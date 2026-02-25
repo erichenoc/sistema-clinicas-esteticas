@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getConsentTemplates, getSignedConsents, getConsentStats } from '@/actions/consents'
 import { ConsentimientosClient } from './_components/consentimientos-client'

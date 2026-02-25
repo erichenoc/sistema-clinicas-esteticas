@@ -80,6 +80,7 @@ export async function getPatients(): Promise<PatientData[]> {
     .select('*')
     .order('first_name', { ascending: true })
     .order('last_name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching patients:', error)

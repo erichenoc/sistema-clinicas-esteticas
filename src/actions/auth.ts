@@ -164,3 +164,134 @@ export async function resetPassword(formData: FormData) {
   revalidatePath('/', 'layout')
   redirect('/login')
 }
+
+// Obtener datos del perfil del usuario autenticado
+export async function getProfile(): Promise<{
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  role: string
+} | null> {
+  const supabase = await createClient()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+
+  if (!authUser) return null
+
+  const adminClient = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: userData } = await (adminClient as any)
+    .from('users')
+    .select('first_name, last_name, email, phone, role')
+    .eq('id', authUser.id)
+    .single()
+
+  if (userData) {
+    return {
+      firstName: userData.first_name || '',
+      lastName: userData.last_name || '',
+      email: userData.email || authUser.email || '',
+      phone: userData.phone || '',
+      role: userData.role || 'receptionist',
+    }
+  }
+
+  // Fallback a user_metadata si no hay registro en users
+  return {
+    firstName: authUser.user_metadata?.first_name || '',
+    lastName: authUser.user_metadata?.last_name || '',
+    email: authUser.email || '',
+    phone: authUser.user_metadata?.phone || '',
+    role: 'receptionist',
+  }
+}
+
+// Actualizar datos de perfil del usuario autenticado
+export async function updateProfile(data: {
+  firstName: string
+  lastName: string
+  phone: string
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+
+  if (!authUser) {
+    return { success: false, error: 'No autorizado' }
+  }
+
+  const adminClient = createAdminClient()
+
+  // Actualizar user_metadata en Supabase Auth
+  const { error: authError } = await adminClient.auth.admin.updateUserById(
+    authUser.id,
+    {
+      user_metadata: {
+        ...authUser.user_metadata,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone,
+      },
+    }
+  )
+
+  if (authError) {
+    return { success: false, error: authError.message }
+  }
+
+  // Actualizar tabla users si existe el registro
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (adminClient as any)
+      .from('users')
+      .update({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', authUser.id)
+  } catch {
+    // Si la tabla users no tiene el registro o falla, no bloqueamos la operacion
+  }
+
+  revalidatePath('/perfil')
+  return { success: true }
+}
+
+// Cambiar contrasena del usuario autenticado
+export async function changePassword(data: {
+  currentPassword: string
+  newPassword: string
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // Verificar usuario autenticado
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser || !authUser.email) {
+    return { success: false, error: 'No autorizado' }
+  }
+
+  // Verificar contrasena actual intentando iniciar sesion
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: authUser.email,
+    password: data.currentPassword,
+  })
+
+  if (signInError) {
+    return { success: false, error: 'La contrasena actual es incorrecta' }
+  }
+
+  // Actualizar a la nueva contrasena usando el admin client
+  const adminClient = createAdminClient()
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(
+    authUser.id,
+    { password: data.newPassword }
+  )
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  return { success: true }
+}

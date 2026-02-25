@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getProfessionals, getCommissions, getAttendanceLogs, getProfessionalStats } from '@/actions/professionals'
 import { ProfesionalesClient } from './_components/profesionales-client'

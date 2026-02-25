@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { TreatmentsClient } from './_components/treatments-client'
 import { getTreatments, getCategories } from '@/actions/treatments'

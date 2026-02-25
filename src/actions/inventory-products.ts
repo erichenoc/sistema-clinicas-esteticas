@@ -225,6 +225,7 @@ export async function getProducts(options?: {
     .from('products')
     .select('*')
     .order('name', { ascending: true })
+    .limit(500)
 
   if (options?.categoryId) {
     query = query.eq('category', options.categoryId)

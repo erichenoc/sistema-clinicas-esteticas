@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
-import { Search, LayoutGrid, List } from 'lucide-react'
+import { Search, LayoutGrid, List, Users } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -130,15 +130,37 @@ export default async function PacientesPage() {
         </div>
 
         <TabsContent value="grid" className="mt-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {patients.map((patient) => (
-              <PatientCard key={patient.id} patient={patient} />
-            ))}
-          </div>
+          {patients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border bg-card py-16 text-center">
+              <Users className="mb-3 h-10 w-10 text-muted-foreground/50" />
+              <p className="text-sm font-medium text-muted-foreground">No hay pacientes registrados</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">Registra tu primer paciente para comenzar</p>
+              <a href="/pacientes/nuevo" className="mt-4 inline-flex items-center rounded-lg bg-[#A67C52] px-4 py-2 text-sm font-medium text-white hover:bg-[#8a6543]">
+                Nuevo Paciente
+              </a>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {patients.map((patient) => (
+                <PatientCard key={patient.id} patient={patient} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="list" className="mt-4">
-          <PatientTable patients={patients} />
+          {patients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border bg-card py-16 text-center">
+              <Users className="mb-3 h-10 w-10 text-muted-foreground/50" />
+              <p className="text-sm font-medium text-muted-foreground">No hay pacientes registrados</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">Registra tu primer paciente para comenzar</p>
+              <a href="/pacientes/nuevo" className="mt-4 inline-flex items-center rounded-lg bg-[#A67C52] px-4 py-2 text-sm font-medium text-white hover:bg-[#8a6543]">
+                Nuevo Paciente
+              </a>
+            </div>
+          ) : (
+            <PatientTable patients={patients} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

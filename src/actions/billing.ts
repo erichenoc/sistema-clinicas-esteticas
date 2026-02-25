@@ -100,6 +100,7 @@ export async function getInvoices(options?: {
       )
     `)
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (options?.startDate) {
     query = query.gte('created_at', options.startDate)

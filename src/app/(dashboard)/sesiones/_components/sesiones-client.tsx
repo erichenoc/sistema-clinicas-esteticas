@@ -47,6 +47,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { SessionListItem } from '@/types/sessions'
 import { SESSION_STATUS_OPTIONS, formatSessionDuration } from '@/types/sessions'
@@ -69,20 +79,30 @@ export function SesionesClient({ sessions, professionals, stats }: SesionesClien
   const [professionalFilter, setProfessionalFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(null)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [sessionToCancel, setSessionToCancel] = useState<{ id: string; patientName: string } | null>(null)
 
-  const handleCancelSession = async (sessionId: string, patientName: string) => {
-    setCancellingSessionId(sessionId)
+  const handleCancelClick = (sessionId: string, patientName: string) => {
+    setSessionToCancel({ id: sessionId, patientName })
+    setCancelDialogOpen(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!sessionToCancel) return
+    setCancelDialogOpen(false)
+    setCancellingSessionId(sessionToCancel.id)
     toast.loading('Cancelando sesion...', { id: 'cancel-session' })
 
-    const result = await cancelSession(sessionId, 'Cancelada por el usuario')
+    const result = await cancelSession(sessionToCancel.id, 'Cancelada por el usuario')
 
     toast.dismiss('cancel-session')
     if (result.success) {
-      toast.success(`Sesion de ${patientName} cancelada`)
+      toast.success(`Sesion de ${sessionToCancel.patientName} cancelada`)
     } else {
       toast.error(result.error || 'Error al cancelar la sesion')
     }
     setCancellingSessionId(null)
+    setSessionToCancel(null)
   }
 
   const filteredSessions = sessions.filter((session) => {
@@ -252,8 +272,24 @@ export function SesionesClient({ sessions, professionals, stats }: SesionesClien
                 <TableBody>
                   {filteredSessions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        No hay sesiones para mostrar
+                      <TableCell colSpan={7} className="py-12">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <Clock className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                          <p className="text-sm font-medium text-muted-foreground">No hay sesiones para mostrar</p>
+                          <p className="mt-1 text-xs text-muted-foreground/70">
+                            {searchQuery || statusFilter !== 'all' || professionalFilter !== 'all'
+                              ? 'Intenta ajustar los filtros de busqueda'
+                              : 'Crea una nueva sesion para comenzar'}
+                          </p>
+                          {!searchQuery && statusFilter === 'all' && professionalFilter === 'all' && (
+                            <Link href="/sesiones/nueva">
+                              <Button size="sm" className="mt-3 bg-[#A67C52] hover:bg-[#8a6543]">
+                                <Plus className="mr-1 h-4 w-4" />
+                                Nueva Sesion
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -330,7 +366,7 @@ export function SesionesClient({ sessions, professionals, stats }: SesionesClien
                               {session.status === 'in_progress' && (
                                 <DropdownMenuItem
                                   className="text-destructive"
-                                  onClick={() => handleCancelSession(session.id, session.patientName)}
+                                  onClick={() => handleCancelClick(session.id, session.patientName)}
                                   disabled={cancellingSessionId === session.id}
                                 >
                                   {cancellingSessionId === session.id ? (
@@ -369,6 +405,28 @@ export function SesionesClient({ sessions, professionals, stats }: SesionesClien
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogo de confirmacion para cancelar sesion */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar sesion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estas seguro de que quieres cancelar la sesion de{' '}
+              <strong>{sessionToCancel?.patientName}</strong>? Esta accion no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, mantener</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancel}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Si, cancelar sesion
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

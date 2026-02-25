@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 import { getPackages, getTreatmentsForPackages } from '@/actions/treatments'
 import { PaquetesClient } from './_components/paquetes-client'
