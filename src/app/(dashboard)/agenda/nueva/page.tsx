@@ -9,10 +9,9 @@ import {
   ArrowLeft,
   Loader2,
   Calendar,
-  Clock,
   User,
   Search,
-  Check,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +35,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -53,54 +51,43 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import {
   appointmentSchema,
   type AppointmentFormData,
-  generateTimeSlots,
 } from '@/lib/validations/appointments'
 import { DURATION_OPTIONS } from '@/types/appointments'
 import { cn } from '@/lib/utils'
-
-// Mock data
-const mockPatients = [
-  { id: '1', name: 'María García López', phone: '8095551234', email: 'maria@email.com' },
-  { id: '2', name: 'Ana Martínez Ruiz', phone: '8295552345', email: 'ana@email.com' },
-  { id: '3', name: 'Laura Hernández', phone: '8095553456', email: 'laura@email.com' },
-  { id: '4', name: 'Carmen Rodríguez Soto', phone: '8295554567', email: 'carmen@email.com' },
-  { id: '5', name: 'Patricia Morales', phone: '8095555678', email: 'paty@email.com' },
-]
-
-const mockProfessionals = [
-  { id: '1', name: 'Dra. Pamela Moquete', specialty: 'Medicina Estética', color: '#A67C52' },
-]
-
-const mockTreatments = [
-  { id: '1', name: 'Limpieza Facial Profunda', duration: 60, price: 80, category: 'Facial', categoryColor: '#ec4899' },
-  { id: '2', name: 'Botox - Frente', duration: 30, price: 350, category: 'Inyectables', categoryColor: '#06b6d4' },
-  { id: '3', name: 'Depilación Láser - Axilas', duration: 20, price: 120, category: 'Láser', categoryColor: '#ef4444' },
-  { id: '4', name: 'Hidratación Facial', duration: 45, price: 95, category: 'Facial', categoryColor: '#ec4899' },
-  { id: '5', name: 'Ácido Hialurónico - Labios', duration: 30, price: 400, category: 'Inyectables', categoryColor: '#06b6d4' },
-]
-
-const mockRooms = [
-  { id: '1', name: 'Cabina 1', color: '#ec4899' },
-  { id: '2', name: 'Cabina 2', color: '#3b82f6' },
-  { id: '3', name: 'Sala Láser', color: '#ef4444' },
-  { id: '4', name: 'Quirófano', color: '#8b5cf6' },
-]
+import {
+  createAppointment,
+  getAppointments,
+  getProfessionals,
+  getRooms,
+  type ProfessionalData,
+  type RoomData,
+} from '@/actions/appointments'
+import { getPatients, type PatientData } from '@/actions/patients'
+import { getTreatments, type TreatmentListItemData } from '@/actions/treatments'
 
 function NuevaCitaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
   const [patientSearchOpen, setPatientSearchOpen] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState<typeof mockPatients[0] | null>(null)
-  const [selectedTreatment, setSelectedTreatment] = useState<typeof mockTreatments[0] | null>(null)
-  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(null)
+  const [selectedTreatment, setSelectedTreatment] = useState<TreatmentListItemData | null>(null)
+  const [bookingConflict, setBookingConflict] = useState<string | null>(null)
+
+  // Real data from DB
+  const [patients, setPatients] = useState<PatientData[]>([])
+  const [professionals, setProfessionals] = useState<ProfessionalData[]>([])
+  const [treatments, setTreatments] = useState<TreatmentListItemData[]>([])
+  const [rooms, setRooms] = useState<RoomData[]>([])
 
   const preselectedPatientId = searchParams.get('paciente')
 
@@ -124,40 +111,98 @@ function NuevaCitaContent() {
   const watchDate = form.watch('scheduledAt')
   const watchProfessional = form.watch('professionalId')
   const watchTreatment = form.watch('treatmentId')
+  const watchDuration = form.watch('durationMinutes')
 
-  // Cargar paciente preseleccionado
+  // Load all reference data on mount
   useEffect(() => {
-    if (preselectedPatientId) {
-      const patient = mockPatients.find(p => p.id === preselectedPatientId)
+    async function loadData() {
+      setIsLoadingData(true)
+      const [patientsData, professionalsData, treatmentsData, roomsData] = await Promise.all([
+        getPatients(),
+        getProfessionals(),
+        getTreatments({ isActive: true }),
+        getRooms(),
+      ])
+      setPatients(patientsData)
+      setProfessionals(professionalsData)
+      setTreatments(treatmentsData)
+      setRooms(roomsData)
+      setIsLoadingData(false)
+    }
+    loadData()
+  }, [])
+
+  // Apply preselected patient once patients are loaded
+  useEffect(() => {
+    if (preselectedPatientId && patients.length > 0) {
+      const patient = patients.find(p => p.id === preselectedPatientId)
       if (patient) {
         setSelectedPatient(patient)
         form.setValue('patientId', patient.id)
       }
     }
-  }, [preselectedPatientId, form])
+  }, [preselectedPatientId, patients, form])
 
-  // Actualizar tratamiento seleccionado
+  // Update duration when treatment changes
   useEffect(() => {
     if (watchTreatment) {
-      const treatment = mockTreatments.find(t => t.id === watchTreatment)
+      const treatment = treatments.find(t => t.id === watchTreatment)
       if (treatment) {
         setSelectedTreatment(treatment)
-        form.setValue('durationMinutes', treatment.duration)
+        form.setValue('durationMinutes', treatment.duration_minutes)
         form.setValue('treatmentName', treatment.name)
       }
     }
-  }, [watchTreatment, form])
+  }, [watchTreatment, treatments, form])
 
-  // Generar slots disponibles
+  // Check for double-booking when professional, date, or duration changes
   useEffect(() => {
-    if (watchDate && watchProfessional) {
-      // TODO: Consultar disponibilidad real del profesional
-      const slots = generateTimeSlots('09:00', '20:00', 30)
-      setAvailableSlots(slots)
-    }
-  }, [watchDate, watchProfessional])
+    async function checkConflicts() {
+      if (!watchProfessional || !watchDate) {
+        setBookingConflict(null)
+        return
+      }
 
-  const handlePatientSelect = (patient: typeof mockPatients[0]) => {
+      const newStart = new Date(watchDate).getTime()
+      const newEnd = newStart + watchDuration * 60000
+
+      // Fetch that professional's appointments for the same day
+      const dayStart = new Date(watchDate)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(watchDate)
+      dayEnd.setHours(23, 59, 59, 999)
+
+      const existing = await getAppointments({
+        professionalId: watchProfessional,
+        startDate: dayStart.toISOString(),
+        endDate: dayEnd.toISOString(),
+      })
+
+      const conflict = existing.find(apt => {
+        if (apt.status === 'cancelled' || apt.status === 'no_show') return false
+        const aptStart = new Date(apt.scheduled_at).getTime()
+        const aptEnd = new Date(apt.end_at).getTime()
+        // Overlap: new starts before existing ends AND new ends after existing starts
+        return newStart < aptEnd && newEnd > aptStart
+      })
+
+      if (conflict) {
+        const conflictTime = new Date(conflict.scheduled_at).toLocaleTimeString('es-DO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        setBookingConflict(
+          `El profesional ya tiene una cita con ${conflict.patient_name} a las ${conflictTime} (${conflict.treatment_display_name || 'sin tratamiento'})`
+        )
+      } else {
+        setBookingConflict(null)
+      }
+    }
+
+    checkConflicts()
+  }, [watchProfessional, watchDate, watchDuration])
+
+  const handlePatientSelect = (patient: PatientData) => {
     setSelectedPatient(patient)
     form.setValue('patientId', patient.id)
     setPatientSearchOpen(false)
@@ -170,20 +215,57 @@ function NuevaCitaContent() {
     }).format(price)
   }
 
+  const getPatientInitials = (patient: PatientData) => {
+    return `${patient.first_name[0] || ''}${patient.last_name[0] || ''}`.toUpperCase()
+  }
+
+  const getPatientFullName = (patient: PatientData) => {
+    return `${patient.first_name} ${patient.last_name}`.trim()
+  }
+
   async function onSubmit(data: AppointmentFormData) {
+    if (bookingConflict) {
+      toast.error('Resuelve el conflicto de horario antes de continuar')
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // TODO: Llamar a Server Action para crear cita
-      console.log('Appointment data:', data)
+      const result = await createAppointment({
+        patient_id: data.patientId,
+        professional_id: data.professionalId,
+        treatment_id: data.treatmentId || undefined,
+        treatment_name: data.treatmentName || undefined,
+        scheduled_at: data.scheduledAt,
+        duration_minutes: data.durationMinutes,
+        room_id: data.roomId && data.roomId !== 'none' ? data.roomId : undefined,
+        buffer_minutes: data.bufferMinutes || 0,
+        notes: data.notes || undefined,
+        patient_notes: data.patientNotes || undefined,
+        is_recurring: data.isRecurring || false,
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
 
       toast.success('Cita creada exitosamente')
       router.push('/agenda')
-    } catch (error) {
-      toast.error('Error al crear la cita')
+    } catch {
+      toast.error('Ocurrió un error inesperado al crear la cita')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -222,11 +304,11 @@ function NuevaCitaContent() {
                       <div className="flex items-center gap-3">
                         <Avatar>
                           <AvatarFallback>
-                            {selectedPatient.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {getPatientInitials(selectedPatient)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">{selectedPatient.name}</p>
+                          <p className="font-medium">{getPatientFullName(selectedPatient)}</p>
                           <p className="text-sm text-muted-foreground">
                             {selectedPatient.phone}
                           </p>
@@ -258,18 +340,19 @@ function NuevaCitaContent() {
                           <CommandList>
                             <CommandEmpty>No se encontraron pacientes</CommandEmpty>
                             <CommandGroup>
-                              {mockPatients.map((patient) => (
+                              {patients.map((patient) => (
                                 <CommandItem
                                   key={patient.id}
+                                  value={`${patient.first_name} ${patient.last_name} ${patient.phone}`}
                                   onSelect={() => handlePatientSelect(patient)}
                                 >
                                   <Avatar className="h-8 w-8 mr-2">
                                     <AvatarFallback className="text-xs">
-                                      {patient.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                      {getPatientInitials(patient)}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1">
-                                    <p className="text-sm font-medium">{patient.name}</p>
+                                    <p className="text-sm font-medium">{getPatientFullName(patient)}</p>
                                     <p className="text-xs text-muted-foreground">{patient.phone}</p>
                                   </div>
                                 </CommandItem>
@@ -311,18 +394,18 @@ function NuevaCitaContent() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockTreatments.map((treatment) => (
+                            {treatments.map((treatment) => (
                               <SelectItem key={treatment.id} value={treatment.id}>
                                 <div className="flex items-center justify-between w-full gap-4">
                                   <div className="flex items-center gap-2">
                                     <span
-                                      className="h-2 w-2 rounded-full"
-                                      style={{ backgroundColor: treatment.categoryColor }}
+                                      className="h-2 w-2 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: treatment.category_color || '#A67C52' }}
                                     />
                                     <span>{treatment.name}</span>
                                   </div>
                                   <span className="text-muted-foreground">
-                                    {treatment.duration} min
+                                    {treatment.duration_minutes} min
                                   </span>
                                 </div>
                               </SelectItem>
@@ -339,14 +422,14 @@ function NuevaCitaContent() {
                       <div>
                         <Badge
                           style={{
-                            backgroundColor: selectedTreatment.categoryColor + '20',
-                            color: selectedTreatment.categoryColor,
+                            backgroundColor: (selectedTreatment.category_color || '#A67C52') + '20',
+                            color: selectedTreatment.category_color || '#A67C52',
                           }}
                         >
-                          {selectedTreatment.category}
+                          {selectedTreatment.category_name || 'Sin categoría'}
                         </Badge>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Duración: {selectedTreatment.duration} minutos
+                          Duración: {selectedTreatment.duration_minutes} minutos
                         </p>
                       </div>
                       <p className="text-lg font-bold text-primary">
@@ -467,6 +550,14 @@ function NuevaCitaContent() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Double-booking conflict alert */}
+                  {bookingConflict && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{bookingConflict}</AlertDescription>
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
 
@@ -489,16 +580,13 @@ function NuevaCitaContent() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockProfessionals.map((prof) => (
+                            {professionals.map((prof) => (
                               <SelectItem key={prof.id} value={prof.id}>
                                 <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-2 w-2 rounded-full"
-                                    style={{ backgroundColor: prof.color }}
-                                  />
-                                  <span>{prof.name}</span>
-                                  <span className="text-muted-foreground">
-                                    ({prof.specialty})
+                                  <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                                  <span>{prof.full_name}</span>
+                                  <span className="text-muted-foreground capitalize">
+                                    ({prof.role})
                                   </span>
                                 </div>
                               </SelectItem>
@@ -535,11 +623,11 @@ function NuevaCitaContent() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">Sin sala asignada</SelectItem>
-                            {mockRooms.map((room) => (
+                            {rooms.map((room) => (
                               <SelectItem key={room.id} value={room.id}>
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className="h-3 w-3 rounded"
+                                    className="h-3 w-3 rounded flex-shrink-0"
                                     style={{ backgroundColor: room.color }}
                                   />
                                   {room.name}
@@ -564,7 +652,7 @@ function NuevaCitaContent() {
                   <CardContent className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Paciente</span>
-                      <span className="font-medium">{selectedPatient.name}</span>
+                      <span className="font-medium">{getPatientFullName(selectedPatient)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Tratamiento</span>
@@ -594,7 +682,11 @@ function NuevaCitaContent() {
             <Button type="button" variant="outline" asChild>
               <Link href="/agenda">Cancelar</Link>
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading || !!bookingConflict}
+              className={cn(bookingConflict && 'opacity-50 cursor-not-allowed')}
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Crear Cita
             </Button>

@@ -79,6 +79,7 @@ export async function getStockReportData(period: ReportPeriod = 'month'): Promis
     .from('products')
     .select('*')
     .order('name')
+    .limit(500)
 
   if (error) {
     console.error('Error fetching products for stock report:', error)
@@ -355,6 +356,7 @@ export async function getExpirationReportData(): Promise<ExpirationReportData> {
     `)
     .gt('current_quantity', 0)
     .order('expiry_date', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching lots:', error)
@@ -490,6 +492,7 @@ export async function getPurchaseReportData(period: ReportPeriod = 'month'): Pro
     `)
     .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching purchase orders:', error)
@@ -605,6 +608,7 @@ export async function getCountReportData(period: ReportPeriod = 'month'): Promis
     .select('*')
     .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching inventory counts:', error)

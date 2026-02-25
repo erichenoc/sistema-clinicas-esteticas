@@ -123,6 +123,7 @@ export async function getSessions(options?: {
       session_products (total_cost)
     `)
     .order('started_at', { ascending: false })
+    .limit(500)
 
   if (options?.patientId) {
     query = query.eq('patient_id', options.patientId)
@@ -458,6 +459,7 @@ export async function getSessionStats(): Promise<{
   const { data: sessions } = await (supabase as any)
     .from('sessions')
     .select('id, status, started_at')
+    .limit(500)
 
   if (!sessions) {
     return {
@@ -528,6 +530,7 @@ export async function getSessionNotes(sessionId: string): Promise<ClinicalNoteDa
     .select('*')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: false })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching clinical notes:', error)
@@ -715,6 +718,7 @@ export async function getSessionImages(sessionId: string): Promise<SessionImageD
     .eq('session_id', sessionId)
     .order('type', { ascending: true })
     .order('sort_order', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching session images:', error)
@@ -753,9 +757,7 @@ export async function getPatientImages(
     query = query.eq('type', options.type)
   }
 
-  if (options?.limit) {
-    query = query.limit(options.limit)
-  }
+  query = query.limit(options?.limit || 200)
 
   const { data, error } = await query
 
@@ -914,6 +916,7 @@ export async function getPatientPhotoHistory(
     .eq('patient_id', patientId)
     .not('session_images', 'is', null)
     .order('started_at', { ascending: false })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching patient photo history:', error)

@@ -118,6 +118,7 @@ export async function getConsentTemplates(options?: {
   const { data: signedCounts } = await (supabase as any)
     .from('signed_consents')
     .select('template_id, status')
+    .limit(500)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((t: any) => {
@@ -194,6 +195,7 @@ export async function getSignedConsents(options?: {
       )
     `)
     .order('patient_signed_at', { ascending: false })
+    .limit(500)
 
   if (options?.patientId) {
     query = query.eq('patient_id', options.patientId)
@@ -414,11 +416,13 @@ export async function getConsentStats(): Promise<{
     .from('consent_templates')
     .select('id, is_active')
     .eq('is_current', true)
+    .limit(100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: consents } = await (supabase as any)
     .from('signed_consents')
     .select('id, status, expires_at')
+    .limit(500)
 
   const now = new Date()
   const totalTemplates = templates?.length || 0

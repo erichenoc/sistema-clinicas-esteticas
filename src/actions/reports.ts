@@ -124,6 +124,7 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
     .select('total, subtotal')
     .eq('status', 'paid')
     .gte('created_at', startDate.toISOString())
+    .limit(500)
 
   // Get previous period sales
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,6 +134,7 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
     .eq('status', 'paid')
     .gte('created_at', previousStartDate.toISOString())
     .lt('created_at', previousEndDate.toISOString())
+    .limit(500)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalRevenue = (currentSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
@@ -181,6 +183,7 @@ export async function getRevenueByCategory(): Promise<RevenueByCategory[]> {
         )
       )
     `)
+    .limit(500)
 
   // Aggregate by category
   const categoryMap = new Map<string, { amount: number; color: string }>()
@@ -253,6 +256,7 @@ export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
         .eq('status', 'paid')
         .gte('created_at', startDate.toISOString())
         .lt('created_at', endDate.toISOString())
+        .limit(500)
     )
   )
 
@@ -293,9 +297,9 @@ export async function getPatientStats(): Promise<PatientStats> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('patients').select('*', { count: 'exact', head: true }).gte('created_at', startOfPrevMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfMonth.toISOString()),
+    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfMonth.toISOString()).limit(500),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfPrevMonth.toISOString()).lt('start_time', startOfMonth.toISOString()),
+    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfPrevMonth.toISOString()).lt('start_time', startOfMonth.toISOString()).limit(500),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -336,6 +340,7 @@ export async function getPatientsByAgeGroup(): Promise<PatientsByAgeGroup[]> {
     .from('patients')
     .select('date_of_birth')
     .eq('status', 'active')
+    .limit(500)
 
   const now = new Date()
   const groups = {
@@ -386,6 +391,7 @@ export async function getTopTreatments(): Promise<TopTreatment[]> {
       treatment_id
     `)
     .not('treatment_id', 'is', null)
+    .limit(500)
 
   // Aggregate by treatment
   const treatmentMap = new Map<string, { sessions: number; revenue: number }>()
@@ -440,6 +446,7 @@ export async function getAppointmentStats(): Promise<AppointmentStats> {
     .from('appointments')
     .select('status, start_time, end_time')
     .gte('start_time', startOfMonth.toISOString())
+    .limit(500)
 
   const total = appointments?.length || 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -515,6 +522,7 @@ export async function getProfessionalPerformance(): Promise<ProfessionalPerforma
     .select('id, full_name')
     .eq('role', 'professional')
     .eq('is_active', true)
+    .limit(100)
 
   if (!professionals || professionals.length === 0) {
     return []
@@ -538,6 +546,7 @@ export async function getProfessionalPerformance(): Promise<ProfessionalPerforma
       .from('professional_commissions')
       .select('commission_amount, sale_amount')
       .eq('professional_id', prof.id)
+      .limit(500)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const totalRevenue = (commissions || []).reduce((sum: number, c: any) => sum + (c.sale_amount || 0), 0)
@@ -571,6 +580,7 @@ export async function getInventoryAlerts(): Promise<InventoryAlert[]> {
     .select('name, current_stock, min_stock')
     .eq('is_active', true)
     .or('current_stock.lte.min_stock')
+    .limit(100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (products || [])
@@ -603,6 +613,7 @@ export async function getInventoryStats(): Promise<{
     .from('products')
     .select('current_stock, cost_price, min_stock')
     .eq('is_active', true)
+    .limit(500)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalValue = (products || []).reduce((sum: number, p: any) =>

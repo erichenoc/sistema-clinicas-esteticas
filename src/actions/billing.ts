@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Tipos - Aligned with actual database schema
 export type InvoiceStatus = 'pending' | 'paid' | 'partial' | 'cancelled' | 'overdue'
@@ -233,8 +234,7 @@ export async function createInvoice(
     .single()
 
   if (error) {
-    console.error('Error creating invoice:', error)
-    return { data: null, error: `Error al crear la factura: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear la factura') }
   }
 
   revalidatePath('/facturacion')
@@ -328,6 +328,7 @@ export async function getPaymentsByInvoice(invoiceId: string): Promise<PaymentDa
     .select('*')
     .eq('invoice_id', invoiceId)
     .order('payment_date', { ascending: false })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching payments:', error)
@@ -382,6 +383,7 @@ export async function registerPayment(
     .from('payments')
     .select('amount')
     .eq('invoice_id', invoiceId)
+    .limit(100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalPaid = payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0
@@ -432,6 +434,7 @@ export async function getBillingStats(): Promise<BillingStats> {
       )
     `)
     .neq('status', 'cancelled') // Excluir facturas anuladas
+    .limit(500)
 
   if (!invoices) {
     return {
@@ -523,6 +526,7 @@ export async function getInvoiceItems(invoiceId: string): Promise<InvoiceItemDat
     .select('*')
     .eq('invoice_id', invoiceId)
     .order('created_at', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching invoice items:', error)
@@ -591,6 +595,7 @@ async function recalculateInvoiceTotals(invoiceId: string): Promise<void> {
     .from('invoice_items')
     .select('subtotal, tax_percent, unit_price, quantity, discount_percent')
     .eq('invoice_id', invoiceId)
+    .limit(100)
 
   if (!items || items.length === 0) return
 

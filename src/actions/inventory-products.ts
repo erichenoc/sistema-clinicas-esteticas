@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Tipos
 export type ProductType = 'consumable' | 'retail' | 'equipment' | 'injectable' | 'topical'
@@ -121,6 +122,7 @@ export async function getProductCategories(): Promise<ProductCategoryData[]> {
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching product categories:', error)
@@ -160,8 +162,7 @@ export async function createProductCategory(
     .single()
 
   if (error) {
-    console.error('Error creating product category:', error)
-    return { data: null, error: `Error al crear la categoria: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear la categoria') }
   }
 
   revalidatePath('/inventario')
@@ -177,6 +178,7 @@ export async function initializeDefaultCategories(): Promise<{ created: number; 
   const { data: existing } = await (supabase as any)
     .from('product_categories')
     .select('name')
+    .limit(100)
 
   const existingNames = new Set((existing || []).map((c: { name: string }) => c.name))
 
@@ -390,8 +392,7 @@ export async function createProduct(
     .single()
 
   if (error) {
-    console.error('Error creating product:', error)
-    return { data: null, error: `Error al crear el producto: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear el producto') }
   }
 
   revalidatePath('/inventario')
@@ -433,8 +434,7 @@ export async function updateProduct(
     .single()
 
   if (error) {
-    console.error('Error updating product:', error)
-    return { data: null, error: `Error al actualizar el producto: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar el producto') }
   }
 
   revalidatePath('/inventario')
@@ -484,6 +484,7 @@ export async function getInventoryStats(): Promise<InventoryStats> {
       )
     `)
     .eq('is_active', true)
+    .limit(500)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: expiringLots } = await (supabase as any)
@@ -492,6 +493,7 @@ export async function getInventoryStats(): Promise<InventoryStats> {
     .gt('current_quantity', 0)
     .lte('expiry_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
     .gt('expiry_date', new Date().toISOString().split('T')[0])
+    .limit(100)
 
   let totalProducts = 0
   let lowStockCount = 0

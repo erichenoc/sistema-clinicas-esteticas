@@ -44,6 +44,7 @@ export async function getProductLots(options?: {
       products (name, sku)
     `)
     .order('expiry_date', { ascending: true })
+    .limit(500)
 
   if (options?.productId) {
     query = query.eq('product_id', options.productId)
@@ -156,6 +157,7 @@ export async function getLotsForList(): Promise<LotListItemData[]> {
       )
     `)
     .order('expiry_date', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching lots for list:', error)
@@ -212,6 +214,7 @@ export async function getLotStats(): Promise<LotStats> {
   const { data: lots, error } = await (supabase as any)
     .from('product_lots')
     .select('current_quantity, unit_cost, expiry_date, status')
+    .limit(500)
 
   if (error) {
     console.error('Error fetching lot stats:', error)
@@ -267,6 +270,7 @@ export async function getProductsForLots(): Promise<ProductForLot[]> {
     .eq('is_active', true)
     .eq('requires_lot_tracking', true)
     .order('name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching products for lots:', error)
@@ -295,6 +299,7 @@ export async function getSuppliersForLots(): Promise<SupplierForLot[]> {
     .select('id, name')
     .eq('is_active', true)
     .order('name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching suppliers:', error)

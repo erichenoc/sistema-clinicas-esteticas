@@ -121,6 +121,7 @@ export async function getProfessionals(options?: {
     .select('*')
     .eq('is_professional', true)
     .order('first_name', { ascending: true })
+    .limit(500)
 
   // Filter by is_active if status is provided
   if (options?.status === 'active') {
@@ -532,6 +533,7 @@ export async function getCommissions(options?: {
         )
       `)
       .order('created_at', { ascending: false })
+      .limit(500)
 
     if (options?.professionalId) {
       query = query.eq('professional_id', options.professionalId)
@@ -580,6 +582,7 @@ export async function getAllCommissionsWithProfessionals(): Promise<{
       .eq('is_professional', true)
       .eq('is_active', true)
       .order('first_name', { ascending: true })
+      .limit(500)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const professionals = (users || []).map((u: any) => ({
@@ -594,6 +597,7 @@ export async function getAllCommissionsWithProfessionals(): Promise<{
       .from('commissions')
       .select('*')
       .order('created_at', { ascending: false })
+      .limit(500)
 
     // Map professional names to commissions
     const professionalMap = new Map(professionals.map((p: { id: string; name: string }) => [p.id, p.name]))
@@ -783,6 +787,7 @@ export async function getAttendanceLogs(options?: {
       .select('*')
       .order('date', { ascending: false })
       .order('clock_in', { ascending: false })
+      .limit(500)
 
     if (options?.professionalId) {
       query = query.eq('professional_id', options.professionalId)
@@ -897,6 +902,7 @@ export async function getProfessionalStats(): Promise<{
     .from('users')
     .select('id, is_active')
     .eq('is_professional', true)
+    .limit(500)
 
   // Note: commissions table may not exist, handle gracefully
   let commissions: { id: string; status: string; commission_amount: number }[] = []
@@ -906,6 +912,7 @@ export async function getProfessionalStats(): Promise<{
       .from('commissions')
       .select('id, status, commission_amount')
       .in('status', ['pending', 'approved'])
+      .limit(500)
     commissions = data || []
   } catch {
     // Table doesn't exist, use empty array
@@ -962,6 +969,7 @@ export async function getProfessionalSchedule(professionalId: string): Promise<W
       .from('professional_schedules')
       .select('*')
       .eq('professional_id', professionalId)
+      .limit(7)
 
     if (error) {
       console.error('Error fetching schedule:', error)

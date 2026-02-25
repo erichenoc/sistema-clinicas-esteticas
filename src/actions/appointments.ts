@@ -9,6 +9,7 @@ import {
   deleteGoogleCalendarEvent,
   isGoogleCalendarConnected,
 } from '@/actions/google-calendar'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Tipos
 export interface AppointmentData {
@@ -269,6 +270,7 @@ export async function getAppointmentStats(date?: Date): Promise<{
     .select('status')
     .gte('scheduled_at', startOfDay.toISOString())
     .lte('scheduled_at', endOfDay.toISOString())
+    .limit(100)
 
   if (error) {
     console.error('Error fetching appointment stats:', error)
@@ -390,8 +392,7 @@ export async function createAppointment(
     .single()
 
   if (error) {
-    console.error('Error creating appointment:', error)
-    return { data: null, error: `Error al crear la cita: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear la cita') }
   }
 
   const created = data as AppointmentData
@@ -475,8 +476,7 @@ export async function updateAppointment(
     .single()
 
   if (error) {
-    console.error('Error updating appointment:', error)
-    return { data: null, error: `Error al actualizar la cita: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar la cita') }
   }
 
   const updated = data as AppointmentData
@@ -558,8 +558,7 @@ export async function updateAppointmentStatus(
     .eq('id', id)
 
   if (error) {
-    console.error('Error updating appointment status:', error)
-    return { success: false, error: `Error al actualizar el estado de la cita: ${error.message}` }
+    return { success: false, error: sanitizeError(error, 'Error al actualizar el estado de la cita') }
   }
 
   // Google Calendar sync on cancellation - non-blocking
@@ -655,6 +654,7 @@ export async function getProfessionals(): Promise<ProfessionalData[]> {
     .in('role', ['doctor', 'nurse', 'admin', 'owner'])
     .eq('is_active', true)
     .order('first_name')
+    .limit(500)
 
   if (error) {
     console.error('Error fetching professionals:', error)
@@ -674,6 +674,7 @@ export async function getRooms(): Promise<RoomData[]> {
     .select('*')
     .eq('is_active', true)
     .order('sort_order')
+    .limit(100)
 
   if (error) {
     console.error('Error fetching rooms:', error)

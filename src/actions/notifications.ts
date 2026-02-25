@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Types
 export type NotificationType =
@@ -70,9 +71,7 @@ export async function getNotifications(options?: {
     query = query.or(`user_id.eq.${options.userId},user_id.is.null`)
   }
 
-  if (options?.limit) {
-    query = query.limit(options.limit)
-  }
+  query = query.limit(options?.limit || 100)
 
   const { data, error } = await query
 
@@ -135,8 +134,7 @@ export async function createNotification(
     .single()
 
   if (error) {
-    console.error('[Notifications] Error creating:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al crear la notificacion') }
   }
 
   revalidatePath('/', 'layout')
@@ -159,8 +157,7 @@ export async function markNotificationAsRead(
     .eq('id', id)
 
   if (error) {
-    console.error('[Notifications] Error marking as read:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al marcar la notificacion como leida') }
   }
 
   revalidatePath('/', 'layout')
@@ -191,8 +188,7 @@ export async function markAllNotificationsAsRead(
   const { error } = await query
 
   if (error) {
-    console.error('[Notifications] Error marking all as read:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al marcar todas las notificaciones como leidas') }
   }
 
   revalidatePath('/', 'layout')
@@ -212,8 +208,7 @@ export async function deleteNotification(
     .eq('id', id)
 
   if (error) {
-    console.error('[Notifications] Error deleting:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al eliminar la notificacion') }
   }
 
   revalidatePath('/', 'layout')
@@ -240,8 +235,7 @@ export async function deleteOldNotifications(
     .select('id')
 
   if (error) {
-    console.error('[Notifications] Error deleting old:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al eliminar notificaciones antiguas') }
   }
 
   return { success: true, deletedCount: data?.length || 0 }

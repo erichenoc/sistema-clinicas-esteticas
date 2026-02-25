@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Tipos para paquetes
 export interface PackageTreatmentItem {
@@ -132,8 +133,7 @@ export async function createPackage(data: {
     .single()
 
   if (error) {
-    console.error('Error creating package:', error)
-    return { data: null, error: error.message }
+    return { data: null, error: sanitizeError(error, 'Error al crear el paquete') }
   }
 
   revalidatePath('/paquetes')
@@ -164,8 +164,7 @@ export async function updatePackage(
     .single()
 
   if (error) {
-    console.error('Error updating package:', error)
-    return { data: null, error: error.message }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar el paquete') }
   }
 
   revalidatePath('/paquetes')
@@ -183,8 +182,7 @@ export async function deletePackage(id: string): Promise<{ error: string | null 
     .eq('id', id)
 
   if (error) {
-    console.error('Error deleting package:', error)
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Error al eliminar el paquete') }
   }
 
   revalidatePath('/paquetes')
@@ -204,8 +202,7 @@ export async function togglePackageStatus(
     .eq('id', id)
 
   if (error) {
-    console.error('Error toggling package status:', error)
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Error al cambiar el estado del paquete') }
   }
 
   revalidatePath('/paquetes')

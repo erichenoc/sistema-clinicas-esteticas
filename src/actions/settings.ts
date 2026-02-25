@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Helper para obtener el cliente de Supabase
 async function getSupabaseClient() {
@@ -289,8 +290,7 @@ export async function updateClinicSettings(
       .single()
 
     if (insertError) {
-      console.error('Error creating clinic settings:', insertError)
-      return { data: null, error: `Error al crear la configuracion: ${insertError.message}` }
+      return { data: null, error: sanitizeError(insertError, 'Error al crear la configuracion') }
     }
 
     revalidatePath('/configuracion')
@@ -299,8 +299,7 @@ export async function updateClinicSettings(
   }
 
   if (updateError) {
-    console.error('Error updating clinic settings:', updateError)
-    return { data: null, error: `Error al guardar la configuracion: ${updateError.message}` }
+    return { data: null, error: sanitizeError(updateError, 'Error al guardar la configuracion') }
   }
 
   revalidatePath('/configuracion')
@@ -343,6 +342,7 @@ export async function getBranches(): Promise<Branch[]> {
     .select('*')
     .eq('clinic_id', DEFAULT_CLINIC_ID)
     .order('created_at', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching branches:', error)
@@ -398,8 +398,7 @@ export async function createBranch(
     .single()
 
   if (error) {
-    console.error('Error creating branch:', error)
-    return { data: null, error: `Error al crear la sucursal: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear la sucursal') }
   }
 
   revalidatePath('/configuracion')
@@ -447,8 +446,7 @@ export async function updateBranch(
     .single()
 
   if (error) {
-    console.error('Error updating branch:', error)
-    return { data: null, error: `Error al actualizar la sucursal: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar la sucursal') }
   }
 
   revalidatePath('/configuracion')
@@ -468,8 +466,7 @@ export async function deleteBranch(
     .eq('id', id)
 
   if (error) {
-    console.error('Error deleting branch:', error)
-    return { success: false, error: `Error al eliminar la sucursal: ${error.message}` }
+    return { success: false, error: sanitizeError(error, 'Error al eliminar la sucursal') }
   }
 
   revalidatePath('/configuracion')

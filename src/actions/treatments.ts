@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendEmail, generatePackageEmailHTML } from '@/lib/email'
+import { sanitizeError } from '@/lib/error-utils'
 
 // =============================================
 // DATOS DE DEMO - 39 Tratamientos de Dra. Pamela Moquete
@@ -196,6 +197,7 @@ export async function getCategories(): Promise<CategoryWithCountData[]> {
     .from('treatment_categories')
     .select('*')
     .order('sort_order', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching categories:', error)
@@ -220,6 +222,7 @@ export async function getCategories(): Promise<CategoryWithCountData[]> {
     .from('treatments')
     .select('category_id')
     .eq('is_active', true)
+    .limit(500)
 
   const treatmentCounts: Record<string, number> = {}
   if (treatments) {
@@ -366,6 +369,7 @@ export async function getTreatments(options?: {
       )
     `)
     .order('name', { ascending: true })
+    .limit(500)
 
   if (options?.categoryId) {
     query = query.eq('category_id', options.categoryId)
@@ -475,8 +479,7 @@ export async function createTreatment(
     .single()
 
   if (error) {
-    console.error('Error creating treatment:', error)
-    return { data: null, error: `Error al crear el tratamiento: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear el tratamiento') }
   }
 
   revalidatePath('/tratamientos')
@@ -516,8 +519,7 @@ export async function updateTreatment(
     .single()
 
   if (error) {
-    console.error('Error updating treatment:', error)
-    return { data: null, error: `Error al actualizar el tratamiento: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar el tratamiento') }
   }
 
   revalidatePath('/tratamientos')
@@ -608,6 +610,7 @@ export async function getTreatmentStats(): Promise<{
         color
       )
     `)
+    .limit(500)
 
   if (error) {
     console.error('Error fetching treatment stats:', error)
@@ -701,6 +704,7 @@ export async function getTreatmentsForPackages(): Promise<TreatmentForPackage[]>
     `)
     .eq('is_active', true)
     .order('name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching treatments for packages:', error)
@@ -726,6 +730,7 @@ export async function getPackages(): Promise<PackageData[]> {
     .from('packages')
     .select('*')
     .order('name', { ascending: true })
+    .limit(200)
 
   if (error) {
     console.error('Error fetching packages:', error)
@@ -869,8 +874,7 @@ export async function createPackage(
     .single()
 
   if (error) {
-    console.error('Error creating package:', error)
-    return { data: null, error: 'Error al crear el paquete: ' + error.message }
+    return { data: null, error: sanitizeError(error, 'Error al crear el paquete') }
   }
 
   revalidatePath('/tratamientos/paquetes')
@@ -947,8 +951,7 @@ export async function updatePackage(
     .single()
 
   if (error) {
-    console.error('Error updating package:', error)
-    return { data: null, error: 'Error al actualizar el paquete: ' + error.message }
+    return { data: null, error: sanitizeError(error, 'Error al actualizar el paquete') }
   }
 
   revalidatePath('/tratamientos/paquetes')

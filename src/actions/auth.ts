@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/lib/auth/roles'
+import { sanitizeError } from '@/lib/error-utils'
 
 export interface CurrentUser {
   id: string
@@ -94,7 +95,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Credenciales invalidas. Verifica tu correo y contrasena.') }
   }
 
   revalidatePath('/', 'layout')
@@ -118,7 +119,7 @@ export async function signup(formData: FormData) {
   const { error } = await supabase.auth.signUp(data)
 
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Error al crear la cuenta. Intenta de nuevo.') }
   }
 
   revalidatePath('/', 'layout')
@@ -142,7 +143,7 @@ export async function forgotPassword(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Error al enviar el correo de recuperacion.') }
   }
 
   return { success: true }
@@ -158,7 +159,7 @@ export async function resetPassword(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeError(error, 'Error al actualizar la contrasena.') }
   }
 
   revalidatePath('/', 'layout')
@@ -236,7 +237,7 @@ export async function updateProfile(data: {
   )
 
   if (authError) {
-    return { success: false, error: authError.message }
+    return { success: false, error: sanitizeError(authError, 'Error al actualizar el perfil.') }
   }
 
   // Actualizar tabla users si existe el registro
@@ -290,7 +291,7 @@ export async function changePassword(data: {
   )
 
   if (updateError) {
-    return { success: false, error: updateError.message }
+    return { success: false, error: sanitizeError(updateError, 'Error al cambiar la contrasena.') }
   }
 
   return { success: true }

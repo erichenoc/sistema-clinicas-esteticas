@@ -43,6 +43,7 @@ export async function getSuppliers(options?: {
     .from('suppliers')
     .select('*')
     .order('name', { ascending: true })
+    .limit(500)
 
   if (options?.isActive !== undefined) {
     query = query.eq('is_active', options.isActive)
@@ -208,6 +209,7 @@ export async function getSupplierStats(): Promise<SupplierStats> {
   const { data: suppliers } = await (supabase as any)
     .from('suppliers')
     .select('id, is_active')
+    .limit(500)
 
   const total = suppliers?.length || 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

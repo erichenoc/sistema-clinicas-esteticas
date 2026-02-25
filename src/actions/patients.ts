@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Tipos
 export interface PatientData {
@@ -98,6 +99,7 @@ export async function getPatientStats(): Promise<PatientStats> {
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('status, tags')
+    .limit(500)
 
   if (error) {
     console.error('Error fetching patient stats:', error)
@@ -170,8 +172,7 @@ export async function createPatient(input: CreatePatientInput): Promise<{ data: 
     .single()
 
   if (error) {
-    console.error('Error creating patient:', error)
-    return { data: null, error: `Error al crear el paciente: ${error.message}` }
+    return { data: null, error: sanitizeError(error, 'Error al crear el paciente') }
   }
 
   revalidatePath('/pacientes')
@@ -255,6 +256,7 @@ export async function getPatientsByStatus(status: string): Promise<PatientData[]
     .eq('status', status)
     .order('first_name', { ascending: true })
     .order('last_name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching patients by status:', error)
@@ -275,6 +277,7 @@ export async function getVIPPatients(): Promise<PatientData[]> {
     .contains('tags', ['VIP'])
     .order('first_name', { ascending: true })
     .order('last_name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching VIP patients:', error)

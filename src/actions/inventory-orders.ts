@@ -82,6 +82,7 @@ export async function getPurchaseOrders(options?: {
       purchase_order_items (id)
     `)
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (options?.status) {
     query = query.eq('status', options.status)
@@ -141,6 +142,7 @@ export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOr
     `)
     .eq('purchase_order_id', orderId)
     .order('created_at', { ascending: true })
+    .limit(200)
 
   if (error) {
     console.error('Error fetching purchase order items:', error)
@@ -340,6 +342,7 @@ export async function getPurchaseOrderStats(): Promise<PurchaseOrderStats> {
   const { data: orders } = await (supabase as any)
     .from('purchase_orders')
     .select('status, total')
+    .limit(500)
 
   const stats = {
     pending: 0,

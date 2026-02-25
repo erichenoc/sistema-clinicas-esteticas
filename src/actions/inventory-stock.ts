@@ -66,6 +66,7 @@ export async function getInventoryCounts(options?: {
     .from('inventory_counts')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (options?.status) {
     query = query.eq('status', options.status)
@@ -111,6 +112,7 @@ export async function getInventoryCountItems(countId: string): Promise<Inventory
     `)
     .eq('count_id', countId)
     .order('created_at', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching inventory count items:', error)
@@ -344,6 +346,7 @@ export async function getInventoryCountStats(): Promise<InventoryCountStats> {
     .from('inventory_counts')
     .select('status, total_difference_value, completed_at')
     .order('completed_at', { ascending: false })
+    .limit(500)
 
   const stats: InventoryCountStats = {
     inProgress: 0,
@@ -431,6 +434,7 @@ export async function getInventoryTransfers(options?: {
       inventory_transfer_items (id)
     `)
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (options?.status) {
     query = query.eq('status', options.status)
@@ -489,6 +493,7 @@ export async function getTransferItems(transferId: string): Promise<TransferItem
       products (name, sku)
     `)
     .eq('transfer_id', transferId)
+    .limit(200)
 
   if (error) {
     console.error('Error fetching transfer items:', error)
@@ -660,6 +665,7 @@ export async function getTransferStats(): Promise<TransferStats> {
   const { data: transfers } = await (supabase as any)
     .from('inventory_transfers')
     .select('status, created_at')
+    .limit(500)
 
   const stats: TransferStats = {
     pending: 0,
@@ -704,6 +710,7 @@ export async function getBranches(): Promise<BranchData[]> {
     .select('id, name')
     .eq('is_active', true)
     .order('name', { ascending: true })
+    .limit(100)
 
   if (error) {
     console.error('Error fetching branches:', error)

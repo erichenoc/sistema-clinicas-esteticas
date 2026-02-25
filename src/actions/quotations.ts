@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { sendEmail, generateQuotationEmailHTML } from '@/lib/email'
 import { notifyQuotationSent } from '@/actions/notifications'
 import { getCurrentExchangeRate } from '@/actions/exchange-rates'
+import { sanitizeError } from '@/lib/error-utils'
 
 // Types
 export interface QuotationItem {
@@ -124,8 +125,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<{ su
       .single()
 
     if (quotationError) {
-      console.error('Error creating quotation:', quotationError)
-      return { success: false, error: quotationError.message }
+      return { success: false, error: sanitizeError(quotationError, 'Error al crear la cotizacion') }
     }
 
     // Insert quotation items
@@ -152,7 +152,7 @@ export async function createQuotation(input: CreateQuotationInput): Promise<{ su
       // Rollback quotation
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from('quotations').delete().eq('id', quotation.id)
-      return { success: false, error: itemsError.message }
+      return { success: false, error: sanitizeError(itemsError, 'Error al agregar los items de la cotizacion') }
     }
 
     revalidatePath('/facturacion/cotizaciones')
@@ -274,8 +274,7 @@ export async function updateQuotation(input: UpdateQuotationInput): Promise<{ su
       .single()
 
     if (quotationError) {
-      console.error('[Quotations] Error updating quotation:', quotationError)
-      return { success: false, error: quotationError.message }
+      return { success: false, error: sanitizeError(quotationError, 'Error al actualizar la cotizacion') }
     }
 
     // Delete existing items
@@ -305,8 +304,7 @@ export async function updateQuotation(input: UpdateQuotationInput): Promise<{ su
       .insert(itemsToInsert)
 
     if (itemsError) {
-      console.error('[Quotations] Error inserting updated items:', itemsError)
-      return { success: false, error: itemsError.message }
+      return { success: false, error: sanitizeError(itemsError, 'Error al actualizar los items de la cotizacion') }
     }
 
     console.log('[Quotations] Quotation updated successfully')
@@ -344,8 +342,7 @@ export async function updateQuotationStatus(
     .eq('id', id)
 
   if (error) {
-    console.error('Error updating quotation status:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al actualizar el estado de la cotizacion') }
   }
 
   revalidatePath('/facturacion/cotizaciones')
@@ -439,8 +436,7 @@ export async function deleteQuotation(id: string): Promise<{ success: boolean; e
     .eq('id', id)
 
   if (error) {
-    console.error('Error deleting quotation:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeError(error, 'Error al eliminar la cotizacion') }
   }
 
   revalidatePath('/facturacion/cotizaciones')
