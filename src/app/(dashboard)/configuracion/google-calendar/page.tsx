@@ -28,6 +28,7 @@ import {
   getGoogleCalendarAuthUrl,
   isGoogleCalendarConnected,
   disconnectGoogleCalendar,
+  syncFromGoogleCalendar,
 } from '@/actions/google-calendar'
 
 const BRAND_COLOR = '#A67C52'
@@ -43,6 +44,7 @@ export default function GoogleCalendarPage() {
   const [status, setStatus] = useState<ConnectionStatus>({ connected: false, loading: true })
   const [isConnecting, setIsConnecting] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const loadStatus = useCallback(async (uid: string) => {
     setStatus(prev => ({ ...prev, loading: true }))
@@ -117,6 +119,32 @@ export default function GoogleCalendarPage() {
   const handleRefresh = () => {
     if (userId) {
       loadStatus(userId)
+    }
+  }
+
+  const handleSync = async () => {
+    if (!userId) return
+    setIsSyncing(true)
+    toast.loading('Sincronizando citas desde Google Calendar...', { id: 'sync-calendar' })
+
+    try {
+      const result = await syncFromGoogleCalendar(userId)
+      toast.dismiss('sync-calendar')
+
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.imported === 0) {
+        toast.success(`Todo al dia. ${result.skipped} citas ya estaban en el sistema.`)
+      } else {
+        toast.success(
+          `Sincronizacion completada: ${result.imported} cita${result.imported !== 1 ? 's' : ''} importada${result.imported !== 1 ? 's' : ''}${result.skipped > 0 ? `, ${result.skipped} ya existian` : ''}.${result.errors > 0 ? ` ${result.errors} error(es).` : ''}`
+        )
+      }
+    } catch {
+      toast.dismiss('sync-calendar')
+      toast.error('Error al sincronizar con Google Calendar')
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -206,24 +234,50 @@ export default function GoogleCalendarPage() {
             {/* Acciones */}
             <div className="space-y-3">
               {status.connected ? (
-                <Button
-                  variant="outline"
-                  className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={handleDisconnect}
-                  disabled={isDisconnecting || status.loading}
-                >
-                  {isDisconnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Desconectando...
-                    </>
-                  ) : (
-                    <>
-                      <Link2Off className="mr-2 h-4 w-4" />
-                      Desconectar
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    className="w-full text-white transition-colors"
+                    style={{ backgroundColor: BRAND_COLOR }}
+                    onMouseEnter={e => {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = BRAND_HOVER_COLOR
+                    }}
+                    onMouseLeave={e => {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = BRAND_COLOR
+                    }}
+                    onClick={handleSync}
+                    disabled={isSyncing || status.loading}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sincronizando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Importar citas desde Google Calendar
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={handleDisconnect}
+                    disabled={isDisconnecting || status.loading}
+                  >
+                    {isDisconnecting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Desconectando...
+                      </>
+                    ) : (
+                      <>
+                        <Link2Off className="mr-2 h-4 w-4" />
+                        Desconectar
+                      </>
+                    )}
+                  </Button>
+                </>
               ) : (
                 <Button
                   className="w-full text-white transition-colors"
@@ -328,6 +382,23 @@ export default function GoogleCalendarPage() {
                   <p className="text-xs text-muted-foreground">
                     Cuando se cancela una cita, el evento correspondiente se elimina de tu
                     Google Calendar
+                  </p>
+                </div>
+              </li>
+
+              <li className="flex items-start gap-3">
+                <div
+                  className="mt-0.5 h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${BRAND_COLOR}20` }}
+                >
+                  <Check className="h-3 w-3" style={{ color: BRAND_COLOR }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Importar citas existentes de Google Calendar</p>
+                  <p className="text-xs text-muted-foreground">
+                    Usa el boton &quot;Importar citas&quot; para traer al sistema todas las citas
+                    que ya tienes en tu Google Calendar (ultimos 30 dias y proximos 90 dias).
+                    Las citas ya importadas no se duplican.
                   </p>
                 </div>
               </li>
