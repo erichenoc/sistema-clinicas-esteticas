@@ -5,25 +5,28 @@ import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/render
 // Med Luxe logo URL (new logo with transparent background)
 export const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/Med_Luxe_Logo_1_kohhy1.png'
 
-// Brand colors matching the email template
+// Brand colors — Med Luxe official palette
 const colors = {
-  primary: '#3c3731',       // Med Luxe Dark Brown
-  primaryDark: '#2a2622',   // Dark brown for gradients
-  dark: '#1f2937',          // Dark background (not used for header/footer now)
-  text: '#333333',          // Main text
-  gray: '#666666',          // Muted text
-  lightGray: '#9ca3af',     // Light muted text
-  border: '#e5e5e5',        // Border color
+  // Primary: warm golden/bronze
+  primary: '#eaa86a',       // Golden bronze (header/footer/accents)
+  primaryDark: '#d4935a',   // Darker golden for hover/borders
+  // Sage family (section accents)
+  sage: '#93beb8',          // Sage teal
+  sageLighter: '#d4e5e3',   // Light sage background
+  sageLight: '#e9f2f1',     // Very light sage
+  // Warm beige family (backgrounds)
+  warmBeige: '#eeb988',     // Warm accent
+  warmLight: '#fbeee1',     // Light warm background
+  warmLighter: '#f7dcc3',   // Lighter warm
+  // Rose family (subtle accents)
+  roseLight: '#f1c6d9',     // Light rose
+  // Neutrals
+  text: '#3a3028',          // Dark warm text
+  gray: '#7a6e66',          // Muted warm gray
+  border: '#e8ddd5',        // Warm border
   white: '#FFFFFF',
-  cream: '#fffbeb',         // Terms background (amber tint)
-  creamBorder: '#f59e0b',   // Terms border (amber)
-  creamText: '#92400e',     // Terms title
-  creamTextDark: '#78350f', // Terms content
-  tableHeader: '#f3f4f6',   // Table header background
-  background: '#f9fafb',    // Section background
 }
 
-// Styles matching the email template exactly
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
@@ -60,15 +63,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Main content
+  // Main content — paddingBottom reserves space for footer
   content: {
     padding: 30,
     paddingTop: 25,
+    paddingBottom: 100,
   },
 
   // Client info box
   clientBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.warmLight,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -94,16 +98,16 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: colors.tableHeader,
+    backgroundColor: colors.sageLighter,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 2,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.sage,
   },
   tableHeaderCell: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#374151',
+    color: colors.text,
   },
   tableRow: {
     flexDirection: 'row',
@@ -125,7 +129,7 @@ const styles = StyleSheet.create({
 
   // Totals section
   totalsBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.warmLight,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -144,7 +148,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   totalDivider: {
-    height: 2,
+    height: 1,
     backgroundColor: colors.border,
     marginVertical: 10,
   },
@@ -164,19 +168,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Bank accounts section
+  // Bank accounts section — sage palette
   bankBox: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.sageLight,
     borderRadius: 6,
     padding: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: colors.sageLighter,
   },
   bankTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#166534',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
   bankType: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#166534',
+    color: colors.sage,
     marginBottom: 2,
   },
   bankName: {
@@ -211,70 +215,71 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
 
-  // Terms section (amber/cream box)
+  // Terms section — warm palette
   termsBox: {
-    backgroundColor: colors.cream,
+    backgroundColor: colors.warmLight,
     borderRadius: 6,
     padding: 14,
     borderLeftWidth: 4,
-    borderLeftColor: colors.creamBorder,
+    borderLeftColor: colors.primary,
     marginBottom: 20,
   },
   termsTitle: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: colors.creamText,
+    color: colors.primaryDark,
     marginBottom: 8,
   },
   termsText: {
     fontSize: 10,
-    color: colors.creamTextDark,
+    color: colors.text,
     lineHeight: 1.6,
   },
 
-  // Exchange rate note
+  // Exchange rate note — sage palette
   exchangeRateBox: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.sageLight,
     borderRadius: 6,
     padding: 10,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: colors.sage,
   },
   exchangeRateText: {
     fontSize: 9,
-    color: '#1e40af',
+    color: colors.text,
     lineHeight: 1.5,
   },
 
-  // Footer (gold background with white text)
+  // Footer — fixed at bottom of every page
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: colors.primary,
-    padding: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 30,
     alignItems: 'center',
   },
   footerQuestion: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.white,
-    marginBottom: 8,
-  },
-  footerEmail: {
-    fontSize: 11,
-    color: colors.white,
-    fontWeight: 'bold',
     marginBottom: 4,
   },
-  footerPhone: {
-    fontSize: 11,
+  footerEmail: {
+    fontSize: 10,
     color: colors.white,
-    marginBottom: 6,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  footerPhone: {
+    fontSize: 10,
+    color: colors.white,
+    marginBottom: 4,
   },
   footerAddress: {
-    fontSize: 10,
+    fontSize: 9,
     color: colors.white,
     textAlign: 'center',
   },
@@ -282,7 +287,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.white,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
   },
 })
 
