@@ -170,8 +170,7 @@ export async function getAppointments(options?: {
         last_name
       ),
       rooms (
-        name,
-        color
+        name
       ),
       treatments (
         name,
@@ -202,10 +201,7 @@ export async function getAppointments(options?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('APPT_ERROR_MSG:', error?.message)
-    console.error('APPT_ERROR_CODE:', error?.code)
-    console.error('APPT_ERROR_DETAILS:', error?.details)
-    console.error('APPT_ERROR_HINT:', error?.hint)
+    console.error('Error fetching appointments:', error?.message)
     return []
   }
 
@@ -323,8 +319,7 @@ export async function getAppointmentById(id: string): Promise<AppointmentListIte
         last_name
       ),
       rooms (
-        name,
-        color
+        name
       ),
       treatments (
         name,
@@ -706,8 +701,7 @@ export async function searchAppointments(query: string): Promise<AppointmentList
         last_name
       ),
       rooms (
-        name,
-        color
+        name
       ),
       treatments (
         name,
