@@ -202,7 +202,10 @@ export async function getAppointments(options?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching appointments:', error)
+    console.error('APPT_ERROR_MSG:', error?.message)
+    console.error('APPT_ERROR_CODE:', error?.code)
+    console.error('APPT_ERROR_DETAILS:', error?.details)
+    console.error('APPT_ERROR_HINT:', error?.hint)
     return []
   }
 
