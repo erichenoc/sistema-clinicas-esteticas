@@ -3,7 +3,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
 // Med Luxe logo URL (new logo with transparent background)
-const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/Med_Luxe_Logo_1_kohhy1.png'
+export const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765430185/Med_Luxe_Logo_1_kohhy1.png'
 
 // Brand colors matching the email template
 const colors = {
@@ -287,6 +287,7 @@ const styles = StyleSheet.create({
 })
 
 export interface QuotationPDFData {
+  logoSrc?: string
   quoteNumber: string
   createdAt: string
   validUntil: string
@@ -353,6 +354,7 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
     total,
     currency,
     termsConditions,
+    logoSrc,
   } = data
 
   return (
@@ -360,7 +362,7 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
       <Page size="A4" style={styles.page}>
         {/* Header with Logo and Title on right */}
         <View style={styles.headerBar}>
-          <Image src={LOGO_URL} style={styles.headerLogo} />
+          <Image src={logoSrc || LOGO_URL} style={styles.headerLogo} />
           <View style={styles.headerTitleSection}>
             <Text style={styles.headerTitle}>Cotizacion</Text>
             <Text style={styles.headerQuoteNumber}>{quoteNumber}</Text>

@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Download,
   Printer,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -58,7 +59,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { cancelInvoice } from '@/actions/billing'
+import { cancelInvoice, deleteInvoice } from '@/actions/billing'
 import type { InvoiceListItemData } from '@/actions/billing'
 
 const statusConfig = {
@@ -72,13 +73,16 @@ const statusConfig = {
 
 interface FacturasClientProps {
   invoices: InvoiceListItemData[]
+  isAdmin?: boolean
 }
 
-export function FacturasClient({ invoices }: FacturasClientProps) {
+export function FacturasClient({ invoices, isAdmin = false }: FacturasClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [invoiceToCancel, setInvoiceToCancel] = useState<InvoiceListItemData | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceListItemData | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [localInvoices, setLocalInvoices] = useState<InvoiceListItemData[]>(invoices)
 
   const filtered = localInvoices.filter((inv) => {
@@ -123,6 +127,25 @@ export function FacturasClient({ invoices }: FacturasClientProps) {
     } finally {
       setIsCancelling(false)
       setInvoiceToCancel(null)
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!invoiceToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteInvoice(invoiceToDelete.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Factura ${invoiceToDelete.invoice_number} eliminada`)
+        setLocalInvoices((prev) => prev.filter((inv) => inv.id !== invoiceToDelete.id))
+      }
+    } catch {
+      toast.error('Error al eliminar la factura')
+    } finally {
+      setIsDeleting(false)
+      setInvoiceToDelete(null)
     }
   }
 
@@ -327,6 +350,18 @@ export function FacturasClient({ invoices }: FacturasClientProps) {
                                 </DropdownMenuItem>
                               </>
                             )}
+                            {isAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-700 font-medium"
+                                  onClick={() => setInvoiceToDelete(invoice)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar permanentemente
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -338,6 +373,38 @@ export function FacturasClient({ invoices }: FacturasClientProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation dialog (admin only) */}
+      <AlertDialog
+        open={invoiceToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setInvoiceToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar factura permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion eliminara de forma permanente la factura{' '}
+              <span className="font-semibold">{invoiceToDelete?.invoice_number}</span> de{' '}
+              <span className="font-semibold">
+                {invoiceToDelete?.patient_name || 'Cliente general'}
+              </span>
+              . Los registros no podran recuperarse. Esta accion no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-700 hover:bg-red-800 focus:ring-red-700"
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Cancel confirmation dialog */}
       <AlertDialog

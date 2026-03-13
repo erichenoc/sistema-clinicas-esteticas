@@ -1,6 +1,6 @@
 'use server'
 
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sanitizeError } from '@/lib/error-utils'
 
@@ -311,6 +311,43 @@ export async function cancelInvoice(
   }
 
   revalidatePath('/facturacion')
+  return { success: true, error: null }
+}
+
+// Eliminar factura permanentemente (solo admins)
+export async function deleteInvoice(
+  id: string
+): Promise<{ success: boolean; error: string | null }> {
+  // Verificar que el usuario es admin
+  const supabase = await createClient()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) return { success: false, error: 'No autorizado' }
+
+  const adminClient = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: userData } = await (adminClient as any)
+    .from('users')
+    .select('role')
+    .eq('id', authUser.id)
+    .single()
+
+  if (!userData || userData.role !== 'admin') {
+    return { success: false, error: 'Solo los administradores pueden eliminar facturas' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (adminClient as any)
+    .from('invoices')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting invoice:', error)
+    return { success: false, error: sanitizeError(error, 'Error al eliminar la factura') }
+  }
+
+  revalidatePath('/facturacion')
+  revalidatePath('/facturacion/facturas')
   return { success: true, error: null }
 }
 

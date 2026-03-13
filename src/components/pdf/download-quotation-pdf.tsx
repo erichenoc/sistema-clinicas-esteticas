@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { Button } from '@/components/ui/button'
 import { Download, Loader2 } from 'lucide-react'
-import { QuotationPDF, type QuotationPDFData } from './quotation-pdf'
+import { QuotationPDF, LOGO_URL, type QuotationPDFData } from './quotation-pdf'
 import { toast } from 'sonner'
 
 interface DownloadQuotationPDFProps {
@@ -27,8 +27,20 @@ export function DownloadQuotationPDF({
     toast.loading('Generando PDF...', { id: 'pdf-generate' })
 
     try {
+      // Pre-fetch logo as base64 to avoid CORS issues in @react-pdf/renderer
+      let logoSrc: string | undefined
+      try {
+        const res = await fetch(LOGO_URL)
+        const arrayBuffer = await res.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+        const mimeType = res.headers.get('content-type') || 'image/png'
+        logoSrc = `data:${mimeType};base64,${base64}`
+      } catch {
+        // Logo fetch failed, will render without logo
+      }
+
       // Generate PDF blob
-      const blob = await pdf(<QuotationPDF data={data} />).toBlob()
+      const blob = await pdf(<QuotationPDF data={{ ...data, logoSrc }} />).toBlob()
 
       // Create download link
       const url = URL.createObjectURL(blob)
