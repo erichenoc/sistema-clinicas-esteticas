@@ -918,13 +918,24 @@ export function SettingsClient({ initialClinic, initialBranches }: SettingsClien
         <TabsContent value="integraciones" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Integraciones</CardTitle>
-              <CardDescription>Conecta servicios externos (proximamente)</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Google Calendar
+              </CardTitle>
+              <CardDescription>Sincroniza citas automaticamente con Google Calendar</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <Plug className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Integraciones disponibles proximamente</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm">Conecta tu cuenta de Google para que las citas del CRM aparezcan automaticamente en tu calendario.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cada profesional debe conectar su propia cuenta de Google.</p>
+                </div>
+                <Link href="/configuracion/google-calendar">
+                  <Button>
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Configurar
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
