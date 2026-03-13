@@ -31,6 +31,7 @@ import {
   getCurrentExchangeRate,
   saveExchangeRate,
   getExchangeRateHistory,
+  updateRateFromAPI,
   type CurrencyConversion,
   type ExchangeRate,
 } from '@/actions/exchange-rates'
@@ -42,6 +43,7 @@ export default function TasasCambioPage() {
   const [newRate, setNewRate] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [fetchingFromApi, setFetchingFromApi] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -66,6 +68,26 @@ export default function TasasCambioPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const handleFetchFromAPI = async () => {
+    setFetchingFromApi(true)
+    toast.loading('Obteniendo tasa desde API...', { id: 'fetch-rate' })
+    try {
+      const result = await updateRateFromAPI('USD', 'DOP')
+      toast.dismiss('fetch-rate')
+      if (result.success) {
+        toast.success(`Tasa actualizada: 1 USD = RD$${result.rate?.toFixed(2)}`)
+        await loadData()
+      } else {
+        toast.error(result.error || 'Error al obtener la tasa')
+      }
+    } catch {
+      toast.dismiss('fetch-rate')
+      toast.error('Error al conectar con la API')
+    } finally {
+      setFetchingFromApi(false)
+    }
+  }
 
   const handleSaveRate = async () => {
     const rate = parseFloat(newRate)
@@ -211,7 +233,18 @@ export default function TasasCambioPage() {
               </p>
             </div>
 
-            {/* Botón refresh */}
+            {/* Botón actualizar desde API */}
+            <Button
+              className="w-full text-white"
+              style={{ backgroundColor: '#A67C52' }}
+              onClick={handleFetchFromAPI}
+              disabled={fetchingFromApi || loading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${fetchingFromApi ? 'animate-spin' : ''}`} />
+              {fetchingFromApi ? 'Obteniendo...' : 'Actualizar desde API'}
+            </Button>
+
+            {/* Botón refresh manual */}
             <Button
               variant="outline"
               className="w-full"
@@ -219,7 +252,7 @@ export default function TasasCambioPage() {
               disabled={loading}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Actualizar
+              Recargar
             </Button>
           </CardContent>
         </Card>
