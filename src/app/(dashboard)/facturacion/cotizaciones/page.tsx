@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Search, FileText, Clock, CheckCircle, XCircle, Send, MoreHorizontal, Loader2, Mail, Trash2, Copy, FileCheck } from 'lucide-react'
+import { pdf } from '@react-pdf/renderer'
+import { ArrowLeft, Plus, Search, FileText, Clock, CheckCircle, XCircle, Send, MoreHorizontal, Loader2, Mail, Trash2, Copy, FileCheck, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -41,7 +42,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 
-import { getQuotations, getQuotationStats, deleteQuotation, sendQuotationEmail, updateQuotationStatus, type QuotationData } from '@/actions/quotations'
+import { getQuotations, getQuotationStats, deleteQuotation, sendQuotationEmail, updateQuotationStatus, getQuotationById, type QuotationData } from '@/actions/quotations'
+import { QuotationPDF } from '@/components/pdf/quotation-pdf'
 
 const statusConfig = {
   draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-800', icon: FileText },
@@ -60,6 +62,7 @@ export default function CotizacionesPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   // Load data
   useEffect(() => {
@@ -135,6 +138,82 @@ export default function CotizacionesPage() {
       toast.success(`Cotización marcada como ${status === 'accepted' ? 'aceptada' : 'rechazada'}`)
     } else {
       toast.error(result.error || 'Error al actualizar estado')
+    }
+  }
+
+  // Handle PDF download
+  const handleDownloadPDF = async (id: string, quoteNumber: string) => {
+    setDownloadingId(id)
+    toast.loading('Generando PDF...', { id: 'pdf-generate' })
+
+    try {
+      const quotation = await getQuotationById(id)
+      if (!quotation) {
+        toast.dismiss('pdf-generate')
+        toast.error('No se pudo cargar la cotizacion')
+        return
+      }
+
+      let logoSrc: string | undefined
+      try {
+        const res = await fetch('/api/logo')
+        const arrayBuffer = await res.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        logoSrc = `data:image/png;base64,${btoa(binary)}`
+      } catch {
+        // Will render without logo
+      }
+
+      const pdfData = {
+        logoSrc,
+        quoteNumber: quotation.quote_number,
+        createdAt: quotation.created_at,
+        validUntil: quotation.valid_until,
+        status: quotation.status,
+        clientName: quotation.patient_name || 'Cliente',
+        clientEmail: quotation.patient_email,
+        clientPhone: quotation.patient_phone,
+        clientAddress: quotation.patient_address,
+        items: (quotation.items || []).map(item => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unit_price,
+          discount: item.discount,
+          discountType: item.discount_type as 'percentage' | 'fixed',
+          subtotal: item.subtotal,
+        })),
+        subtotal: quotation.subtotal,
+        discountTotal: quotation.discount_total,
+        taxRate: quotation.tax_rate,
+        taxAmount: quotation.tax_amount,
+        total: quotation.total,
+        currency: quotation.currency,
+        notes: quotation.notes,
+        termsConditions: quotation.terms_conditions,
+      }
+
+      const blob = await pdf(<QuotationPDF data={pdfData} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${quoteNumber}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast.dismiss('pdf-generate')
+      toast.success('PDF descargado')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast.dismiss('pdf-generate')
+      toast.error('Error al generar el PDF')
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -308,8 +387,8 @@ export default function CotizacionesPage() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={sendingId === quote.id}>
-                              {sendingId === quote.id ? (
+                            <Button variant="ghost" size="icon" disabled={sendingId === quote.id || downloadingId === quote.id}>
+                              {sendingId === quote.id || downloadingId === quote.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <MoreHorizontal className="h-4 w-4" />
@@ -355,6 +434,10 @@ export default function CotizacionesPage() {
                                 <Copy className="mr-2 h-4 w-4" />
                                 Duplicar
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadPDF(quote.id, quote.quote_number)}>
+                              <Download className="mr-2 h-4 w-4" />
+                              Descargar PDF
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
