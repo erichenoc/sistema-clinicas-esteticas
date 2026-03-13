@@ -7,22 +7,14 @@ export const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765
 
 // Brand colors — Med Luxe official palette
 const colors = {
-  // Header/Footer: rose pink
-  primary: '#e8a0c0',       // Rose pink (header + footer)
-  primaryDark: '#c9829f',   // Darker rose for text on light bg
-  // Section accents: sage teal
-  sage: '#a9cbc6',          // Sage teal (client box, table header, totals)
-  sageLighter: '#d4e5e3',   // Light sage for table rows alt
-  sageLight: '#e9f2f1',     // Very light sage
-  // Bank section: medium rose
-  roseBank: '#edb3cd',      // Rose for bank accounts section
-  roseBankLight: '#f6d9e6', // Lighter rose background
-  // Warm beige for terms
-  warmLight: '#fbeee1',     // Light warm background
-  // Neutrals
-  text: '#3a3028',          // Dark warm text
-  gray: '#7a6e66',          // Muted warm gray
-  border: '#ddd5d0',        // Warm border
+  primary: '#998262',          // Primary brown (header + footer + table header + totals)
+  primaryMid: '#b8a38a',       // 70% tint (bank accounts section)
+  primaryLight: '#d4c4b0',     // 40% tint (client box)
+  primaryVeryLight: '#f0ebe4', // Very light tint (terms background)
+  background: '#FAF8F5',       // Official background
+  text: '#4A4A4A',             // Text Primary
+  gray: '#7a6e66',             // Muted warm gray
+  border: '#ddd5cc',           // Warm border
   white: '#FFFFFF',
 }
 
@@ -31,7 +23,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: 10,
     padding: 0,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
   },
 
   // Header bar
@@ -69,9 +61,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Client info box — sage teal
+  // Client info box — 40% tint
   clientBox: {
-    backgroundColor: colors.sage,
+    backgroundColor: colors.primaryLight,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -97,7 +89,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: colors.sage,
+    backgroundColor: colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 0,
@@ -125,9 +117,9 @@ const styles = StyleSheet.create({
   colPrice: { width: '22%', textAlign: 'right' },
   colSubtotal: { width: '23%', textAlign: 'right' },
 
-  // Totals section — sage teal
+  // Totals section — primary
   totalsBox: {
-    backgroundColor: colors.sage,
+    backgroundColor: colors.primary,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -167,9 +159,9 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 
-  // Bank accounts section — rose palette
+  // Bank accounts section — 70% tint
   bankBox: {
-    backgroundColor: colors.roseBank,
+    backgroundColor: colors.primaryMid,
     borderRadius: 6,
     padding: 14,
     marginBottom: 20,
@@ -212,9 +204,9 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
 
-  // Terms section — warm palette
+  // Terms section — very light tint
   termsBox: {
-    backgroundColor: colors.warmLight,
+    backgroundColor: colors.primaryVeryLight,
     borderRadius: 6,
     padding: 14,
     borderLeftWidth: 4,
@@ -224,7 +216,7 @@ const styles = StyleSheet.create({
   termsTitle: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: colors.primaryDark,
+    color: colors.primary,
     marginBottom: 8,
   },
   termsText: {
@@ -233,14 +225,14 @@ const styles = StyleSheet.create({
     lineHeight: 1.6,
   },
 
-  // Exchange rate note — sage palette
+  // Exchange rate note — background + primary border
   exchangeRateBox: {
-    backgroundColor: colors.sageLight,
+    backgroundColor: colors.background,
     borderRadius: 6,
     padding: 10,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: colors.sage,
+    borderLeftColor: colors.primary,
   },
   exchangeRateText: {
     fontSize: 9,
