@@ -219,31 +219,47 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         : new Date(startTime.getTime() + 60 * 60000)
       const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000)
 
-      // Try to extract patient/treatment from description if created by this system
+      // Try to extract patient/treatment from description
       let patientName: string | null = null
+      let patientPhone: string | null = null
+      let patientEmail: string | null = null
       let treatmentName: string | null = null
 
       if (event.description) {
         const patientMatch = event.description.match(/Paciente:\s*(.+)/i)
         if (patientMatch) patientName = patientMatch[1].trim()
-        const treatmentMatch = event.description.match(/Tratamiento:\s*(.+)/i)
+        const treatmentMatch = event.description.match(/(?:Tratamiento|Servicio):\s*(.+)/i)
         if (treatmentMatch) treatmentName = treatmentMatch[1].trim()
+        const phoneMatch = event.description.match(/Tel[eé]fono:\s*(.+)/i)
+        if (phoneMatch) patientPhone = phoneMatch[1].trim()
+        const emailMatch = event.description.match(/Email:\s*(.+)/i)
+        if (emailMatch) patientEmail = emailMatch[1].trim()
       }
 
-      // Fallback: parse summary like "Botox - María García"
-      if (!patientName && event.summary) {
+      // Fallback: parse summary like "Cita - Rellenos Faciales" or "Botox - María García"
+      if (!treatmentName && event.summary) {
         const parts = event.summary.split(' - ')
         if (parts.length >= 2) {
-          treatmentName = treatmentName || parts[0].trim()
-          patientName = parts[parts.length - 1].trim()
+          // "Cita - Rellenos Faciales" → treatment = Rellenos Faciales
+          treatmentName = parts[parts.length - 1].trim()
+          if (!patientName) patientName = parts[0] !== 'Cita' ? parts[0].trim() : null
         } else {
-          treatmentName = treatmentName || event.summary
+          treatmentName = event.summary
         }
       }
 
-      // Try to find existing patient by name
+      // Try to find existing patient by name or email
       let patientId: string | null = null
-      if (patientName) {
+      if (patientEmail) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: patient } = await (supabase as any)
+          .from('patients')
+          .select('id')
+          .ilike('email', patientEmail)
+          .maybeSingle()
+        if (patient) patientId = patient.id
+      }
+      if (!patientId && patientName) {
         const nameParts = patientName.trim().split(' ')
         const firstName = nameParts[0] || ''
         const lastName = nameParts.slice(1).join(' ') || ''
@@ -257,25 +273,41 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         if (patient) patientId = patient.id
       }
 
-      // Find professional linked to this user
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: professional } = await (supabase as any)
-        .from('professionals')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle()
+      // If patient not found, create one from event data
+      if (!patientId && patientName) {
+        const nameParts = patientName.trim().split(' ')
+        const firstName = nameParts[0] || 'Paciente'
+        const lastName = nameParts.slice(1).join(' ') || 'Importado'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: newPatient } = await (supabase as any)
+          .from('patients')
+          .insert({
+            clinic_id: '00000000-0000-0000-0000-000000000001',
+            first_name: firstName,
+            last_name: lastName,
+            phone: patientPhone,
+            email: patientEmail,
+          })
+          .select('id')
+          .single()
+        if (newPatient) patientId = newPatient.id
+      }
 
-      const notes = patientName && !patientId
-        ? `Importado desde Google Calendar. Paciente: ${patientName}. ${event.description || ''}`.trim()
-        : event.description || null
+      // Skip if we still have no patient (can't insert — patient_id is NOT NULL)
+      if (!patientId) {
+        skipped++
+        continue
+      }
+
+      const notes = event.description || null
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: insertError } = await (supabase as any)
         .from('appointments')
         .insert({
+          clinic_id: '00000000-0000-0000-0000-000000000001',
           patient_id: patientId,
-          professional_id: professional?.id || null,
+          professional_id: userId,  // userId is the users.id, appointments references users(id)
           treatment_name: treatmentName || event.summary || 'Evento de Google Calendar',
           scheduled_at: startTime.toISOString(),
           duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
