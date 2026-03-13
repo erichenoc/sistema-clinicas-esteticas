@@ -166,7 +166,10 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
   error?: string
 }> {
   const tokens = await getUserTokens(userId)
-  if (!tokens) return { imported: 0, skipped: 0, errors: 0, error: 'Google Calendar no conectado' }
+  if (!tokens) {
+    console.error('[GCal Sync] No tokens for userId:', userId)
+    return { imported: 0, skipped: 0, errors: 0, error: 'Google Calendar no conectado' }
+  }
 
   try {
     const calendar = await getCalendarClient(tokens)
@@ -188,6 +191,7 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
     })
 
     const events = response.data.items || []
+    console.log(`[GCal Sync] userId=${userId} found ${events.length} events`)
     let imported = 0
     let skipped = 0
     let errors = 0
