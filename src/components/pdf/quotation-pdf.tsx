@@ -503,7 +503,7 @@ export function QuotationPDF({ data }: { data: QuotationPDFData }) {
         <View style={styles.footer}>
           <Text style={styles.footerQuestion}>Tienes preguntas? Contactanos</Text>
           <Text style={styles.footerEmail}>info@medluxeclinic.com</Text>
-          <Text style={styles.footerPhone}>809-558-0911</Text>
+          <Text style={styles.footerPhone}>809-558-0911  |  www.medluxeclinic.com</Text>
           <Text style={styles.footerCompany}>Med Luxe Aesthetics & Wellness</Text>
           <Text style={styles.footerAddress}>Plaza Terranova Caribbean 2, Av. Barcelo, Punta Cana 23000, Republica Dominicana</Text>
         </View>
