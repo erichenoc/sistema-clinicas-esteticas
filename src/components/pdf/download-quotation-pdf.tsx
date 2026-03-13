@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { Button } from '@/components/ui/button'
 import { Download, Loader2 } from 'lucide-react'
-import { QuotationPDF, LOGO_URL, type QuotationPDFData } from './quotation-pdf'
+import { QuotationPDF, type QuotationPDFData } from './quotation-pdf'
 import { toast } from 'sonner'
 
 interface DownloadQuotationPDFProps {
@@ -27,14 +27,17 @@ export function DownloadQuotationPDF({
     toast.loading('Generando PDF...', { id: 'pdf-generate' })
 
     try {
-      // Pre-fetch logo as base64 to avoid CORS issues in @react-pdf/renderer
+      // Pre-fetch logo via server proxy to avoid CORS issues in @react-pdf/renderer
       let logoSrc: string | undefined
       try {
-        const res = await fetch(LOGO_URL)
+        const res = await fetch('/api/logo')
         const arrayBuffer = await res.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-        const mimeType = res.headers.get('content-type') || 'image/png'
-        logoSrc = `data:${mimeType};base64,${base64}`
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        logoSrc = `data:image/png;base64,${btoa(binary)}`
       } catch {
         // Logo fetch failed, will render without logo
       }
