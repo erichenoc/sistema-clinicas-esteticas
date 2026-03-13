@@ -167,8 +167,7 @@ export async function getAppointments(options?: {
       ),
       users!appointments_professional_id_fkey (
         first_name,
-        last_name,
-        full_name
+        last_name
       ),
       rooms (
         name,
@@ -318,8 +317,7 @@ export async function getAppointmentById(id: string): Promise<AppointmentListIte
       ),
       users!appointments_professional_id_fkey (
         first_name,
-        last_name,
-        full_name
+        last_name
       ),
       rooms (
         name,
@@ -702,8 +700,7 @@ export async function searchAppointments(query: string): Promise<AppointmentList
       ),
       users!appointments_professional_id_fkey (
         first_name,
-        last_name,
-        full_name
+        last_name
       ),
       rooms (
         name,
