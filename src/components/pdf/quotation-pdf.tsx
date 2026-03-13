@@ -7,23 +7,22 @@ export const LOGO_URL = 'https://res.cloudinary.com/dbftvu8ab/image/upload/v1765
 
 // Brand colors — Med Luxe official palette
 const colors = {
-  // Primary: warm golden/bronze
-  primary: '#eaa86a',       // Golden bronze (header/footer/accents)
-  primaryDark: '#d4935a',   // Darker golden for hover/borders
-  // Sage family (section accents)
-  sage: '#93beb8',          // Sage teal
-  sageLighter: '#d4e5e3',   // Light sage background
+  // Header/Footer: rose pink
+  primary: '#e8a0c0',       // Rose pink (header + footer)
+  primaryDark: '#c9829f',   // Darker rose for text on light bg
+  // Section accents: sage teal
+  sage: '#a9cbc6',          // Sage teal (client box, table header, totals)
+  sageLighter: '#d4e5e3',   // Light sage for table rows alt
   sageLight: '#e9f2f1',     // Very light sage
-  // Warm beige family (backgrounds)
-  warmBeige: '#eeb988',     // Warm accent
+  // Bank section: medium rose
+  roseBank: '#edb3cd',      // Rose for bank accounts section
+  roseBankLight: '#f6d9e6', // Lighter rose background
+  // Warm beige for terms
   warmLight: '#fbeee1',     // Light warm background
-  warmLighter: '#f7dcc3',   // Lighter warm
-  // Rose family (subtle accents)
-  roseLight: '#f1c6d9',     // Light rose
   // Neutrals
   text: '#3a3028',          // Dark warm text
   gray: '#7a6e66',          // Muted warm gray
-  border: '#e8ddd5',        // Warm border
+  border: '#ddd5d0',        // Warm border
   white: '#FFFFFF',
 }
 
@@ -70,9 +69,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Client info box
+  // Client info box — sage teal
   clientBox: {
-    backgroundColor: colors.warmLight,
+    backgroundColor: colors.sage,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -84,12 +83,12 @@ const styles = StyleSheet.create({
   clientLabel: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
     width: 80,
   },
   clientValue: {
     fontSize: 10,
-    color: colors.text,
+    color: colors.white,
   },
 
   // Items table
@@ -98,16 +97,15 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: colors.sageLighter,
+    backgroundColor: colors.sage,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.sage,
+    borderBottomWidth: 0,
   },
   tableHeaderCell: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
   },
   tableRow: {
     flexDirection: 'row',
@@ -127,9 +125,9 @@ const styles = StyleSheet.create({
   colPrice: { width: '22%', textAlign: 'right' },
   colSubtotal: { width: '23%', textAlign: 'right' },
 
-  // Totals section
+  // Totals section — sage teal
   totalsBox: {
-    backgroundColor: colors.warmLight,
+    backgroundColor: colors.sage,
     borderRadius: 6,
     padding: 16,
     marginBottom: 20,
@@ -141,16 +139,17 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 10,
-    color: colors.gray,
+    color: colors.white,
   },
   totalValue: {
     fontSize: 10,
-    color: colors.text,
+    color: colors.white,
   },
   totalDivider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white,
     marginVertical: 10,
+    opacity: 0.4,
   },
   grandTotalRow: {
     flexDirection: 'row',
@@ -160,27 +159,25 @@ const styles = StyleSheet.create({
   grandTotalLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
   },
   grandTotalValue: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.white,
   },
 
-  // Bank accounts section — sage palette
+  // Bank accounts section — rose palette
   bankBox: {
-    backgroundColor: colors.sageLight,
+    backgroundColor: colors.roseBank,
     borderRadius: 6,
     padding: 14,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.sageLighter,
   },
   bankTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -195,23 +192,23 @@ const styles = StyleSheet.create({
   bankType: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: colors.sage,
+    color: colors.white,
     marginBottom: 2,
   },
   bankName: {
     fontSize: 9,
-    color: colors.text,
+    color: colors.white,
     marginBottom: 1,
   },
   bankNumber: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
     marginBottom: 1,
   },
   bankHolder: {
     fontSize: 9,
-    color: colors.gray,
+    color: colors.white,
     marginBottom: 1,
   },
 
