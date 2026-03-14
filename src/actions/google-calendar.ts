@@ -176,9 +176,9 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
     const calendar = await getCalendarClient(tokens)
     const supabase = createAdminClient()
 
-    // Fetch events from 30 days ago to 90 days ahead
+    // Fetch events from 90 days ago to 90 days ahead (wider window)
     const timeMin = new Date()
-    timeMin.setDate(timeMin.getDate() - 30)
+    timeMin.setDate(timeMin.getDate() - 90)
     const timeMax = new Date()
     timeMax.setDate(timeMax.getDate() + 90)
 
@@ -189,15 +189,20 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
       singleEvents: true,
       orderBy: 'startTime',
       maxResults: 500,
+      showDeleted: false,
     })
 
     const events = response.data.items || []
     // Log which Google account and how many events found
     try {
       const calInfo = await calendar.calendars.get({ calendarId: 'primary' })
-      console.log(`[GCal Sync] account=${calInfo.data.id} userId=${userId} events=${events.length} timeMin=${timeMin.toISOString().slice(0, 10)} timeMax=${timeMax.toISOString().slice(0, 10)}`)
+      console.log(`[GCal Sync] account=${calInfo.data.id} events=${events.length}`)
     } catch {
-      console.log(`[GCal Sync] userId=${userId} found ${events.length} events (could not get account info)`)
+      console.log(`[GCal Sync] events=${events.length}`)
+    }
+    // Log first few event summaries for debugging
+    if (events.length > 0) {
+      events.slice(0, 5).forEach(e => console.log(`[GCal Event] ${e.start?.dateTime || e.start?.date} "${e.summary}"`))
     }
     let imported = 0
     let skipped = 0
