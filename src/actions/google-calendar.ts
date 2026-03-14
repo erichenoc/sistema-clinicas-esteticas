@@ -192,7 +192,13 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
     })
 
     const events = response.data.items || []
-    console.log(`[GCal Sync] userId=${userId} found ${events.length} events`)
+    // Log which Google account and how many events found
+    try {
+      const calInfo = await calendar.calendars.get({ calendarId: 'primary' })
+      console.log(`[GCal Sync] account=${calInfo.data.id} userId=${userId} events=${events.length} timeMin=${timeMin.toISOString().slice(0, 10)} timeMax=${timeMax.toISOString().slice(0, 10)}`)
+    } catch {
+      console.log(`[GCal Sync] userId=${userId} found ${events.length} events (could not get account info)`)
+    }
     let imported = 0
     let skipped = 0
     let errors = 0
