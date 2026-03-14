@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import {
   getAuthUrl,
   getCalendarClient,
@@ -277,11 +278,11 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         if (patient) patientId = patient.id
       }
 
-      // If patient not found, create one from event data
-      if (!patientId && patientName) {
-        const nameParts = patientName.trim().split(' ')
-        const firstName = nameParts[0] || 'Paciente'
-        const lastName = nameParts.slice(1).join(' ') || 'Importado'
+      // If patient not found, create one from event data (use placeholder if no name)
+      if (!patientId) {
+        const nameParts = (patientName || '').trim().split(' ')
+        const firstName = nameParts[0] || 'Reserva'
+        const lastName = nameParts.slice(1).join(' ') || (treatmentName ? `(${treatmentName})` : 'Google Calendar')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: newPatient } = await (supabase as any)
           .from('patients')
@@ -297,7 +298,7 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         if (newPatient) patientId = newPatient.id
       }
 
-      // Skip if we still have no patient (can't insert — patient_id is NOT NULL)
+      // Skip if patient creation also failed
       if (!patientId) {
         skipped++
         continue
@@ -326,6 +327,11 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
       } else {
         imported++
       }
+    }
+
+    if (imported > 0) {
+      revalidatePath('/agenda')
+      revalidatePath('/')
     }
 
     return { imported, skipped, errors }
