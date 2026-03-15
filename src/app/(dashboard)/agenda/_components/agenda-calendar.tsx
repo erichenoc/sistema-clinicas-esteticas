@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Users, Clock, Loader2, Calendar as CalendarIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -64,6 +65,7 @@ interface AgendaCalendarProps {
 }
 
 export function AgendaCalendar({ appointments, professionals }: AgendaCalendarProps) {
+  const router = useRouter()
   const calendarRef = useRef<FullCalendar>(null)
   const [mounted, setMounted] = useState(false)
   const [view, setView] = useState<'timeGridDay' | 'timeGridWeek' | 'dayGridMonth'>('timeGridWeek')
@@ -154,15 +156,10 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
     return currentDate.toLocaleDateString('es-MX', options)
   }
 
-  const handleReschedule = async () => {
+  const handleReschedule = () => {
     if (!selectedAppointment) return
-    setIsRescheduling(true)
-    toast.loading('Preparando reprogramacion...', { id: 'reschedule' })
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    toast.dismiss('reschedule')
-    toast.success(`Cita de ${selectedAppointment.patient_name} lista para reprogramar. Seleccione nueva fecha en el calendario.`)
-    setIsRescheduling(false)
     setIsDetailOpen(false)
+    router.push(`/agenda/${selectedAppointment.id}/editar`)
   }
 
   const handleCancelAppointment = async () => {
@@ -488,8 +485,7 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
                   </Link>
                 </Button>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={handleReschedule} disabled={isRescheduling}>
-                    {isRescheduling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  <Button variant="outline" onClick={handleReschedule}>
                     Reprogramar
                   </Button>
                   <Button variant="outline" className="text-destructive" onClick={handleCancelAppointment} disabled={isCancelling}>

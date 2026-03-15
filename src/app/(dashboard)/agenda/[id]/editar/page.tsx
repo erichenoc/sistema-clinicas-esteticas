@@ -10,7 +10,6 @@ import {
   Clock,
   User,
   Stethoscope,
-  MapPin,
   FileText,
   Loader2,
 } from 'lucide-react'
@@ -26,12 +25,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import {
+  getAppointmentById,
+  updateAppointment,
+  getProfessionals,
+  getRooms,
+  type ProfessionalData,
+  type RoomData,
+} from '@/actions/appointments'
 
-// Status options
 const STATUS_OPTIONS = [
   { value: 'scheduled', label: 'Programada', color: 'bg-blue-500' },
   { value: 'confirmed', label: 'Confirmada', color: 'bg-green-500' },
@@ -42,36 +46,13 @@ const STATUS_OPTIONS = [
   { value: 'no_show', label: 'No asistio', color: 'bg-gray-500' },
 ]
 
-// Mock data
-const mockAppointment = {
-  id: '1',
-  patientId: '1',
-  patientName: 'Maria Garcia Lopez',
-  patientPhone: '809-555-1234',
-  patientEmail: 'maria.garcia@email.com',
-  professionalId: '1',
-  professionalName: 'Dra. Maria Garcia',
-  treatmentId: '1',
-  treatmentName: 'Limpieza Facial Profunda',
-  roomId: '1',
-  roomName: 'Cabina 1',
-  scheduledAt: new Date().toISOString(),
-  durationMinutes: 60,
-  status: 'confirmed',
-  notes: 'Paciente tiene piel sensible.',
-  patientNotes: 'Prefiere productos sin fragancia.',
-}
-
-const mockProfessionals = [
-  { id: '1', name: 'Dra. Maria Garcia' },
-  { id: '2', name: 'Dr. Carlos Martinez' },
-  { id: '3', name: 'Lic. Ana Rodriguez' },
-]
-
-const mockRooms = [
-  { id: '1', name: 'Cabina 1' },
-  { id: '2', name: 'Cabina 2' },
-  { id: '3', name: 'Sala de Tratamientos' },
+const DURATION_OPTIONS = [
+  { value: '15', label: '15 min' },
+  { value: '30', label: '30 min' },
+  { value: '45', label: '45 min' },
+  { value: '60', label: '1 hora' },
+  { value: '90', label: '1h 30min' },
+  { value: '120', label: '2 horas' },
 ]
 
 export default function EditarCitaPage() {
@@ -81,51 +62,82 @@ export default function EditarCitaPage() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [appointment, setAppointment] = useState(mockAppointment)
+  const [patientName, setPatientName] = useState('')
+  const [patientPhone, setPatientPhone] = useState('')
+  const [treatmentName, setTreatmentName] = useState('')
+  const [professionals, setProfessionals] = useState<ProfessionalData[]>([])
+  const [rooms, setRooms] = useState<RoomData[]>([])
 
   const [formData, setFormData] = useState({
     date: '',
     time: '',
     durationMinutes: 60,
     professionalId: '',
-    roomId: '',
-    status: 'confirmed',
+    roomId: 'none',
+    status: 'scheduled',
     notes: '',
-    patientNotes: '',
   })
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      const scheduledDate = new Date(mockAppointment.scheduledAt)
+    async function load() {
+      const [appt, profs, roomList] = await Promise.all([
+        getAppointmentById(appointmentId),
+        getProfessionals(),
+        getRooms(),
+      ])
+
+      if (!appt) {
+        toast.error('Cita no encontrada')
+        router.push('/agenda')
+        return
+      }
+
+      const scheduledDate = new Date(appt.scheduled_at)
+      setPatientName(appt.patient_name)
+      setPatientPhone(appt.patient_phone || '')
+      setTreatmentName(appt.treatment_display_name || '')
+      setProfessionals(profs)
+      setRooms(roomList)
       setFormData({
         date: format(scheduledDate, 'yyyy-MM-dd'),
         time: format(scheduledDate, 'HH:mm'),
-        durationMinutes: mockAppointment.durationMinutes,
-        professionalId: mockAppointment.professionalId,
-        roomId: mockAppointment.roomId,
-        status: mockAppointment.status,
-        notes: mockAppointment.notes,
-        patientNotes: mockAppointment.patientNotes,
+        durationMinutes: appt.duration_minutes,
+        professionalId: appt.professional_id,
+        roomId: appt.room_id || 'none',
+        status: appt.status,
+        notes: appt.notes || '',
       })
       setIsLoading(false)
-    }, 500)
-  }, [appointmentId])
+    }
+    load()
+  }, [appointmentId, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.date || !formData.time) {
+      toast.error('La fecha y hora son requeridas')
+      return
+    }
     setIsSubmitting(true)
-    toast.loading('Guardando cambios...', { id: 'save-appointment' })
-
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const scheduledAt = new Date(`${formData.date}T${formData.time}`).toISOString()
+      const result = await updateAppointment(appointmentId, {
+        professional_id: formData.professionalId,
+        room_id: formData.roomId !== 'none' ? formData.roomId : undefined,
+        scheduled_at: scheduledAt,
+        duration_minutes: formData.durationMinutes,
+        status: formData.status as Parameters<typeof updateAppointment>[1]['status'],
+        notes: formData.notes || undefined,
+      })
 
-      toast.dismiss('save-appointment')
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
       toast.success('Cita actualizada correctamente')
       router.push(`/agenda/${appointmentId}`)
-    } catch (error) {
-      toast.dismiss('save-appointment')
+    } catch {
       toast.error('Error al actualizar la cita')
     } finally {
       setIsSubmitting(false)
@@ -143,58 +155,53 @@ export default function EditarCitaPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
           <Link href={`/agenda/${appointmentId}`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Editar Cita</h1>
-            <p className="text-muted-foreground">
-              {appointment.treatmentName} - {appointment.patientName}
-            </p>
-          </div>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Editar Cita</h1>
+          <p className="text-muted-foreground">{treatmentName} — {patientName}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Patient Info Card (Read-only) */}
+        {/* Paciente (solo lectura) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-[#A67C52]" />
-              Informacion del Paciente
+              Paciente
             </CardTitle>
-            <CardDescription>Datos del paciente (no editables)</CardDescription>
+            <CardDescription>Datos no editables desde esta pantalla</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="p-4 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Paciente</p>
-                <p className="font-medium">{appointment.patientName}</p>
+                <p className="font-medium">{patientName}</p>
               </div>
               <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Telefono</p>
-                <p className="font-medium">{appointment.patientPhone}</p>
+                <p className="text-sm text-muted-foreground">Teléfono</p>
+                <p className="font-medium">{patientPhone || '—'}</p>
               </div>
               <div className="p-4 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Tratamiento</p>
-                <p className="font-medium">{appointment.treatmentName}</p>
+                <p className="font-medium">{treatmentName || '—'}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Schedule Card */}
+        {/* Fecha y hora */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-[#A67C52]" />
               Fecha y Hora
             </CardTitle>
-            <CardDescription>Modifica la programacion de la cita</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
@@ -204,7 +211,7 @@ export default function EditarCitaPage() {
                   id="date"
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={e => setFormData({ ...formData, date: e.target.value })}
                   required
                 />
               </div>
@@ -214,26 +221,23 @@ export default function EditarCitaPage() {
                   id="time"
                   type="time"
                   value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                  onChange={e => setFormData({ ...formData, time: e.target.value })}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="duration">Duracion (minutos)</Label>
+                <Label htmlFor="duration">Duración</Label>
                 <Select
                   value={formData.durationMinutes.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, durationMinutes: parseInt(v) })}
+                  onValueChange={v => setFormData({ ...formData, durationMinutes: parseInt(v) })}
                 >
                   <SelectTrigger id="duration">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="45">45 min</SelectItem>
-                    <SelectItem value="60">1 hora</SelectItem>
-                    <SelectItem value="90">1h 30min</SelectItem>
-                    <SelectItem value="120">2 horas</SelectItem>
+                    {DURATION_OPTIONS.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -241,14 +245,13 @@ export default function EditarCitaPage() {
           </CardContent>
         </Card>
 
-        {/* Assignment Card */}
+        {/* Asignación */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Stethoscope className="h-5 w-5 text-[#A67C52]" />
-              Asignacion
+              Asignación
             </CardTitle>
-            <CardDescription>Profesional y ubicacion</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -256,15 +259,15 @@ export default function EditarCitaPage() {
                 <Label htmlFor="professional">Profesional</Label>
                 <Select
                   value={formData.professionalId}
-                  onValueChange={(v) => setFormData({ ...formData, professionalId: v })}
+                  onValueChange={v => setFormData({ ...formData, professionalId: v })}
                 >
                   <SelectTrigger id="professional">
                     <SelectValue placeholder="Selecciona un profesional" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockProfessionals.map((p) => (
+                    {professionals.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                        {p.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -274,16 +277,15 @@ export default function EditarCitaPage() {
                 <Label htmlFor="room">Sala/Cabina</Label>
                 <Select
                   value={formData.roomId}
-                  onValueChange={(v) => setFormData({ ...formData, roomId: v })}
+                  onValueChange={v => setFormData({ ...formData, roomId: v })}
                 >
                   <SelectTrigger id="room">
-                    <SelectValue placeholder="Selecciona una sala" />
+                    <SelectValue placeholder="Sin sala asignada" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockRooms.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
+                    <SelectItem value="none">Sin sala</SelectItem>
+                    {rooms.map(r => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -292,30 +294,30 @@ export default function EditarCitaPage() {
           </CardContent>
         </Card>
 
-        {/* Status Card */}
+        {/* Estado */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-[#A67C52]" />
-              Estado de la Cita
+              Estado
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
+              <Label htmlFor="status">Estado de la cita</Label>
               <Select
                 value={formData.status}
-                onValueChange={(v) => setFormData({ ...formData, status: v })}
+                onValueChange={v => setFormData({ ...formData, status: v })}
               >
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value}>
                       <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${status.color}`} />
-                        {status.label}
+                        <div className={`h-2 w-2 rounded-full ${s.color}`} />
+                        {s.label}
                       </div>
                     </SelectItem>
                   ))}
@@ -325,7 +327,7 @@ export default function EditarCitaPage() {
           </CardContent>
         </Card>
 
-        {/* Notes Card */}
+        {/* Notas */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -333,31 +335,17 @@ export default function EditarCitaPage() {
               Notas
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas internas</Label>
-              <Textarea
-                id="notes"
-                placeholder="Notas para el equipo..."
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="patientNotes">Notas del paciente</Label>
-              <Textarea
-                id="patientNotes"
-                placeholder="Preferencias o instrucciones del paciente..."
-                value={formData.patientNotes}
-                onChange={(e) => setFormData({ ...formData, patientNotes: e.target.value })}
-                rows={3}
-              />
-            </div>
+          <CardContent>
+            <Textarea
+              id="notes"
+              placeholder="Notas internas de la cita..."
+              value={formData.notes}
+              onChange={e => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+            />
           </CardContent>
         </Card>
 
-        {/* Footer Actions */}
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" asChild>
             <Link href={`/agenda/${appointmentId}`}>Cancelar</Link>
@@ -367,11 +355,7 @@ export default function EditarCitaPage() {
             disabled={isSubmitting}
             className="bg-[#A67C52] hover:bg-[#8a6543]"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
+            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
           </Button>
         </div>
