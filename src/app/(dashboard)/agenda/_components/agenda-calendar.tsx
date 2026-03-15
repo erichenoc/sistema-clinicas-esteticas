@@ -343,8 +343,8 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
 
       {/* Sheet de detalle de cita */}
       <Sheet open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="px-6 overflow-y-auto">
+          <SheetHeader className="pb-4 border-b">
             <SheetTitle>Detalle de Cita</SheetTitle>
             <SheetDescription>
               Informacion de la cita seleccionada
@@ -352,7 +352,7 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
           </SheetHeader>
 
           {selectedAppointment && (
-            <div className="mt-6 space-y-6">
+            <div className="mt-6 space-y-5">
               {/* Paciente */}
               <div className="flex items-center gap-3">
                 <Avatar className="h-12 w-12">

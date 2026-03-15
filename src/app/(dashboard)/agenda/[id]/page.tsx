@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -8,7 +8,6 @@ import {
   Calendar,
   Clock,
   User,
-  MapPin,
   Phone,
   Mail,
   MessageSquare,
@@ -16,18 +15,17 @@ import {
   CheckCircle,
   XCircle,
   Edit,
-  Printer,
   Send,
   DollarSign,
   FileText,
   AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -40,133 +38,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import type { AppointmentListItem, AppointmentStatus } from '@/types/appointments'
-
-// Mock data - en producción vendría de la base de datos
-const mockAppointments: Record<string, AppointmentListItem> = {
-  '1': {
-    id: '1',
-    clinicId: '1',
-    branchId: null,
-    patientId: 'ea19a372-8de2-4258-b963-9bb8d5044ffa',
-    professionalId: '1',
-    roomId: '1',
-    treatmentId: '1',
-    treatmentName: 'Limpieza Facial Profunda',
-    packageSessionId: null,
-    scheduledAt: new Date().toISOString(),
-    durationMinutes: 60,
-    bufferMinutes: 0,
-    status: 'confirmed',
-    statusChangedAt: null,
-    statusChangedBy: null,
-    notes: 'Paciente tiene piel sensible. Usar productos hipoalergénicos.',
-    patientNotes: 'Prefiere que no usen productos con fragancia.',
-    cancellationReason: null,
-    reminderSentAt: new Date(Date.now() - 86400000).toISOString(),
-    confirmationSentAt: new Date(Date.now() - 3600000).toISOString(),
-    isRecurring: false,
-    recurrenceRule: null,
-    parentAppointmentId: null,
-    createdAt: new Date(Date.now() - 604800000).toISOString(),
-    updatedAt: new Date().toISOString(),
-    createdBy: null,
-    patientName: 'María García López',
-    patientPhone: '5512345678',
-    patientEmail: 'maria.garcia@email.com',
-    patientAvatar: null,
-    professionalName: 'Dra. María García',
-    roomName: 'Cabina 1',
-    roomColor: '#ec4899',
-    treatmentDisplayName: 'Limpieza Facial Profunda',
-    treatmentPrice: 1200,
-    categoryName: 'Facial',
-    categoryColor: '#ec4899',
-    endAt: new Date(new Date().getTime() + 60 * 60000).toISOString(),
-  },
-  '2': {
-    id: '2',
-    clinicId: '1',
-    branchId: null,
-    patientId: '66280efb-8296-4fd5-8e8d-f71d2787de21',
-    professionalId: '2',
-    roomId: '2',
-    treatmentId: '2',
-    treatmentName: 'Botox - Frente',
-    packageSessionId: null,
-    scheduledAt: new Date(new Date().setHours(10, 30, 0, 0)).toISOString(),
-    durationMinutes: 30,
-    bufferMinutes: 0,
-    status: 'scheduled',
-    statusChangedAt: null,
-    statusChangedBy: null,
-    notes: 'Primera vez con tratamiento de Botox',
-    patientNotes: null,
-    cancellationReason: null,
-    reminderSentAt: null,
-    confirmationSentAt: null,
-    isRecurring: false,
-    recurrenceRule: null,
-    parentAppointmentId: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    createdBy: null,
-    patientName: 'Ana Martínez Ruiz',
-    patientPhone: '5598765432',
-    patientEmail: 'ana.martinez@email.com',
-    patientAvatar: null,
-    professionalName: 'Dra. Pamela Moquete',
-    roomName: 'Cabina 2',
-    roomColor: '#3b82f6',
-    treatmentDisplayName: 'Botox - Frente',
-    treatmentPrice: 5500,
-    categoryName: 'Inyectables',
-    categoryColor: '#06b6d4',
-    endAt: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
-  },
-  '3': {
-    id: '3',
-    clinicId: '1',
-    branchId: null,
-    patientId: '636beca5-3a92-4616-a4b2-a5335af96b7f',
-    professionalId: '3',
-    roomId: '3',
-    treatmentId: '3',
-    treatmentName: 'Depilación Láser - Axilas',
-    packageSessionId: null,
-    scheduledAt: new Date(new Date().setHours(12, 0, 0, 0)).toISOString(),
-    durationMinutes: 20,
-    bufferMinutes: 0,
-    status: 'waiting',
-    statusChangedAt: null,
-    statusChangedBy: null,
-    notes: null,
-    patientNotes: null,
-    cancellationReason: null,
-    reminderSentAt: null,
-    confirmationSentAt: null,
-    isRecurring: false,
-    recurrenceRule: null,
-    parentAppointmentId: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    createdBy: null,
-    patientName: 'Laura Hernández',
-    patientPhone: '5511223344',
-    patientEmail: 'laura.h@email.com',
-    patientAvatar: null,
-    professionalName: 'Lic. Ana Martínez',
-    roomName: 'Sala Láser',
-    roomColor: '#ef4444',
-    treatmentDisplayName: 'Depilación Láser - Axilas',
-    treatmentPrice: 2800,
-    categoryName: 'Láser',
-    categoryColor: '#ef4444',
-    endAt: new Date(new Date().setHours(12, 20, 0, 0)).toISOString(),
-  },
-}
+import { getAppointmentById, type AppointmentListItemData } from '@/actions/appointments'
+import type { AppointmentStatus } from '@/types/appointments'
 
 const statusConfig: Record<AppointmentStatus, { label: string; color: string; bgColor: string }> = {
   scheduled: { label: 'Programada', color: 'text-blue-700', bgColor: 'bg-blue-100' },
@@ -184,26 +58,41 @@ interface PageProps {
 
 export default function AppointmentDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const appointment = mockAppointments[id]
+  const [appointment, setAppointment] = useState<AppointmentListItemData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFoundFlag, setNotFoundFlag] = useState(false)
 
-  if (!appointment) {
-    notFound()
+  useEffect(() => {
+    getAppointmentById(id).then(data => {
+      if (!data) setNotFoundFlag(true)
+      else setAppointment(data)
+      setLoading(false)
+    })
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
-  const status = statusConfig[appointment.status]
-  const scheduledDate = new Date(appointment.scheduledAt)
-  const endDate = new Date(appointment.endAt)
+  if (notFoundFlag || !appointment) return notFound()
+
+  const status = statusConfig[appointment.status as AppointmentStatus]
+  const scheduledDate = new Date(appointment.scheduled_at)
+  const endDate = new Date(appointment.end_at)
+
+  // Filter out internal booking metadata from notes
+  const cleanNotes = appointment.notes
+    ?.split('\n')
+    .filter(line => !line.match(/^(Tratamiento|Servicio|Paciente|Tel[eé]fono|Email):\s*/i))
+    .join('\n')
+    .trim() || null
 
   const handleStatusChange = (newStatus: AppointmentStatus) => {
     toast.success(`Estado cambiado a ${statusConfig[newStatus].label}`)
-  }
-
-  const handleSendReminder = () => {
-    toast.success('Recordatorio enviado al paciente')
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   return (
@@ -219,14 +108,14 @@ export default function AppointmentDetailPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight">
-                Cita #{appointment.id}
+                Detalle de Cita
               </h1>
-              <Badge className={`${status.bgColor} ${status.color} border-0`}>
-                {status.label}
+              <Badge className={`${status?.bgColor} ${status?.color} border-0`}>
+                {status?.label}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              Creada el {new Date(appointment.createdAt).toLocaleDateString('es-MX', {
+              Creada el {new Date(appointment.created_at).toLocaleDateString('es-MX', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',
@@ -236,11 +125,7 @@ export default function AppointmentDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleSendReminder}>
+          <Button variant="outline" size="sm" onClick={() => toast.info('Función próximamente')}>
             <Send className="mr-2 h-4 w-4" />
             Enviar Recordatorio
           </Button>
@@ -309,17 +194,11 @@ export default function AppointmentDetailPage({ params }: PageProps) {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Hora</p>
                   <p className="font-medium">
-                    {scheduledDate.toLocaleTimeString('es-MX', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}
-                    -{' '}
-                    {endDate.toLocaleTimeString('es-MX', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {scheduledDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                    {' - '}
+                    {endDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                     <span className="text-muted-foreground ml-2">
-                      ({appointment.durationMinutes} min)
+                      ({appointment.duration_minutes} min)
                     </span>
                   </p>
                 </div>
@@ -333,20 +212,22 @@ export default function AppointmentDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-2">
                     <div
                       className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: appointment.categoryColor || '#6366f1' }}
+                      style={{ backgroundColor: appointment.category_color || '#A67C52' }}
                     />
-                    <p className="font-medium">{appointment.treatmentDisplayName}</p>
+                    <p className="font-medium">{appointment.treatment_display_name || 'Sin tratamiento'}</p>
                   </div>
-                  <Badge variant="outline">{appointment.categoryName}</Badge>
+                  {appointment.category_name && (
+                    <Badge variant="outline">{appointment.category_name}</Badge>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Precio</p>
-                  <p className="text-xl font-bold text-primary">
-                    RD${appointment.treatmentPrice?.toLocaleString('es-MX', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
+                {appointment.treatment_price != null && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Precio</p>
+                    <p className="text-xl font-bold text-primary">
+                      RD${appointment.treatment_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -357,110 +238,42 @@ export default function AppointmentDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback>
-                        {appointment.professionalName
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)}
+                        {appointment.professional_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
-                    <p className="font-medium">{appointment.professionalName}</p>
+                    <p className="font-medium">{appointment.professional_name}</p>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Sala</p>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-3 w-3 rounded"
-                      style={{ backgroundColor: appointment.roomColor || '#6366f1' }}
-                    />
-                    <p className="font-medium">{appointment.roomName}</p>
+                {appointment.room_name && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Sala</p>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded"
+                        style={{ backgroundColor: appointment.room_color || '#6366f1' }}
+                      />
+                      <p className="font-medium">{appointment.room_name}</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Notas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Notas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="clinical">
-                <TabsList>
-                  <TabsTrigger value="clinical">Notas Clínicas</TabsTrigger>
-                  <TabsTrigger value="patient">Notas del Paciente</TabsTrigger>
-                </TabsList>
-                <TabsContent value="clinical" className="mt-4">
-                  {appointment.notes ? (
-                    <p className="text-sm">{appointment.notes}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      Sin notas clínicas
-                    </p>
-                  )}
-                </TabsContent>
-                <TabsContent value="patient" className="mt-4">
-                  {appointment.patientNotes ? (
-                    <p className="text-sm">{appointment.patientNotes}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      Sin notas del paciente
-                    </p>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          {/* Historial de estados */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Historial
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {appointment.confirmationSentAt && (
-                  <div className="flex items-start gap-3">
-                    <div className="h-2 w-2 mt-2 rounded-full bg-green-500" />
-                    <div>
-                      <p className="text-sm font-medium">Confirmación enviada</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(appointment.confirmationSentAt).toLocaleString('es-MX')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {appointment.reminderSentAt && (
-                  <div className="flex items-start gap-3">
-                    <div className="h-2 w-2 mt-2 rounded-full bg-blue-500" />
-                    <div>
-                      <p className="text-sm font-medium">Recordatorio enviado</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(appointment.reminderSentAt).toLocaleString('es-MX')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-start gap-3">
-                  <div className="h-2 w-2 mt-2 rounded-full bg-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium">Cita creada</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(appointment.createdAt).toLocaleString('es-MX')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {cleanNotes && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Notas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap break-words">{cleanNotes}</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Columna lateral - Paciente */}
@@ -475,19 +288,15 @@ export default function AppointmentDetailPage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={appointment.patientAvatar || undefined} />
+                  <AvatarImage src={appointment.patient_avatar || undefined} />
                   <AvatarFallback className="text-lg">
-                    {appointment.patientName
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')
-                      .slice(0, 2)}
+                    {appointment.patient_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-semibold text-lg">{appointment.patientName}</p>
+                  <p className="font-semibold text-lg">{appointment.patient_name}</p>
                   <Button variant="link" className="h-auto p-0 text-sm" asChild>
-                    <Link href={`/pacientes/${appointment.patientId}`}>
+                    <Link href={`/pacientes/${appointment.patient_id}`}>
                       Ver perfil completo
                     </Link>
                   </Button>
@@ -497,32 +306,36 @@ export default function AppointmentDetailPage({ params }: PageProps) {
               <Separator />
 
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm">{appointment.patientPhone}</p>
-                    <a
-                      href={`https://wa.me/${appointment.patientPhone}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Enviar WhatsApp
-                    </a>
+                {appointment.patient_phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm">{appointment.patient_phone}</p>
+                      <a
+                        href={`https://wa.me/${appointment.patient_phone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Enviar WhatsApp
+                      </a>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm">{appointment.patientEmail}</p>
-                    <a
-                      href={`mailto:${appointment.patientEmail}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Enviar email
-                    </a>
+                )}
+                {appointment.patient_email && (
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm break-all">{appointment.patient_email}</p>
+                      <a
+                        href={`mailto:${appointment.patient_email}`}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Enviar email
+                      </a>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <Separator />
@@ -535,7 +348,7 @@ export default function AppointmentDetailPage({ params }: PageProps) {
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/pos?patientId=${appointment.patientId}`}>
+                  <Link href={`/pos?patientId=${appointment.patient_id}`}>
                     <DollarSign className="mr-2 h-4 w-4" />
                     Ir al POS
                   </Link>
@@ -544,17 +357,19 @@ export default function AppointmentDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Alertas */}
-          {appointment.notes && (
-            <Card className="border-amber-200 bg-amber-50">
+          {/* Origen de reserva */}
+          {appointment.google_event_id && (
+            <Card className="border-blue-200 bg-blue-50">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-amber-700 text-sm">
+                <CardTitle className="flex items-center gap-2 text-blue-700 text-sm">
                   <AlertCircle className="h-4 w-4" />
-                  Recordatorio
+                  Reserva Online
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-amber-700">{appointment.notes}</p>
+                <p className="text-sm text-blue-700">
+                  Esta cita fue creada desde medluxeclinic.com vía Google Calendar.
+                </p>
               </CardContent>
             </Card>
           )}
