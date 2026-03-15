@@ -463,14 +463,21 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
                   </div>
                 )}
 
-                {selectedAppointment.notes && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Notas</p>
-                    <p className="text-sm bg-muted px-3 py-2 rounded whitespace-pre-wrap break-words">
-                      {selectedAppointment.notes}
-                    </p>
-                  </div>
-                )}
+                {(() => {
+                  const cleanNotes = selectedAppointment.notes
+                    ?.split('\n')
+                    .filter(line => !line.match(/^(Tratamiento|Servicio|Paciente|Tel[eé]fono|Email):\s*/i))
+                    .join('\n')
+                    .trim()
+                  return cleanNotes ? (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Notas</p>
+                      <p className="text-sm bg-muted px-3 py-2 rounded whitespace-pre-wrap break-words">
+                        {cleanNotes}
+                      </p>
+                    </div>
+                  ) : null
+                })()}
               </div>
 
               {/* Acciones */}
