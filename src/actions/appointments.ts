@@ -158,7 +158,7 @@ export async function getAppointments(options?: {
     .from('appointments')
     .select(`
       *,
-      patients!inner (
+      patients (
         first_name,
         last_name,
         phone,
@@ -198,12 +198,21 @@ export async function getAppointments(options?: {
     query = query.eq('status', options.status)
   }
 
+  // Diagnostic: raw count to check if table has any rows
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: rawCount } = await (supabase as any)
+    .from('appointments')
+    .select('*', { count: 'exact', head: true })
+  console.log(`[getAppointments] rawCount=${rawCount}`)
+
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching appointments:', error?.message)
+    console.error('[getAppointments] ERROR:', JSON.stringify(error))
     return []
   }
+
+  console.log(`[getAppointments] rows=${data?.length ?? 0} options=${JSON.stringify(options)}`)
 
   // Transformar datos a formato esperado
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,7 +230,7 @@ export async function getAppointments(options?: {
       professional_name: apt.users?.full_name || `${apt.users?.first_name || ''} ${apt.users?.last_name || ''}`.trim(),
       room_name: apt.rooms?.name || null,
       room_color: apt.rooms?.color || null,
-      treatment_display_name: apt.treatments?.name || apt.treatment_name,
+      treatment_display_name: apt.treatments?.name || apt.treatment_name || (apt.notes?.match(/Tratamiento:\s*([^\n]+)/i)?.[1]) || null,
       treatment_price: apt.treatments?.price || null,
       category_name: apt.treatments?.treatment_categories?.name || null,
       category_color: apt.treatments?.treatment_categories?.color || null,
@@ -307,7 +316,7 @@ export async function getAppointmentById(id: string): Promise<AppointmentListIte
     .from('appointments')
     .select(`
       *,
-      patients!inner (
+      patients (
         first_name,
         last_name,
         phone,
@@ -689,7 +698,7 @@ export async function searchAppointments(query: string): Promise<AppointmentList
     .from('appointments')
     .select(`
       *,
-      patients!inner (
+      patients (
         first_name,
         last_name,
         phone,
@@ -712,7 +721,7 @@ export async function searchAppointments(query: string): Promise<AppointmentList
         )
       )
     `)
-    .or(`patients.first_name.ilike.%${query}%,patients.last_name.ilike.%${query}%,treatment_name.ilike.%${query}%`)
+    .or(`patients.first_name.ilike.%${query}%,patients.last_name.ilike.%${query}%`)
     .order('scheduled_at', { ascending: false })
     .limit(20)
 
@@ -736,7 +745,7 @@ export async function searchAppointments(query: string): Promise<AppointmentList
       professional_name: apt.users?.full_name || `${apt.users?.first_name || ''} ${apt.users?.last_name || ''}`.trim(),
       room_name: apt.rooms?.name || null,
       room_color: apt.rooms?.color || null,
-      treatment_display_name: apt.treatments?.name || apt.treatment_name,
+      treatment_display_name: apt.treatments?.name || apt.treatment_name || (apt.notes?.match(/Tratamiento:\s*([^\n]+)/i)?.[1]) || null,
       treatment_price: apt.treatments?.price || null,
       category_name: apt.treatments?.treatment_categories?.name || null,
       category_color: apt.treatments?.treatment_categories?.color || null,

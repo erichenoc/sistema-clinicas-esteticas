@@ -295,7 +295,7 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         const firstName = nameParts[0] || 'Reserva'
         const lastName = nameParts.slice(1).join(' ') || (treatmentName ? `(${treatmentName})` : 'Google Calendar')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: newPatient } = await (supabase as any)
+        const { data: newPatient, error: patientError } = await (supabase as any)
           .from('patients')
           .insert({
             clinic_id: '00000000-0000-0000-0000-000000000001',
@@ -306,16 +306,23 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
           })
           .select('id')
           .single()
+        if (patientError) console.error('[GCal Sync] PatErr code=' + patientError.code + ' msg=' + patientError.message)
         if (newPatient) patientId = newPatient.id
       }
 
       // Skip if patient creation also failed
       if (!patientId) {
+        console.error('[GCal Sync] Skipping event (no patientId):', event.id, event.summary)
         skipped++
         continue
       }
 
-      const notes = event.description || null
+      // Build notes: prepend treatment name so UI can display it even without the DB column
+      const treatmentLabel = treatmentName || event.summary || null
+      const notes = [
+        treatmentLabel ? `Tratamiento: ${treatmentLabel}` : null,
+        event.description || null,
+      ].filter(Boolean).join('\n') || null
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: insertError } = await (supabase as any)
@@ -324,7 +331,6 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
           clinic_id: '00000000-0000-0000-0000-000000000001',
           patient_id: patientId,
           professional_id: userId,  // userId is the users.id, appointments references users(id)
-          treatment_name: treatmentName || event.summary || 'Evento de Google Calendar',
           scheduled_at: startTime.toISOString(),
           duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
           status: 'scheduled',
