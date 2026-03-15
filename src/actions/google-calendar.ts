@@ -317,10 +317,13 @@ export async function syncFromGoogleCalendar(userId: string): Promise<{
         continue
       }
 
-      // Build notes: prepend treatment name so UI can display it even without the DB column
+      // Build notes: only prepend treatment label if description doesn't already have it
       const treatmentLabel = treatmentName || event.summary || null
+      const descriptionHasTreatment = event.description
+        ? /(?:Tratamiento|Servicio):/i.test(event.description)
+        : false
       const notes = [
-        treatmentLabel ? `Tratamiento: ${treatmentLabel}` : null,
+        (!descriptionHasTreatment && treatmentLabel) ? `Tratamiento: ${treatmentLabel}` : null,
         event.description || null,
       ].filter(Boolean).join('\n') || null
 
