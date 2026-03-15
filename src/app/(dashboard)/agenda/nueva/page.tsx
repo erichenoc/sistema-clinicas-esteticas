@@ -12,6 +12,7 @@ import {
   User,
   Search,
   AlertTriangle,
+  UserPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -70,7 +71,7 @@ import {
   type ProfessionalData,
   type RoomData,
 } from '@/actions/appointments'
-import { getPatients, type PatientData } from '@/actions/patients'
+import { getPatients, createPatient, type PatientData } from '@/actions/patients'
 import { getTreatments, type TreatmentListItemData } from '@/actions/treatments'
 
 function NuevaCitaContent() {
@@ -82,6 +83,9 @@ function NuevaCitaContent() {
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(null)
   const [selectedTreatment, setSelectedTreatment] = useState<TreatmentListItemData | null>(null)
   const [bookingConflict, setBookingConflict] = useState<string | null>(null)
+  const [showNewPatientForm, setShowNewPatientForm] = useState(false)
+  const [isCreatingPatient, setIsCreatingPatient] = useState(false)
+  const [newPatient, setNewPatient] = useState({ first_name: '', last_name: '', phone: '', email: '' })
 
   // Real data from DB
   const [patients, setPatients] = useState<PatientData[]>([])
@@ -206,6 +210,52 @@ function NuevaCitaContent() {
     setSelectedPatient(patient)
     form.setValue('patientId', patient.id)
     setPatientSearchOpen(false)
+    setShowNewPatientForm(false)
+    setNewPatient({ first_name: '', last_name: '', phone: '', email: '' })
+  }
+
+  const handleQuickCreatePatient = async () => {
+    if (!newPatient.first_name.trim()) {
+      toast.error('El nombre es requerido')
+      return
+    }
+
+    setIsCreatingPatient(true)
+    try {
+      // Check for duplicate by phone or email in the local list first
+      const phone = newPatient.phone.trim()
+      const email = newPatient.email.trim().toLowerCase()
+      const duplicate = patients.find(p =>
+        (phone && p.phone === phone) ||
+        (email && p.email?.toLowerCase() === email)
+      )
+
+      if (duplicate) {
+        toast.info(`Ya existe: ${duplicate.first_name} ${duplicate.last_name}. Seleccionado automáticamente.`)
+        handlePatientSelect(duplicate)
+        return
+      }
+
+      const result = await createPatient({
+        first_name: newPatient.first_name.trim(),
+        last_name: newPatient.last_name.trim(),
+        phone: phone || '',
+        email: email || undefined,
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      if (result.data) {
+        setPatients(prev => [result.data!, ...prev])
+        handlePatientSelect(result.data)
+        toast.success(`Paciente "${result.data.first_name} ${result.data.last_name}" creado y seleccionado`)
+      }
+    } finally {
+      setIsCreatingPatient(false)
+    }
   }
 
   const formatPrice = (price: number) => {
@@ -338,7 +388,74 @@ function NuevaCitaContent() {
                         <Command>
                           <CommandInput placeholder="Buscar por nombre o teléfono..." />
                           <CommandList>
-                            <CommandEmpty>No se encontraron pacientes</CommandEmpty>
+                            <CommandEmpty>
+                              {showNewPatientForm ? (
+                                <div className="p-3 space-y-2" onClick={e => e.stopPropagation()}>
+                                  <p className="text-xs font-medium text-muted-foreground mb-2">Nuevo paciente</p>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Nombre *"
+                                      value={newPatient.first_name}
+                                      onChange={e => setNewPatient(p => ({ ...p, first_name: e.target.value }))}
+                                      className="h-8 text-sm"
+                                    />
+                                    <Input
+                                      placeholder="Apellido"
+                                      value={newPatient.last_name}
+                                      onChange={e => setNewPatient(p => ({ ...p, last_name: e.target.value }))}
+                                      className="h-8 text-sm"
+                                    />
+                                  </div>
+                                  <Input
+                                    placeholder="Teléfono"
+                                    value={newPatient.phone}
+                                    onChange={e => setNewPatient(p => ({ ...p, phone: e.target.value }))}
+                                    className="h-8 text-sm"
+                                  />
+                                  <Input
+                                    placeholder="Email"
+                                    value={newPatient.email}
+                                    onChange={e => setNewPatient(p => ({ ...p, email: e.target.value }))}
+                                    className="h-8 text-sm"
+                                  />
+                                  <div className="flex gap-2 pt-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="flex-1 h-8 text-xs"
+                                      onClick={handleQuickCreatePatient}
+                                      disabled={isCreatingPatient}
+                                    >
+                                      {isCreatingPatient ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                                      Guardar y seleccionar
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() => setShowNewPatientForm(false)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-3 text-center space-y-2">
+                                  <p className="text-sm text-muted-foreground">No se encontraron pacientes</p>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-xs gap-1"
+                                    onClick={() => setShowNewPatientForm(true)}
+                                  >
+                                    <UserPlus className="h-3 w-3" />
+                                    Crear nuevo paciente
+                                  </Button>
+                                </div>
+                              )}
+                            </CommandEmpty>
                             <CommandGroup>
                               {patients.map((patient) => (
                                 <CommandItem
