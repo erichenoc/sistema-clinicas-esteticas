@@ -1,17 +1,21 @@
-export const revalidate = 30
+export const dynamic = 'force-dynamic'
 
 import { getInvoices, getBillingStats } from '@/actions/billing'
 import { getQuotations, getQuotationStats } from '@/actions/quotations'
+import { getCurrentUserRole } from '@/actions/auth'
 import { FacturacionClient } from './_components/facturacion-client'
 import type { InvoiceStatus } from '@/types/billing'
 
 export default async function FacturacionPage() {
-  const [dbInvoices, dbStats, dbQuotations, dbQuoteStats] = await Promise.all([
+  const [dbInvoices, dbStats, dbQuotations, dbQuoteStats, role] = await Promise.all([
     getInvoices(),
     getBillingStats(),
     getQuotations(),
     getQuotationStats(),
+    getCurrentUserRole(),
   ])
+
+  const canDelete = role === 'admin' || role === 'owner'
 
   // Map invoice status for display
   const mapInvoiceStatus = (status: string): InvoiceStatus => {
@@ -97,6 +101,7 @@ export default async function FacturacionPage() {
       invoices={invoices}
       quotes={quotes}
       stats={stats}
+      isAdmin={canDelete}
     />
   )
 }

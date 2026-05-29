@@ -71,7 +71,7 @@ import {
   INVOICE_STATUS_OPTIONS,
   formatCurrency,
 } from '@/types/billing'
-import { cancelInvoice } from '@/actions/billing'
+import { cancelInvoice, deleteInvoice } from '@/actions/billing'
 
 // Tipos para los datos de la base de datos
 interface InvoiceItem {
@@ -115,9 +115,10 @@ interface FacturacionClientProps {
   invoices: InvoiceItem[]
   quotes: QuoteItem[]
   stats: BillingStats
+  isAdmin?: boolean
 }
 
-export function FacturacionClient({ invoices, quotes, stats }: FacturacionClientProps) {
+export function FacturacionClient({ invoices, quotes, stats, isAdmin = false }: FacturacionClientProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('facturas')
   const [quoteSearch, setQuoteSearch] = useState('')
@@ -134,6 +135,11 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
 
+  // Estado para el diálogo de eliminación permanente (admin/owner)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteInvoiceData, setDeleteInvoiceData] = useState<{ id: string; number: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch =
       quote.quoteNumber.toLowerCase().includes(quoteSearch.toLowerCase()) ||
@@ -147,7 +153,12 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
       invoice.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
       invoice.clientName.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
       (invoice.ncfNumber?.toLowerCase().includes(invoiceSearch.toLowerCase()) ?? false)
-    const matchesStatus = invoiceStatusFilter === 'all' || invoice.status === invoiceStatusFilter
+    // Por defecto ("Todos") ocultar las anuladas para una vista limpia;
+    // solo se muestran si el usuario elige explicitamente el filtro "Anulada".
+    const matchesStatus =
+      invoiceStatusFilter === 'all'
+        ? invoice.status !== 'cancelled'
+        : invoice.status === invoiceStatusFilter
     const matchesFiscal =
       invoiceFiscalFilter === 'all' ||
       (invoiceFiscalFilter === 'fiscal' && invoice.hasFiscalReceipt) ||
@@ -297,6 +308,37 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
       toast.error('Error al anular la factura')
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  // Abrir diálogo de eliminación permanente
+  const openDeleteDialog = (id: string, number: string) => {
+    setDeleteInvoiceData({ id, number })
+    setDeleteDialogOpen(true)
+  }
+
+  // Procesar eliminación permanente (admin/owner)
+  const handleDeleteInvoice = async () => {
+    if (!deleteInvoiceData) return
+
+    setIsDeleting(true)
+    try {
+      const result = await deleteInvoice(deleteInvoiceData.id)
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success(`Factura ${deleteInvoiceData.number} eliminada permanentemente`)
+      setDeleteDialogOpen(false)
+      setDeleteInvoiceData(null)
+      router.refresh()
+    } catch (error) {
+      console.error('Error deleting invoice:', error)
+      toast.error('Error al eliminar la factura')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -594,6 +636,18 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
                                 </DropdownMenuItem>
                               </>
                             )}
+                            {isAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-700 font-medium"
+                                  onClick={() => openDeleteDialog(invoice.id, invoice.invoiceNumber)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar permanentemente
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -789,6 +843,29 @@ export function FacturacionClient({ invoices, quotes, stats }: FacturacionClient
             <Button variant="destructive" onClick={handleCancelInvoice} disabled={isCancelling}>
               {isCancelling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Anular Factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación para eliminar permanentemente (admin/owner) */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar factura permanentemente</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará de forma permanente la factura {deleteInvoiceData?.number} junto
+              con sus items y pagos. No se puede deshacer. Quedará registrada en la auditoría de
+              facturas.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteInvoice} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar permanentemente
             </Button>
           </DialogFooter>
         </DialogContent>
