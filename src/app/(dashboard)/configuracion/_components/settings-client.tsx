@@ -600,6 +600,35 @@ export function SettingsClient({ initialClinic, initialBranches }: SettingsClien
                 </div>
               </CardContent>
             </Card>
+
+            {/* Auditoria de Facturas */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Auditoria de Facturas
+                </CardTitle>
+                <CardDescription>Historial de facturas eliminadas y anuladas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm">
+                      Consulta quien elimino o anulo cada factura, cuando, y una copia de su contenido
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Solo disponible para administradores. El borrado de facturas es permanente.
+                    </p>
+                  </div>
+                  <Link href="/configuracion/auditoria">
+                    <Button variant="outline">
+                      <Shield className="mr-2 h-4 w-4" />
+                      Ver Historial
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

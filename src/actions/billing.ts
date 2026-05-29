@@ -283,12 +283,34 @@ export async function updateInvoice(
   return { data: data as InvoiceData, error: null }
 }
 
-// Cancelar factura
+// Cancelar (anular) factura — registra auditoria de quien la anulo
 export async function cancelInvoice(
   id: string,
   reason?: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const supabase = createAdminClient()
+  const adminClient = createAdminClient()
+
+  // Identificar al usuario actual para la auditoria (sin bloquear si no se puede)
+  let currentUserId: string | null = null
+  try {
+    const authClient = await createClient()
+    const { data: { user: authUser } } = await authClient.auth.getUser()
+    currentUserId = authUser?.id ?? null
+  } catch {
+    currentUserId = null
+  }
+
+  // Capturar estado previo de la factura
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: prevInvoice, error: fetchError } = await (adminClient as any)
+    .from('invoices')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !prevInvoice) {
+    return { success: false, error: 'Factura no encontrada' }
+  }
 
   const updateData: Record<string, unknown> = {
     status: 'cancelled',
@@ -300,7 +322,7 @@ export async function cancelInvoice(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await (adminClient as any)
     .from('invoices')
     .update(updateData)
     .eq('id', id)
@@ -310,15 +332,34 @@ export async function cancelInvoice(
     return { success: false, error: 'Error al anular la factura' }
   }
 
+  // Registrar la anulacion en el log de auditoria (no bloquea la operacion si falla)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: auditError } = await (adminClient as any)
+    .from('audit_logs')
+    .insert({
+      clinic_id: prevInvoice.clinic_id ?? null,
+      user_id: currentUserId,
+      action: 'cancel_invoice',
+      table_name: 'invoices',
+      record_id: id,
+      old_data: prevInvoice,
+      new_data: { status: 'cancelled', reason: reason ?? null },
+    })
+
+  if (auditError) {
+    console.error('Error writing audit log for invoice cancellation:', auditError)
+  }
+
   revalidatePath('/facturacion')
   return { success: true, error: null }
 }
 
-// Eliminar factura permanentemente (solo admins)
+// Eliminar factura permanentemente (solo admin / owner)
+// Antes de borrar, registra un snapshot completo en audit_logs (quien, cuando, que contenia).
 export async function deleteInvoice(
   id: string
 ): Promise<{ success: boolean; error: string | null }> {
-  // Verificar que el usuario es admin
+  // Verificar que el usuario es admin u owner
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) return { success: false, error: 'No autorizado' }
@@ -331,8 +372,43 @@ export async function deleteInvoice(
     .eq('id', authUser.id)
     .single()
 
-  if (!userData || userData.role !== 'admin') {
+  if (!userData || (userData.role !== 'admin' && userData.role !== 'owner')) {
     return { success: false, error: 'Solo los administradores pueden eliminar facturas' }
+  }
+
+  // Capturar snapshot completo de la factura (incluye items y pagos que se borran en cascada)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: invoiceSnapshot, error: snapshotError } = await (adminClient as any)
+    .from('invoices')
+    .select(`
+      *,
+      invoice_items (*),
+      payments (*)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (snapshotError || !invoiceSnapshot) {
+    return { success: false, error: 'Factura no encontrada' }
+  }
+
+  // Registrar en el log de auditoria ANTES de borrar
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: auditError } = await (adminClient as any)
+    .from('audit_logs')
+    .insert({
+      clinic_id: invoiceSnapshot.clinic_id ?? null,
+      user_id: authUser.id,
+      action: 'delete_invoice',
+      table_name: 'invoices',
+      record_id: id,
+      old_data: invoiceSnapshot,
+    })
+
+  if (auditError) {
+    // No borrar si no se pudo registrar la auditoria (el rastro es obligatorio)
+    console.error('Error writing audit log for invoice deletion:', auditError)
+    return { success: false, error: 'No se pudo registrar la auditoria. La factura no fue eliminada.' }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -349,6 +425,96 @@ export async function deleteInvoice(
   revalidatePath('/facturacion')
   revalidatePath('/facturacion/facturas')
   return { success: true, error: null }
+}
+
+// =============================================
+// AUDITORIA DE FACTURAS ELIMINADAS
+// =============================================
+
+export type InvoiceAuditAction = 'delete_invoice' | 'cancel_invoice'
+
+export interface DeletedInvoiceAuditEntry {
+  id: string
+  action: InvoiceAuditAction
+  deleted_at: string
+  deleted_by_name: string | null
+  deleted_by_email: string | null
+  invoice_id: string
+  invoice_number: string | null
+  total: number | null
+  currency: string | null
+  status: string | null
+  ncf: string | null
+  issue_date: string | null
+  reason: string | null
+  items_count: number
+  payments_count: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  snapshot: any
+}
+
+// Obtener el historial de facturas eliminadas y anuladas (solo admin / owner)
+export async function getDeletedInvoicesAudit(): Promise<{
+  data: DeletedInvoiceAuditEntry[]
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) return { data: [], error: 'No autorizado' }
+
+  const adminClient = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: userData } = await (adminClient as any)
+    .from('users')
+    .select('role')
+    .eq('id', authUser.id)
+    .single()
+
+  if (!userData || (userData.role !== 'admin' && userData.role !== 'owner')) {
+    return { data: [], error: 'No autorizado' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (adminClient as any)
+    .from('audit_logs')
+    .select(`
+      *,
+      users:user_id (first_name, last_name, email)
+    `)
+    .in('action', ['delete_invoice', 'cancel_invoice'])
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (error) {
+    console.error('Error fetching invoice audit log:', error)
+    return { data: [], error: 'Error al cargar el historial' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entries: DeletedInvoiceAuditEntry[] = (data || []).map((row: any) => {
+    const inv = row.old_data || {}
+    const u = row.users
+    return {
+      id: row.id,
+      action: row.action as InvoiceAuditAction,
+      deleted_at: row.created_at,
+      deleted_by_name: u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : null,
+      deleted_by_email: u?.email || null,
+      invoice_id: row.record_id,
+      invoice_number: inv.invoice_number || null,
+      total: inv.total ?? null,
+      currency: inv.currency || null,
+      status: inv.status || null,
+      ncf: inv.ncf || null,
+      issue_date: inv.issue_date || null,
+      reason: row.new_data?.reason ?? inv.internal_notes ?? null,
+      items_count: Array.isArray(inv.invoice_items) ? inv.invoice_items.length : 0,
+      payments_count: Array.isArray(inv.payments) ? inv.payments.length : 0,
+      snapshot: row.old_data,
+    }
+  })
+
+  return { data: entries, error: null }
 }
 
 // =============================================
