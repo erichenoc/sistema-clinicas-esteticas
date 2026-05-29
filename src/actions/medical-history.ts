@@ -2,10 +2,12 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getAuthContext } from '@/lib/auth/guards'
 import type { Patient } from '@/types/database'
 
 // Get all patients for listing
 export async function getPatients(): Promise<Patient[]> {
+  if (!(await getAuthContext())) return []
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +26,7 @@ export async function getPatients(): Promise<Patient[]> {
 
 // Get a single patient by ID
 export async function getPatientById(patientId: string): Promise<Patient | null> {
+  if (!(await getAuthContext())) return null
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -75,6 +78,7 @@ export interface MedicalHistoryRecord {
 }
 
 export async function getMedicalHistory(patientId: string): Promise<MedicalHistoryRecord | null> {
+  if (!(await getAuthContext())) return null
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -92,6 +96,7 @@ export async function getMedicalHistory(patientId: string): Promise<MedicalHisto
 }
 
 export async function saveMedicalHistory(data: MedicalHistoryData) {
+  if (!(await getAuthContext())) throw new Error('No autorizado')
   const supabase = createAdminClient()
 
   // Check if medical history already exists for this patient
@@ -151,6 +156,7 @@ export async function saveMedicalHistory(data: MedicalHistoryData) {
 }
 
 export async function getPatientWithMedicalHistory(patientId: string) {
+  if (!(await getAuthContext())) return null
   const supabase = createAdminClient()
 
   const { data: patient, error: patientError } = await supabase

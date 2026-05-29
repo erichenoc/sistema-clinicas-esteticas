@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sanitizeError } from '@/lib/error-utils'
+import { getAuthContext, requirePermission } from '@/lib/auth/guards'
 
 // Tipos
 export interface PatientData {
@@ -73,6 +74,7 @@ export interface PatientStats {
 
 // Obtener todos los pacientes
 export async function getPatients(): Promise<PatientData[]> {
+  if (!(await getAuthContext())) return []
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,6 +95,7 @@ export async function getPatients(): Promise<PatientData[]> {
 
 // Obtener estadísticas de pacientes
 export async function getPatientStats(): Promise<PatientStats> {
+  if (!(await getAuthContext())) return { total: 0, active: 0, vip: 0, inactive: 0 }
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -118,6 +121,7 @@ export async function getPatientStats(): Promise<PatientStats> {
 
 // Obtener un paciente por ID
 export async function getPatientById(id: string): Promise<PatientData | null> {
+  if (!(await getAuthContext())) return null
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,11 +141,14 @@ export async function getPatientById(id: string): Promise<PatientData | null> {
 
 // Crear un nuevo paciente
 export async function createPatient(input: CreatePatientInput): Promise<{ data: PatientData | null; error: string | null }> {
+  const { ctx, error: permError } = await requirePermission('patients:create')
+  if (permError || !ctx) return { data: null, error: permError || 'No autorizado' }
+
   const supabase = createAdminClient()
 
   // Mapear campos al esquema real de la tabla patients
   const patientData = {
-    clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario actual
+    clinic_id: ctx.clinicId,
     first_name: input.first_name,
     last_name: input.last_name,
     email: input.email || null,
@@ -181,6 +188,9 @@ export async function createPatient(input: CreatePatientInput): Promise<{ data: 
 
 // Actualizar un paciente
 export async function updatePatient(id: string, input: UpdatePatientInput): Promise<{ data: PatientData | null; error: string | null }> {
+  const { error: permError } = await requirePermission('patients:edit')
+  if (permError) return { data: null, error: permError }
+
   const supabase = createAdminClient()
 
   // Whitelist de campos editables: evita mass-assignment (que un cliente inyecte
@@ -217,6 +227,9 @@ export async function updatePatient(id: string, input: UpdatePatientInput): Prom
 
 // Eliminar un paciente (set status to inactive since no deleted_at column exists)
 export async function deletePatient(id: string): Promise<{ success: boolean; error: string | null }> {
+  const { error: permError } = await requirePermission('patients:delete')
+  if (permError) return { success: false, error: permError }
+
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -238,13 +251,17 @@ export async function deletePatient(id: string): Promise<{ success: boolean; err
 
 // Buscar pacientes
 export async function searchPatients(query: string): Promise<PatientData[]> {
+  if (!(await getAuthContext())) return []
   const supabase = createAdminClient()
+
+  // Escapar comodines de LIKE/PostgREST y comas que romperían el filtro .or()
+  const q = query.replace(/[%_,()\\]/g, '\\$&')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('*')
-    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
+    .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
     .order('created_at', { ascending: false })
     .limit(20)
 
@@ -258,6 +275,7 @@ export async function searchPatients(query: string): Promise<PatientData[]> {
 
 // Obtener pacientes por estado
 export async function getPatientsByStatus(status: string): Promise<PatientData[]> {
+  if (!(await getAuthContext())) return []
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,6 +297,7 @@ export async function getPatientsByStatus(status: string): Promise<PatientData[]
 
 // Obtener pacientes VIP
 export async function getVIPPatients(): Promise<PatientData[]> {
+  if (!(await getAuthContext())) return []
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
