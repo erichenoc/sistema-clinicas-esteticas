@@ -554,6 +554,42 @@ export async function registerPayment(
 ): Promise<{ data: PaymentData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Validar monto positivo
+  if (!paymentData.amount || paymentData.amount <= 0) {
+    return { data: null, error: 'El monto del pago debe ser mayor que cero' }
+  }
+
+  // Validar que el pago no exceda el saldo pendiente de la factura
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: invoiceCheck } = await (supabase as any)
+    .from('invoices')
+    .select('total')
+    .eq('id', invoiceId)
+    .single()
+
+  if (!invoiceCheck) {
+    return { data: null, error: 'Factura no encontrada' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existingPayments } = await (supabase as any)
+    .from('payments')
+    .select('amount')
+    .eq('invoice_id', invoiceId)
+    .limit(100)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alreadyPaid = existingPayments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0
+  const pending = Number(invoiceCheck.total) - alreadyPaid
+
+  // Tolerancia de 1 centavo por redondeos
+  if (paymentData.amount > pending + 0.01) {
+    return {
+      data: null,
+      error: `El pago (${paymentData.amount.toFixed(2)}) excede el saldo pendiente (${pending.toFixed(2)})`,
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('payments')

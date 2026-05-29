@@ -297,13 +297,13 @@ export async function getPatientStats(): Promise<PatientStats> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('patients').select('*', { count: 'exact', head: true }).gte('created_at', startOfPrevMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfMonth.toISOString()).limit(500),
+    (supabase as any).from('appointments').select('patient_id').gte('scheduled_at', startOfMonth.toISOString()).limit(500),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('appointments').select('patient_id').gte('start_time', startOfPrevMonth.toISOString()).lt('start_time', startOfMonth.toISOString()).limit(500),
+    (supabase as any).from('appointments').select('patient_id').gte('scheduled_at', startOfPrevMonth.toISOString()).lt('scheduled_at', startOfMonth.toISOString()).limit(500),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).eq('referral_source', 'referral').gte('created_at', startOfMonth.toISOString()),
+    (supabase as any).from('patients').select('*', { count: 'exact', head: true }).eq('source', 'referral').gte('created_at', startOfMonth.toISOString()),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -444,8 +444,8 @@ export async function getAppointmentStats(): Promise<AppointmentStats> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: appointments } = await (supabase as any)
     .from('appointments')
-    .select('status, start_time, end_time')
-    .gte('start_time', startOfMonth.toISOString())
+    .select('status, scheduled_at, duration_minutes')
+    .gte('scheduled_at', startOfMonth.toISOString())
     .limit(500)
 
   const total = appointments?.length || 0
@@ -461,10 +461,8 @@ export async function getAppointmentStats(): Promise<AppointmentStats> {
   let durationCount = 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(appointments || []).forEach((a: any) => {
-    if (a.start_time && a.end_time) {
-      const start = new Date(a.start_time)
-      const end = new Date(a.end_time)
-      totalDuration += (end.getTime() - start.getTime()) / (1000 * 60) // minutes
+    if (a.duration_minutes) {
+      totalDuration += Number(a.duration_minutes)
       durationCount++
     }
   })
@@ -475,7 +473,7 @@ export async function getAppointmentStats(): Promise<AppointmentStats> {
   const days = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(appointments || []).forEach((a: any) => {
-    const day = days[new Date(a.start_time).getDay()]
+    const day = days[new Date(a.scheduled_at).getDay()]
     dayCount[day] = (dayCount[day] || 0) + 1
   })
   const peakDay = Object.entries(dayCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Martes'
@@ -484,7 +482,7 @@ export async function getAppointmentStats(): Promise<AppointmentStats> {
   const hourCount: Record<string, number> = {}
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(appointments || []).forEach((a: any) => {
-    const hour = new Date(a.start_time).getHours()
+    const hour = new Date(a.scheduled_at).getHours()
     const hourSlot = `${hour}:00 - ${hour + 2}:00`
     hourCount[hourSlot] = (hourCount[hourSlot] || 0) + 1
   })

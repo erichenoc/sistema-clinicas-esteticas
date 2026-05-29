@@ -183,13 +183,24 @@ export async function createPatient(input: CreatePatientInput): Promise<{ data: 
 export async function updatePatient(id: string, input: UpdatePatientInput): Promise<{ data: PatientData | null; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Whitelist de campos editables: evita mass-assignment (que un cliente inyecte
+  // columnas como clinic_id, status, code, etc. via spread del input).
+  const ALLOWED_FIELDS: (keyof UpdatePatientInput)[] = [
+    'first_name', 'last_name', 'email', 'phone', 'phone_secondary',
+    'date_of_birth', 'gender', 'document_type', 'document_number',
+    'address', 'city', 'state', 'postal_code',
+    'emergency_contact_name', 'emergency_contact_phone',
+    'source', 'tags', 'notes',
+  ]
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  for (const field of ALLOWED_FIELDS) {
+    if (input[field] !== undefined) updateData[field] = input[field]
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('patients')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
