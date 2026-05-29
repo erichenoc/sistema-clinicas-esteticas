@@ -44,9 +44,20 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   )
 
+  // Rutas /api que deben ser públicas (callbacks externos / assets).
+  // El resto de /api ya NO se excluye del chequeo de autenticación.
+  const publicApiRoutes = ['/api/auth/callback', '/api/logo']
+  const isPublicApiRoute = publicApiRoutes.some(route =>
+    request.nextUrl.pathname.startsWith(route)
+  )
+
   // If no user and trying to access protected route, redirect to login
-  if (!user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api')) {
+  if (!user && !isPublicRoute && !isPublicApiRoute) {
     const url = request.nextUrl.clone()
+    // Para rutas API protegidas devolvemos 401 en vez de redirigir a HTML
+    if (request.nextUrl.pathname.startsWith('/api')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
@@ -60,23 +71,27 @@ export async function updateSession(request: NextRequest) {
 
   // RBAC: Verificar permisos de ruta si el usuario está autenticado
   if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api')) {
-    // Obtener el rol del usuario desde user_metadata o profiles
-    const userMetaRole = user.user_metadata?.role as string | undefined
-
-    // Verificar si hay perfil del usuario
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('is_active')
-      .eq('id', user.id)
-      .single()
-
-    // Determinar el rol - priorizar user_metadata ya que es donde se configura el admin
+    // Fuente de verdad del rol/estado: la tabla `users` (no user_metadata, que es editable).
     let userRole: UserRole = 'receptionist'
-    if (userMetaRole === 'admin' || userMetaRole === 'owner' || userMetaRole === 'doctor' || userMetaRole === 'nurse') {
-      userRole = userMetaRole as UserRole
-    }
+    let isActive = true
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/server')
+      const adminClient = createAdminClient()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: dbUser } = await (adminClient as any)
+        .from('users')
+        .select('role, is_active')
+        .eq('id', user.id)
+        .single()
 
-    const isActive = profileData?.is_active ?? true
+      const VALID_ROLES = ['owner', 'admin', 'doctor', 'nurse', 'professional', 'assistant', 'receptionist']
+      if (dbUser?.role && VALID_ROLES.includes(dbUser.role)) {
+        userRole = dbUser.role as UserRole
+      }
+      isActive = dbUser?.is_active ?? true
+    } catch {
+      // Si falla la lectura, mantener rol mínimo (receptionist) y permitir (is_active=true)
+    }
 
     // Verificar si el usuario está activo
     if (!isActive) {

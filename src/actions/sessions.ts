@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getAuthContext } from '@/lib/auth/guards'
 import type { InjectionPoint } from '@/types/treatment-templates'
 
 // Tipos
@@ -549,18 +550,21 @@ export async function createClinicalNote(
     content: string
     is_important?: boolean
     is_private?: boolean
-  },
-  userId: string
+  }
 ): Promise<{ data: ClinicalNoteData | null; error: string | null }> {
+  // Autor y clínica SIEMPRE del servidor: nunca confiar en un userId del cliente.
+  const ctx = await getAuthContext()
+  if (!ctx) return { data: null, error: 'No autorizado' }
+
   const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('clinical_notes')
     .insert({
-      clinic_id: '00000000-0000-0000-0000-000000000001', // TODO: Obtener del usuario
+      clinic_id: ctx.clinicId,
       ...input,
-      created_by: userId,
+      created_by: ctx.userId,
     })
     .select()
     .single()

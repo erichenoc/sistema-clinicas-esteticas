@@ -2,7 +2,7 @@
 // SISTEMA DE CONTROL DE ACCESO POR ROLES (RBAC)
 // =============================================
 
-export type UserRole = 'owner' | 'admin' | 'doctor' | 'nurse' | 'receptionist'
+export type UserRole = 'owner' | 'admin' | 'doctor' | 'nurse' | 'professional' | 'assistant' | 'receptionist'
 
 // Definición de permisos por módulo
 export type Permission =
@@ -125,6 +125,30 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'billing:view', 'billing:create',
     'consents:view',
   ],
+  // 'professional' es el rol clínico usado en la BD (equivalente a 'doctor')
+  professional: [
+    'dashboard:view',
+    'patients:view', 'patients:create', 'patients:edit', 'patients:medical_history',
+    'appointments:view', 'appointments:create', 'appointments:edit', 'appointments:cancel',
+    'treatments:view',
+    'sessions:view', 'sessions:create', 'sessions:edit',
+    'pos:view', 'pos:sell',
+    'billing:view',
+    'inventory:view',
+    'professionals:view',
+    'reports:view',
+    'consents:view', 'consents:create',
+  ],
+  // 'assistant' es el rol de apoyo usado en la BD (equivalente a 'nurse')
+  assistant: [
+    'dashboard:view',
+    'patients:view', 'patients:medical_history',
+    'appointments:view', 'appointments:edit',
+    'treatments:view',
+    'sessions:view', 'sessions:create', 'sessions:edit',
+    'inventory:view',
+    'consents:view',
+  ],
 }
 
 // Rutas protegidas por módulo
@@ -178,6 +202,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
   doctor: 'Doctor/a',
   nurse: 'Enfermero/a',
+  professional: 'Profesional',
+  assistant: 'Asistente',
   receptionist: 'Recepcionista',
 }
 
@@ -187,6 +213,8 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   admin: 'bg-blue-500',
   doctor: 'bg-green-500',
   nurse: 'bg-teal-500',
+  professional: 'bg-green-500',
+  assistant: 'bg-teal-500',
   receptionist: 'bg-orange-500',
 }
 

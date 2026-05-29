@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requirePermission } from '@/lib/auth/guards'
 
 // Tipos
 export type ProfessionalStatus = 'active' | 'inactive' | 'vacation' | 'suspended' | 'terminated'
@@ -285,6 +286,11 @@ const DEFAULT_CLINIC_ID = '00000000-0000-0000-0000-000000000001'
 export async function createProfessional(
   input: CreateProfessionalInput
 ): Promise<{ data: ProfessionalSummaryData | null; error: string | null }> {
+  // Solo quien pueda gestionar profesionales (admin/owner) puede crear usuarios profesionales,
+  // que conllevan salario y comisiones. Evita escalación de privilegios.
+  const { ctx, error: permError } = await requirePermission('professionals:manage')
+  if (permError || !ctx) return { data: null, error: permError || 'No autorizado' }
+
   const supabase = createAdminClient()
 
   try {
@@ -297,7 +303,7 @@ export async function createProfessional(
       .from('users')
       .insert({
         id: userId,
-        clinic_id: DEFAULT_CLINIC_ID,
+        clinic_id: ctx.clinicId,
         email: input.email,
         first_name: input.firstName,
         last_name: input.lastName,
