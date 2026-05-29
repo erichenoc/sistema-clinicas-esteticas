@@ -141,9 +141,10 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const previousRevenue = (previousSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
 
-  // Estimate expenses as 27% of revenue (typical for clinics)
-  const totalExpenses = totalRevenue * 0.27
-  const previousExpenses = previousRevenue * 0.27
+  // No hay tabla de gastos: no inventar un porcentaje. Reportar 0 hasta que exista
+  // un registro real de gastos. (Antes se estimaba 27% del ingreso, dato ficticio.)
+  const totalExpenses = 0
+  const previousExpenses = 0
 
   const netProfit = totalRevenue - totalExpenses
   const previousProfit = previousRevenue - previousExpenses

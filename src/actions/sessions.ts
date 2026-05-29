@@ -342,12 +342,21 @@ export async function completeSession(
     return { success: false, error: 'Error al obtener la sesión' }
   }
 
+  // Idempotencia: si la sesión ya está completada, no volver a completar ni
+  // generar otra comisión (evita comisiones duplicadas por doble click/retry).
+  if (sessionData?.status === 'completed') {
+    return { success: true, error: null, commissionGenerated: false }
+  }
+
+  // `totalAmount` es un parámetro de cálculo, NO una columna de la tabla.
+  const { totalAmount: _totalAmount, ...sessionFields } = input || {}
+
   // Actualizar la sesión como completada
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('sessions')
     .update({
-      ...input,
+      ...sessionFields,
       status: 'completed',
       ended_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -412,7 +421,8 @@ export async function cancelSession(
     .from('sessions')
     .update({
       status: 'cancelled',
-      observations: reason,
+      // Usar columna dedicada para no sobrescribir las notas clínicas (observations)
+      cancellation_reason: reason || null,
       ended_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

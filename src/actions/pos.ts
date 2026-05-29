@@ -230,6 +230,8 @@ export async function createSale(input: CreateSaleInput): Promise<{
     item_type: item.item_type,
     item_id: item.item_id,
     item_name: item.item_name,
+    // FK a treatments (para reportes por categoría) cuando el item es un tratamiento
+    treatment_id: item.item_type === 'treatment' ? item.item_id : null,
     quantity: item.quantity,
     unit_price: item.unit_price,
     discount_amount: item.discount_amount,
@@ -243,7 +245,10 @@ export async function createSale(input: CreateSaleInput): Promise<{
 
   if (itemsError) {
     console.error('Error creating sale items:', itemsError)
-    // Sale was created but items failed - log but don't fail
+    // Rollback: eliminar la venta para no dejarla huérfana sin items
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('sales').delete().eq('id', sale.id)
+    return { data: null, error: 'Error al registrar los productos de la venta' }
   }
 
   revalidatePath('/pos')
