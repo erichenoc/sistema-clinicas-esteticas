@@ -74,6 +74,15 @@ import {
 import { getPatients, createPatient, type PatientData } from '@/actions/patients'
 import { getTreatments, type TreatmentListItemData } from '@/actions/treatments'
 
+// Convierte un ISO (UTC) a "YYYY-MM-DDTHH:mm" en hora LOCAL para el input
+// datetime-local. Evita el desfase de zona horaria al mostrar la hora elegida.
+function toLocalDatetimeInput(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function NuevaCitaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -654,7 +663,7 @@ function NuevaCitaContent() {
                           <Input
                             type="datetime-local"
                             {...field}
-                            value={field.value ? field.value.slice(0, 16) : ''}
+                            value={field.value ? toLocalDatetimeInput(field.value) : ''}
                             onChange={(e) => {
                               const date = e.target.value
                               if (date) {

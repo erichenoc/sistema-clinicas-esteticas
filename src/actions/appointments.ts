@@ -653,11 +653,13 @@ export async function deleteAppointment(id: string): Promise<{ success: boolean;
 export async function getProfessionals(): Promise<ProfessionalData[]> {
   const supabase = createAdminClient()
 
+  // Profesionales reales = marcados como profesional o con rol clínico.
+  // (Se excluyen cuentas de sistema admin/owner que NO atienden pacientes.)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('users')
     .select('*')
-    .in('role', ['doctor', 'nurse', 'admin', 'owner'])
+    .or('is_professional.eq.true,role.in.(doctor,nurse,professional)')
     .eq('is_active', true)
     .order('first_name')
     .limit(500)
@@ -667,7 +669,12 @@ export async function getProfessionals(): Promise<ProfessionalData[]> {
     return []
   }
 
-  return (data || []) as ProfessionalData[]
+  // Construir full_name a partir de first_name/last_name (la tabla no tiene columna full_name)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((u: any) => ({
+    ...u,
+    full_name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Profesional',
+  })) as ProfessionalData[]
 }
 
 // Obtener salas activas
