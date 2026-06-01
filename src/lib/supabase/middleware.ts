@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
 
   // Rutas /api que deben ser públicas (callbacks externos / assets).
   // El resto de /api ya NO se excluye del chequeo de autenticación.
-  const publicApiRoutes = ['/api/auth/callback', '/api/logo']
+  const publicApiRoutes = ['/api/auth/callback', '/api/logo', '/api/cron']
   const isPublicApiRoute = publicApiRoutes.some(route =>
     request.nextUrl.pathname.startsWith(route)
   )

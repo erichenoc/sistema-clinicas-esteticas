@@ -7,7 +7,7 @@ import {
   createGoogleCalendarEvent,
   updateGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
-  isGoogleCalendarConnected,
+  resolveCalendarUserId,
 } from '@/actions/google-calendar'
 import { sanitizeError } from '@/lib/error-utils'
 
@@ -404,15 +404,16 @@ export async function createAppointment(
 
   // Google Calendar sync - non-blocking
   try {
-    const calendarConnected = await isGoogleCalendarConnected(input.professional_id)
+    // Empuja al calendario del profesional si está conectado; si no, al del dueño (central).
+    const calendarUserId = await resolveCalendarUserId(input.professional_id)
 
-    if (calendarConnected) {
+    if (calendarUserId) {
       const { patientName, professionalName } = await resolveAppointmentNames(
         input.patient_id,
         input.professional_id
       )
 
-      const gcalResult = await createGoogleCalendarEvent(input.professional_id, {
+      const gcalResult = await createGoogleCalendarEvent(calendarUserId, {
         treatmentName: input.treatment_name || null,
         patientName,
         scheduledAt: input.scheduled_at,
@@ -492,16 +493,16 @@ export async function updateAppointment(
     const googleEventId: string | null = existing?.google_event_id ?? null
 
     if (professionalId && googleEventId) {
-      const calendarConnected = await isGoogleCalendarConnected(professionalId)
+      const calendarUserId = await resolveCalendarUserId(professionalId)
 
-      if (calendarConnected) {
+      if (calendarUserId) {
         const patientId = input.patient_id ?? existing?.patient_id
         const { patientName, professionalName } = await resolveAppointmentNames(
           patientId,
           professionalId
         )
 
-        const gcalResult = await updateGoogleCalendarEvent(professionalId, googleEventId, {
+        const gcalResult = await updateGoogleCalendarEvent(calendarUserId, googleEventId, {
           treatmentName: input.treatment_name ?? existing?.treatment_name ?? null,
           patientName,
           scheduledAt: input.scheduled_at ?? existing?.scheduled_at,
@@ -573,10 +574,10 @@ export async function updateAppointmentStatus(
       const professionalId: string | null = existing?.professional_id ?? null
 
       if (professionalId && googleEventId) {
-        const calendarConnected = await isGoogleCalendarConnected(professionalId)
+        const calendarUserId = await resolveCalendarUserId(professionalId)
 
-        if (calendarConnected) {
-          const gcalResult = await deleteGoogleCalendarEvent(professionalId, googleEventId)
+        if (calendarUserId) {
+          const gcalResult = await deleteGoogleCalendarEvent(calendarUserId, googleEventId)
 
           if (!gcalResult.success && gcalResult.error) {
             console.error('Google Calendar sync failed on cancellation:', gcalResult.error)
@@ -630,10 +631,10 @@ export async function deleteAppointment(id: string): Promise<{ success: boolean;
     const professionalId: string | null = existing?.professional_id ?? null
 
     if (professionalId && googleEventId) {
-      const calendarConnected = await isGoogleCalendarConnected(professionalId)
+      const calendarUserId = await resolveCalendarUserId(professionalId)
 
-      if (calendarConnected) {
-        const gcalResult = await deleteGoogleCalendarEvent(professionalId, googleEventId)
+      if (calendarUserId) {
+        const gcalResult = await deleteGoogleCalendarEvent(calendarUserId, googleEventId)
 
         if (!gcalResult.success && gcalResult.error) {
           console.error('Google Calendar sync failed on delete:', gcalResult.error)

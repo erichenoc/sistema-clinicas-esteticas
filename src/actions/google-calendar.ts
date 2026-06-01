@@ -383,3 +383,102 @@ export async function deleteGoogleCalendarEvent(
     return { success: false, error: 'Error al eliminar evento en Google Calendar' }
   }
 }
+
+// =============================================
+// SINCRONIZACIÓN AUTOMÁTICA (pull de todos los conectados)
+// =============================================
+
+/**
+ * Devuelve el user_id al que se debe empujar el evento de una cita:
+ * - si el profesional tiene Google conectado, su propio calendario;
+ * - si no, el calendario del dueño/admin conectado (calendario central de la clínica).
+ */
+export async function resolveCalendarUserId(professionalId: string): Promise<string | null> {
+  const supabase = createAdminClient()
+
+  // ¿El profesional está conectado?
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: own } = await (supabase as any)
+    .from('google_calendar_tokens')
+    .select('user_id')
+    .eq('user_id', professionalId)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (own) return professionalId
+
+  // Fallback: primer owner/admin con Google conectado (calendario central de la clínica)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: activeTokens } = await (supabase as any)
+    .from('google_calendar_tokens')
+    .select('user_id')
+    .eq('is_active', true)
+  const tokenUserIds = (activeTokens || []).map((t: { user_id: string }) => t.user_id)
+  if (tokenUserIds.length === 0) return null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: owner } = await (supabase as any)
+    .from('users')
+    .select('id')
+    .in('role', ['owner', 'admin'])
+    .in('id', tokenUserIds)
+    .limit(1)
+    .maybeSingle()
+
+  return owner?.id || null
+}
+
+/**
+ * Sincroniza (pull) las citas desde Google Calendar para TODOS los usuarios
+ * conectados. Con throttle por usuario para no saturar la API de Google.
+ */
+export async function syncAllConnectedCalendars(options?: {
+  throttleMinutes?: number
+}): Promise<{ imported: number; skipped: number; errors: number; usersSynced: number }> {
+  const supabase = createAdminClient()
+  const throttleMinutes = options?.throttleMinutes ?? 0
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tokens } = await (supabase as any)
+    .from('google_calendar_tokens')
+    .select('user_id, last_synced_at')
+    .eq('is_active', true)
+
+  let imported = 0
+  let skipped = 0
+  let errors = 0
+  let usersSynced = 0
+
+  for (const t of (tokens || [])) {
+    // Throttle: saltar si se sincronizó hace menos de throttleMinutes
+    if (throttleMinutes > 0 && t.last_synced_at) {
+      const ageMs = Date.now() - new Date(t.last_synced_at).getTime()
+      if (ageMs < throttleMinutes * 60_000) continue
+    }
+
+    const result = await syncFromGoogleCalendar(t.user_id)
+    imported += result.imported
+    skipped += result.skipped
+    errors += result.errors
+    usersSynced++
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('google_calendar_tokens')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('user_id', t.user_id)
+  }
+
+  return { imported, skipped, errors, usersSynced }
+}
+
+/**
+ * Disparador para la agenda (cliente): pull throttled de todos los conectados.
+ * Requiere sesión. Devuelve cuántas citas se importaron para refrescar la UI.
+ */
+export async function triggerAgendaSync(): Promise<{ imported: number }> {
+  const { getAuthContext } = await import('@/lib/auth/guards')
+  if (!(await getAuthContext())) return { imported: 0 }
+
+  const result = await syncAllConnectedCalendars({ throttleMinutes: 5 })
+  return { imported: result.imported }
+}

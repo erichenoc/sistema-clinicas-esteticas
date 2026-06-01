@@ -32,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { AppointmentListItemData, ProfessionalData } from '@/actions/appointments'
 import { updateAppointmentStatus } from '@/actions/appointments'
+import { triggerAgendaSync } from '@/actions/google-calendar'
 
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -75,6 +76,22 @@ export function AgendaCalendar({ appointments, professionals }: AgendaCalendarPr
   const [currentDate, setCurrentDate] = useState<Date | null>(null)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+
+  // Sincronizar (pull) citas desde Google Calendar al abrir la agenda.
+  // throttled en el servidor (5 min) para no saturar la API de Google.
+  useEffect(() => {
+    let cancelled = false
+    triggerAgendaSync()
+      .then((res) => {
+        if (!cancelled && res.imported > 0) {
+          toast.success(`${res.imported} cita(s) importada(s) de Google Calendar`)
+          router.refresh()
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setCurrentDate(new Date())
