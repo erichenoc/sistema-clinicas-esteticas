@@ -67,6 +67,14 @@ async function getUserTokens(userId: string) {
       }
     } catch {
       console.error('Failed to refresh Google Calendar token for user:', userId)
+      // El refresh token ya no es válido (revocado o expirado por modo Testing de la
+      // app OAuth). Marcar como inactivo para que la UI pida reconectar y no se intente
+      // sincronizar en vano.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('google_calendar_tokens')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
       return null
     }
   }
