@@ -108,7 +108,7 @@ export async function getInventoryCountItems(countId: string): Promise<Inventory
     .from('inventory_count_items')
     .select(`
       *,
-      products (name, sku)
+      products (name, code)
     `)
     .eq('count_id', countId)
     .order('created_at', { ascending: true })
@@ -123,7 +123,7 @@ export async function getInventoryCountItems(countId: string): Promise<Inventory
   return (data || []).map((item: any) => ({
     ...item,
     product_name: item.products?.name || 'Producto',
-    product_sku: item.products?.sku || '',
+    product_sku: item.products?.code || '',
   })) as InventoryCountItemData[]
 }
 
@@ -190,11 +190,10 @@ export async function createInventoryCount(
     .from('products')
     .select(`
       id,
-      cost_price,
+      cost,
       inventory (quantity)
     `)
     .eq('is_active', true)
-    .eq('track_stock', true)
 
   if (input.product_ids && input.product_ids.length > 0) {
     productsQuery = productsQuery.in('id', input.product_ids)
@@ -208,7 +207,7 @@ export async function createInventoryCount(
       count_id: count.id,
       product_id: p.id,
       system_quantity: p.inventory?.[0]?.quantity || 0,
-      unit_cost: p.cost_price || 0,
+      unit_cost: p.cost || 0,
       status: 'pending',
     }))
 
@@ -490,7 +489,7 @@ export async function getTransferItems(transferId: string): Promise<TransferItem
     .from('inventory_transfer_items')
     .select(`
       *,
-      products (name, sku)
+      products (name, code)
     `)
     .eq('transfer_id', transferId)
     .limit(200)
@@ -504,7 +503,7 @@ export async function getTransferItems(transferId: string): Promise<TransferItem
   return (data || []).map((item: any) => ({
     ...item,
     product_name: item.products?.name || 'Producto',
-    product_sku: item.products?.sku || '',
+    product_sku: item.products?.code || '',
   })) as TransferItemData[]
 }
 

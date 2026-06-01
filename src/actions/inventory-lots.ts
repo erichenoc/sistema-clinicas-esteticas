@@ -41,7 +41,7 @@ export async function getProductLots(options?: {
     .from('product_lots')
     .select(`
       *,
-      products (name, sku)
+      products (name, code)
     `)
     .order('expiry_date', { ascending: true })
     .limit(500)

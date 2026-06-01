@@ -542,13 +542,13 @@ export async function getProfessionalPerformance(): Promise<ProfessionalPerforma
     // Get commissions (as proxy for revenue)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: commissions } = await (supabase as any)
-      .from('professional_commissions')
-      .select('commission_amount, sale_amount')
+      .from('commissions')
+      .select('commission_amount, base_amount')
       .eq('professional_id', prof.id)
       .limit(500)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const totalRevenue = (commissions || []).reduce((sum: number, c: any) => sum + (c.sale_amount || 0), 0)
+    const totalRevenue = (commissions || []).reduce((sum: number, c: any) => sum + (c.base_amount || 0), 0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const totalCommission = (commissions || []).reduce((sum: number, c: any) => sum + (c.commission_amount || 0), 0)
 
@@ -629,7 +629,7 @@ export async function getInventoryStats(): Promise<{
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { count: expiringSoon } = await (supabase as any)
-    .from('product_batches')
+    .from('product_lots')
     .select('*', { count: 'exact', head: true })
     .lte('expiry_date', thirtyDaysFromNow.toISOString())
     .gt('current_quantity', 0)

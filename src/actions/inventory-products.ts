@@ -540,17 +540,11 @@ export async function searchProducts(query: string): Promise<ProductListItemData
     .from('products')
     .select(`
       *,
-      product_categories (
-        name,
-        color
-      ),
       inventory (
-        quantity,
-        reserved_quantity,
-        available_quantity
+        quantity
       )
     `)
-    .or(`name.ilike.%${query}%,sku.ilike.%${query}%,barcode.ilike.%${query}%`)
+    .or(`name.ilike.%${query.replace(/[%_,()\\]/g, '\\$&')}%,code.ilike.%${query.replace(/[%_,()\\]/g, '\\$&')}%`)
     .eq('is_active', true)
     .order('name', { ascending: true })
     .limit(20)
