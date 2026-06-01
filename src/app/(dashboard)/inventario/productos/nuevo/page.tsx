@@ -45,7 +45,7 @@ import {
 } from '@/types/inventory'
 import { productSchema, ProductFormData } from '@/lib/validations/inventory'
 import { toast } from 'sonner'
-import { getProductCategories, createProduct, initializeDefaultCategories, type ProductCategoryData } from '@/actions/inventory'
+import { getProductCategories, createProduct, initializeDefaultCategories, getSuppliers, type ProductCategoryData } from '@/actions/inventory'
 
 // Product type options for clear selection
 const PRODUCT_TYPE_OPTIONS = [
@@ -68,6 +68,14 @@ export default function NuevoProductoPage() {
   const [activeTab, setActiveTab] = useState('general')
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+
+  // Cargar proveedores activos para el selector
+  useEffect(() => {
+    getSuppliers({ isActive: true })
+      .then((data) => setSuppliers(data.map((s) => ({ id: s.id, name: s.name }))))
+      .catch(() => setSuppliers([]))
+  }, [])
 
   // Cargar categorías de la base de datos (e inicializar si no existen)
   useEffect(() => {
@@ -105,6 +113,7 @@ export default function NuevoProductoPage() {
     resolver: zodResolver(productSchema),
     defaultValues: {
       categoryId: null,
+      supplierId: null,
       sku: '',
       barcode: null,
       name: '',
@@ -180,6 +189,7 @@ export default function NuevoProductoPage() {
       // Mapear campos del formulario a CreateProductInput
       const result = await createProduct({
         category_id: data.categoryId || undefined,
+        default_supplier_id: data.supplierId || undefined,
         sku: data.sku || undefined,
         barcode: data.barcode || undefined,
         name: data.name,
@@ -393,6 +403,40 @@ export default function NuevoProductoPage() {
                                       />
                                       {cat.name}
                                     </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="supplierId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Proveedor</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || undefined}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar proveedor (opcional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {suppliers.length === 0 ? (
+                                <SelectItem value="none" disabled>
+                                  No hay proveedores. Créalos en Inventario → Proveedores.
+                                </SelectItem>
+                              ) : (
+                                suppliers.map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>
+                                    {s.name}
                                   </SelectItem>
                                 ))
                               )}

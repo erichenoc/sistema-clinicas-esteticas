@@ -287,7 +287,7 @@ export async function getProducts(options?: {
       thumbnail_url: null,
       is_active: p.is_active,
       is_sellable: p.is_for_sale, // production uses 'is_for_sale'
-      default_supplier_id: null,
+      default_supplier_id: p.supplier_id || null,
       notes: null,
       created_at: p.created_at,
       updated_at: p.updated_at,
@@ -347,7 +347,7 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
     thumbnail_url: null,
     is_active: p.is_active,
     is_sellable: p.is_for_sale,
-    default_supplier_id: null,
+    default_supplier_id: p.supplier_id || null,
     notes: null,
     created_at: p.created_at,
     updated_at: p.updated_at,
@@ -382,6 +382,7 @@ export async function createProduct(
     is_consumable: input.type === 'consumable' || input.type === 'injectable', // production uses 'is_consumable' not 'type'
     is_for_sale: input.is_sellable ?? (input.type === 'retail'), // production uses 'is_for_sale' not 'is_sellable'
     is_active: input.is_active ?? true,
+    supplier_id: input.default_supplier_id || null, // proveedor que vende este producto
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -424,6 +425,7 @@ export async function updateProduct(
   if (input.min_stock !== undefined) updateData.min_stock = input.min_stock
   if (input.is_active !== undefined) updateData.is_active = input.is_active
   if (input.is_sellable !== undefined) updateData.is_for_sale = input.is_sellable // production uses 'is_for_sale'
+  if (input.default_supplier_id !== undefined) updateData.supplier_id = input.default_supplier_id
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)

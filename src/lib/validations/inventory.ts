@@ -24,6 +24,7 @@ export type ProductCategoryFormData = z.infer<typeof productCategorySchema>
 
 export const productSchema = z.object({
   categoryId: z.string().uuid('Selecciona una categoría').optional().nullable(),
+  supplierId: z.string().uuid('Selecciona un proveedor').optional().nullable(),
   sku: z.string()
     .min(3, 'El SKU debe tener al menos 3 caracteres')
     .max(50)

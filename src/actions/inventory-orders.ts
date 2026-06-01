@@ -138,7 +138,7 @@ export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOr
     .from('purchase_order_items')
     .select(`
       *,
-      products (name, sku)
+      products (name, code)
     `)
     .eq('purchase_order_id', orderId)
     .order('created_at', { ascending: true })
@@ -153,7 +153,7 @@ export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOr
   return (data || []).map((item: any) => ({
     ...item,
     product_name: item.products?.name || 'Producto',
-    product_sku: item.products?.sku || '',
+    product_sku: item.products?.code || '',
   })) as PurchaseOrderItemData[]
 }
 

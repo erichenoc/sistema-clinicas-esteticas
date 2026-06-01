@@ -490,9 +490,20 @@ export function OrdenesCompraClient({ initialOrders, initialStats, suppliers, pr
                       <SelectValue placeholder="Seleccionar producto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
+                      {(() => {
+                        // Mostrar los productos que vende el proveedor seleccionado.
+                        // Si el proveedor aún no tiene productos asignados, mostrar todos.
+                        const ofSupplier = formData.supplier_id
+                          ? products.filter(p => p.default_supplier_id === formData.supplier_id)
+                          : []
+                        const list = ofSupplier.length > 0 ? ofSupplier : products
+                        if (list.length === 0) {
+                          return <div className="px-2 py-2 text-sm text-muted-foreground">No hay productos. Crea productos en Inventario.</div>
+                        }
+                        return list.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>
