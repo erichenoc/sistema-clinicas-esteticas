@@ -370,7 +370,7 @@ export function POSClient({ treatments, packages, products, patients }: POSClien
                     {patients.map((patient) => (
                       <CommandItem
                         key={patient.id}
-                        value={patient.name}
+                        value={`${patient.name} ${patient.phone} ${patient.id}`}
                         onSelect={() => {
                           setSelectedPatient(patient)
                           setPatientOpen(false)

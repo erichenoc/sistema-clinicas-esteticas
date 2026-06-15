@@ -16,13 +16,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Table,
   TableBody,
   TableCell,
@@ -38,7 +31,12 @@ import {
 } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { useUser } from '@/contexts/user-context'
-import { formatCurrency, PAYMENT_TERMS_OPTIONS } from '@/types/billing'
+import { formatCurrency } from '@/types/billing'
+import {
+  getInvoiceById,
+  getInvoiceItems,
+  updateInvoiceWithItems,
+} from '@/actions/billing'
 
 interface InvoiceItem {
   id: string
@@ -49,6 +47,7 @@ interface InvoiceItem {
   discountType: 'percentage' | 'fixed'
   taxable: boolean
   taxRate: number
+  treatmentId: string | null
 }
 
 export default function EditInvoicePage({
@@ -65,10 +64,7 @@ export default function EditInvoicePage({
   // Form state
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [clientName, setClientName] = useState('')
-  const [clientEmail, setClientEmail] = useState('')
-  const [clientPhone, setClientPhone] = useState('')
   const [clientRnc, setClientRnc] = useState('')
-  const [paymentTerms, setPaymentTerms] = useState('immediate')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
 
@@ -80,45 +76,60 @@ export default function EditInvoicePage({
     }
   }, [hasPermission, userLoading, router])
 
-  // Load invoice data
+  // Cargar datos reales de la factura
   useEffect(() => {
-    // Simular carga de datos (en produccion seria una llamada a API)
     const loadInvoice = async () => {
-      // Mock data
-      setInvoiceNumber(`FAC-2024-00${id}`)
-      setClientName('Maria Garcia Lopez')
-      setClientEmail('maria.garcia@email.com')
-      setClientPhone('809-555-1234')
-      setClientRnc('')
-      setPaymentTerms('immediate')
-      setNotes('Tratamiento realizado por Dra. Carmen Perez.')
-      setItems([
-        {
-          id: '1',
-          description: 'Limpieza Facial Profunda',
-          quantity: 1,
-          unitPrice: 2500,
-          discount: 0,
-          discountType: 'percentage',
-          taxable: true,
-          taxRate: 18,
-        },
-        {
-          id: '2',
-          description: 'Botox - Zona Entrecejo (20 unidades)',
-          quantity: 1,
-          unitPrice: 15000,
-          discount: 10,
-          discountType: 'percentage',
-          taxable: true,
-          taxRate: 18,
-        },
-      ])
-      setIsLoading(false)
+      setIsLoading(true)
+      try {
+        const [invoice, itemsData] = await Promise.all([
+          getInvoiceById(id),
+          getInvoiceItems(id),
+        ])
+
+        if (!invoice) {
+          toast.error('Factura no encontrada')
+          router.push('/facturacion')
+          return
+        }
+
+        // Solo se puede editar mientras la factura no tenga pagos ni este anulada
+        const locked =
+          invoice.status === 'paid' ||
+          invoice.status === 'cancelled' ||
+          invoice.paid_amount > 0
+        if (locked) {
+          toast.error('Esta factura ya no se puede editar (pagada o anulada)')
+          router.push(`/facturacion/facturas/${id}`)
+          return
+        }
+
+        setInvoiceNumber(invoice.invoice_number)
+        setClientName(invoice.patient_name || 'Cliente General')
+        setClientRnc(invoice.ncf || '')
+        setNotes(invoice.notes || '')
+        setItems(
+          itemsData.map((item) => ({
+            id: item.id,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
+            discount: item.discount_percent || 0,
+            discountType: 'percentage' as const,
+            taxable: (item.tax_percent || 0) > 0,
+            taxRate: (item.tax_percent || 0) > 0 ? item.tax_percent : 18,
+            treatmentId: item.treatment_id,
+          }))
+        )
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Error loading invoice:', error)
+        toast.error('Error al cargar la factura')
+        router.push('/facturacion')
+      }
     }
 
     loadInvoice()
-  }, [id])
+  }, [id, router])
 
   const calculateItemTotal = (item: InvoiceItem) => {
     let subtotal = item.quantity * item.unitPrice
@@ -182,6 +193,7 @@ export default function EditInvoicePage({
       discountType: 'percentage',
       taxable: true,
       taxRate: 18,
+      treatmentId: null,
     }
     setItems([...items, newItem])
   }
@@ -206,11 +218,33 @@ export default function EditInvoicePage({
 
     setIsSaving(true)
 
-    // Simular guardado
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      const { error } = await updateInvoiceWithItems(
+        id,
+        { notes: notes.trim() || null },
+        items.map((item) => ({
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          discount_percent: item.discount,
+          tax_percent: item.taxable ? item.taxRate : 0,
+          treatment_id: item.treatmentId,
+        }))
+      )
 
-    toast.success('Factura actualizada exitosamente')
-    router.push(`/facturacion/facturas/${id}`)
+      if (error) {
+        toast.error(error)
+        return
+      }
+
+      toast.success('Factura actualizada exitosamente')
+      router.push(`/facturacion/facturas/${id}`)
+    } catch (error) {
+      console.error('Error updating invoice:', error)
+      toast.error('Error al actualizar la factura')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const totals = calculateTotals()
@@ -261,51 +295,24 @@ export default function EditInvoicePage({
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Client Info */}
+          {/* Client Info (solo lectura: el cliente se define al crear la factura) */}
           <Card>
             <CardHeader>
               <CardTitle>Datos del Cliente</CardTitle>
-              <CardDescription>Informacion del cliente para la factura</CardDescription>
+              <CardDescription>El cliente no se puede modificar desde la edicion</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="clientName">Nombre *</Label>
-                  <Input
-                    id="clientName"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                  />
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground">Nombre</Label>
+                  <p className="font-medium">{clientName}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientRnc">RNC / Cedula</Label>
-                  <Input
-                    id="clientRnc"
-                    value={clientRnc}
-                    onChange={(e) => setClientRnc(e.target.value)}
-                    placeholder="Para comprobantes fiscales"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="clientEmail">Email</Label>
-                  <Input
-                    id="clientEmail"
-                    type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientPhone">Telefono</Label>
-                  <Input
-                    id="clientPhone"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="1-809-555-0000"
-                  />
-                </div>
+                {clientRnc && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground">NCF / Comprobante</Label>
+                    <p className="font-mono font-medium">{clientRnc}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -437,29 +444,6 @@ export default function EditInvoicePage({
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuracion</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="paymentTerms">Terminos de Pago</Label>
-                <Select value={paymentTerms} onValueChange={setPaymentTerms}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_TERMS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Resumen</CardTitle>

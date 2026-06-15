@@ -511,7 +511,10 @@ export default function InvoiceDetailPage({
                 </DropdownMenuItem>
               )}
               {invoice.patient_id && <DropdownMenuSeparator />}
-              {canEditInvoice && invoice.status !== 'cancelled' && (
+              {canEditInvoice &&
+                invoice.status !== 'cancelled' &&
+                invoice.status !== 'paid' &&
+                invoice.paid_amount === 0 && (
                 <DropdownMenuItem asChild>
                   <Link href={`/facturacion/facturas/${invoice.id}/editar`}>
                     <Pencil className="mr-2 h-4 w-4" />

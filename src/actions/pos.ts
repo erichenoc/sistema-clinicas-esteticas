@@ -137,13 +137,15 @@ export async function getPOSProducts(): Promise<POSProduct[]> {
 export async function getPOSPatients(): Promise<POSPatient[]> {
   const supabase = createAdminClient()
 
+  // Mostrar TODOS los pacientes en el POS (igual que la busqueda de facturacion).
+  // Antes se filtraba por status='active' y limit(100), por lo que faltaban pacientes.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('patients')
     .select('id, first_name, last_name, phone, email')
-    .eq('status', 'active')
     .order('first_name', { ascending: true })
-    .limit(100)
+    .order('last_name', { ascending: true })
+    .limit(500)
 
   if (error) {
     console.error('Error fetching patients for POS:', error)

@@ -136,10 +136,45 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
     .lt('created_at', previousEndDate.toISOString())
     .limit(500)
 
+  // Pagos de facturas (Facturacion) cobrados en cada periodo. El POS y las facturas
+  // son sistemas independientes: el POS no genera pagos en esta tabla, por lo que
+  // sumar ambos NO duplica. Se cuenta el dinero realmente cobrado (no las pendientes).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalRevenue = (currentSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
+  const { data: currentPayments } = await (supabase as any)
+    .from('payments')
+    .select('amount, invoices(status)')
+    .gte('payment_date', startDate.toISOString())
+    .limit(1000)
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const previousRevenue = (previousSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
+  const { data: previousPayments } = await (supabase as any)
+    .from('payments')
+    .select('amount, invoices(status)')
+    .gte('payment_date', previousStartDate.toISOString())
+    .lt('payment_date', previousEndDate.toISOString())
+    .limit(1000)
+
+  // Excluir pagos de facturas anuladas
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sumPayments = (rows: any[]) => (rows || [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((p: any) => p.invoices?.status !== 'cancelled')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentPaymentRows = (currentPayments || []).filter((p: any) => p.invoices?.status !== 'cancelled')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const previousPaymentRows = (previousPayments || []).filter((p: any) => p.invoices?.status !== 'cancelled')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const salesRevenue = (currentSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const previousSalesRevenue = (previousSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
+
+  // Ingreso total = ventas POS + pagos de facturas cobrados
+  const totalRevenue = salesRevenue + sumPayments(currentPayments)
+  const previousRevenue = previousSalesRevenue + sumPayments(previousPayments)
 
   // No hay tabla de gastos: no inventar un porcentaje. Reportar 0 hasta que exista
   // un registro real de gastos. (Antes se estimaba 27% del ingreso, dato ficticio.)
@@ -149,8 +184,11 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
   const netProfit = totalRevenue - totalExpenses
   const previousProfit = previousRevenue - previousExpenses
 
-  const averageTicket = currentSales?.length ? totalRevenue / currentSales.length : 0
-  const previousTicket = previousSales?.length ? previousRevenue / previousSales.length : 0
+  // Ticket promedio sobre el numero de transacciones (ventas POS + pagos de factura)
+  const currentTxCount = (currentSales?.length || 0) + currentPaymentRows.length
+  const previousTxCount = (previousSales?.length || 0) + previousPaymentRows.length
+  const averageTicket = currentTxCount ? totalRevenue / currentTxCount : 0
+  const previousTicket = previousTxCount ? previousRevenue / previousTxCount : 0
 
   return {
     totalRevenue,

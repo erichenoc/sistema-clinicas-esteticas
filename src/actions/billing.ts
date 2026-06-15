@@ -283,6 +283,125 @@ export async function updateInvoice(
   return { data: data as InvoiceData, error: null }
 }
 
+// Item editable enviado desde el formulario de edicion de factura
+export interface EditableInvoiceItemInput {
+  description: string
+  quantity: number
+  unit_price: number
+  discount_percent: number
+  tax_percent: number
+  treatment_id?: string | null
+}
+
+// Actualizar factura completa (cabecera + items) recalculando los totales.
+// Solo permitido mientras la factura este PENDIENTE: si ya tiene pagos
+// registrados, esta pagada o anulada, la edicion se rechaza.
+export async function updateInvoiceWithItems(
+  id: string,
+  header: { notes?: string | null },
+  items: EditableInvoiceItemInput[]
+): Promise<{ error: string | null }> {
+  const supabase = createAdminClient()
+
+  // Validaciones basicas
+  if (!items || items.length === 0) {
+    return { error: 'La factura debe tener al menos un item' }
+  }
+  if (items.some((i) => !i.description?.trim())) {
+    return { error: 'Todos los items deben tener una descripcion' }
+  }
+
+  // Verificar estado y pagos actuales (defensa en el servidor)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: current, error: fetchError } = await (supabase as any)
+    .from('invoices')
+    .select('status, payments(amount)')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !current) {
+    return { error: 'Factura no encontrada' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paidAmount = (current.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0)
+
+  if (current.status === 'cancelled') {
+    return { error: 'No se puede editar una factura anulada' }
+  }
+  if (current.status === 'paid' || paidAmount > 0) {
+    return { error: 'No se puede editar una factura que ya tiene pagos registrados' }
+  }
+
+  // Calcular totales a partir de los items (mismo criterio que la creacion)
+  let subtotal = 0
+  let discountAmount = 0
+  let taxAmount = 0
+  const itemsToInsert = items.map((item) => {
+    const gross = item.quantity * item.unit_price
+    const itemDiscount = gross * ((item.discount_percent || 0) / 100)
+    const net = gross - itemDiscount
+    const itemTax = net * ((item.tax_percent || 0) / 100)
+    subtotal += net
+    discountAmount += itemDiscount
+    taxAmount += itemTax
+    return {
+      invoice_id: id,
+      description: item.description.trim(),
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      discount_percent: item.discount_percent || 0,
+      tax_percent: item.tax_percent || 0,
+      subtotal: net + itemTax,
+      treatment_id: item.treatment_id || null,
+    }
+  })
+  const total = subtotal + taxAmount
+
+  // Reemplazar items: borrar los actuales e insertar los nuevos
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: delError } = await (supabase as any)
+    .from('invoice_items')
+    .delete()
+    .eq('invoice_id', id)
+  if (delError) {
+    console.error('Error deleting invoice items:', delError)
+    return { error: 'Error al actualizar los items de la factura' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insError } = await (supabase as any)
+    .from('invoice_items')
+    .insert(itemsToInsert)
+  if (insError) {
+    console.error('Error inserting invoice items:', insError)
+    return { error: 'Error al guardar los items de la factura' }
+  }
+
+  // Actualizar cabecera y totales recalculados
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('invoices')
+    .update({
+      subtotal,
+      tax_amount: taxAmount,
+      discount_amount: discountAmount,
+      total,
+      notes: header.notes ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error updating invoice:', error)
+    return { error: 'Error al actualizar la factura' }
+  }
+
+  revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${id}`)
+  return { error: null }
+}
+
 // Cancelar (anular) factura — registra auditoria de quien la anulo
 export async function cancelInvoice(
   id: string,
