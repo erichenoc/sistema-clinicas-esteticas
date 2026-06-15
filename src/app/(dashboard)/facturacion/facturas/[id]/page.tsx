@@ -26,6 +26,7 @@ import {
   Copy,
   User,
   Loader2,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -81,6 +82,8 @@ import {
   getPaymentsByInvoice,
   cancelInvoice,
   registerPayment,
+  updatePayment,
+  deletePayment,
   sendInvoiceEmail,
   type InvoiceListItemData,
   type InvoiceItemData,
@@ -97,9 +100,11 @@ export default function InvoiceDetailPage({
 }) {
   const { id } = use(params)
   const router = useRouter()
-  const { hasPermission } = useUser()
+  const { hasPermission, user } = useUser()
   const canEditInvoice = hasPermission('billing:edit')
   const canVoidInvoice = hasPermission('billing:void')
+  // Solo admin y dueno pueden editar/eliminar pagos del historial
+  const canManagePayments = user?.role === 'admin' || user?.role === 'owner'
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -117,6 +122,14 @@ export default function InvoiceDetailPage({
   const [emailRecipient, setEmailRecipient] = useState('')
   const [invoice, setInvoice] = useState<(InvoiceListItemData & { items?: InvoiceItemData[] }) | null>(null)
   const [payments, setPayments] = useState<PaymentData[]>([])
+  // Edicion / eliminacion de abonos (admin/owner)
+  const [editingPayment, setEditingPayment] = useState<PaymentData | null>(null)
+  const [editAmount, setEditAmount] = useState('')
+  const [editMethod, setEditMethod] = useState<string>('')
+  const [editReference, setEditReference] = useState('')
+  const [isSavingPayment, setIsSavingPayment] = useState(false)
+  const [deletingPayment, setDeletingPayment] = useState<PaymentData | null>(null)
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false)
 
   // Fetch invoice data from database
   useEffect(() => {
@@ -338,6 +351,79 @@ export default function InvoiceDetailPage({
       toast.error('Error al registrar el pago')
     } finally {
       setIsProcessingPayment(false)
+    }
+  }
+
+  const refreshPaymentsData = async () => {
+    const [invoiceData, itemsData, paymentsData] = await Promise.all([
+      getInvoiceById(id),
+      getInvoiceItems(id),
+      getPaymentsByInvoice(id),
+    ])
+    if (invoiceData) {
+      setInvoice({ ...invoiceData, items: itemsData })
+    }
+    setPayments(paymentsData)
+  }
+
+  const openEditPayment = (p: PaymentData) => {
+    setEditingPayment(p)
+    setEditAmount(String(p.amount))
+    setEditMethod(p.payment_method)
+    setEditReference(p.reference || '')
+  }
+
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return
+    const amount = parseFloat(editAmount)
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Ingrese un monto valido')
+      return
+    }
+    if (!editMethod) {
+      toast.error('Seleccione un metodo de pago')
+      return
+    }
+
+    setIsSavingPayment(true)
+    try {
+      const result = await updatePayment(editingPayment.id, {
+        amount,
+        payment_method: editMethod as PaymentMethod,
+        reference: editReference || null,
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Pago actualizado')
+      setEditingPayment(null)
+      await refreshPaymentsData()
+    } catch (error) {
+      console.error('Error updating payment:', error)
+      toast.error('Error al actualizar el pago')
+    } finally {
+      setIsSavingPayment(false)
+    }
+  }
+
+  const handleDeletePayment = async () => {
+    if (!deletingPayment) return
+    setIsDeletingPayment(true)
+    try {
+      const result = await deletePayment(deletingPayment.id)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Pago eliminado')
+      setDeletingPayment(null)
+      await refreshPaymentsData()
+    } catch (error) {
+      console.error('Error deleting payment:', error)
+      toast.error('Error al eliminar el pago')
+    } finally {
+      setIsDeletingPayment(false)
     }
   }
 
@@ -722,6 +808,7 @@ export default function InvoiceDetailPage({
                       <TableHead>Metodo</TableHead>
                       <TableHead>Referencia</TableHead>
                       <TableHead className="text-right">Monto</TableHead>
+                      {canManagePayments && <TableHead className="w-[60px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -738,6 +825,30 @@ export default function InvoiceDetailPage({
                         <TableCell className="text-right font-medium text-green-600">
                           {formatCurrency(p.amount, invoice.currency)}
                         </TableCell>
+                        {canManagePayments && (
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => openEditPayment(p)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Editar pago
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onSelect={() => setDeletingPayment(p)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar pago
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -747,12 +858,14 @@ export default function InvoiceDetailPage({
                       <TableCell className="text-right font-medium text-green-600">
                         {formatCurrency(invoice.paid_amount, invoice.currency)}
                       </TableCell>
+                      {canManagePayments && <TableCell />}
                     </TableRow>
                     <TableRow className="bg-muted/50">
                       <TableCell colSpan={3} className="text-right font-bold">Saldo pendiente</TableCell>
                       <TableCell className={`text-right font-bold ${invoice.amount_due > 0 ? 'text-amber-600' : 'text-green-600'}`}>
                         {formatCurrency(invoice.amount_due, invoice.currency)}
                       </TableCell>
+                      {canManagePayments && <TableCell />}
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -913,6 +1026,89 @@ export default function InvoiceDetailPage({
             <Button onClick={handleSendEmail} disabled={isSendingEmail}>
               {isSendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enviar Factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar pago (admin/owner) */}
+      <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Pago</DialogTitle>
+            <DialogDescription>
+              Modifica el monto, metodo o referencia de este abono. El saldo se recalcula automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editAmount">Monto</Label>
+              <Input
+                id="editAmount"
+                type="number"
+                placeholder="0.00"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editMethod">Metodo de Pago</Label>
+              <Select value={editMethod} onValueChange={setEditMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar metodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHOD_OPTIONS.map((method) => (
+                    <SelectItem key={method.value} value={method.value}>
+                      {method.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editReference">Referencia (opcional)</Label>
+              <Input
+                id="editReference"
+                placeholder="Numero de transaccion, ultimos 4 digitos, etc."
+                value={editReference}
+                onChange={(e) => setEditReference(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPayment(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdatePayment} disabled={isSavingPayment}>
+              {isSavingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Eliminar pago (admin/owner) */}
+      <Dialog open={!!deletingPayment} onOpenChange={(open) => !open && setDeletingPayment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Pago</DialogTitle>
+            <DialogDescription>
+              {deletingPayment && (
+                <>
+                  Vas a eliminar el abono de {formatCurrency(deletingPayment.amount, invoice.currency)}.
+                  Esta accion no se puede deshacer y el saldo pendiente se recalculara.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingPayment(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeletePayment} disabled={isDeletingPayment}>
+              {isDeletingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar Pago
             </Button>
           </DialogFooter>
         </DialogContent>

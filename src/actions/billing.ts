@@ -766,6 +766,177 @@ export async function registerPayment(
   return { data: data as PaymentData, error: null }
 }
 
+// Obtener el rol del usuario actual (para acciones restringidas)
+async function getCurrentUserRole(): Promise<string | null> {
+  try {
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) return null
+    const admin = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (admin as any)
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    return data?.role ?? null
+  } catch {
+    return null
+  }
+}
+
+// Recalcular el estado de la factura segun los pagos registrados
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recalcInvoicePaymentStatus(supabase: any, invoiceId: string): Promise<void> {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('total, due_date, status')
+    .eq('id', invoiceId)
+    .single()
+  if (!invoice) return
+  // No reactivar una factura anulada
+  if (invoice.status === 'cancelled') return
+
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('amount')
+    .eq('invoice_id', invoiceId)
+    .limit(200)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalPaid = (payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0)
+  const total = Number(invoice.total)
+
+  let newStatus: InvoiceStatus
+  if (totalPaid > 0 && totalPaid >= total - 0.01) {
+    newStatus = 'paid'
+  } else if (totalPaid > 0) {
+    newStatus = 'partial'
+  } else {
+    // Sin pagos: pendiente (o vencida si ya paso la fecha de vencimiento)
+    newStatus = invoice.due_date && new Date(invoice.due_date) < new Date() ? 'overdue' : 'pending'
+  }
+
+  await supabase
+    .from('invoices')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('id', invoiceId)
+}
+
+// Editar un pago/abono (solo admin y owner). Recalcula el estado de la factura.
+export async function updatePayment(
+  paymentId: string,
+  input: {
+    amount?: number
+    payment_method?: PaymentMethod
+    reference?: string | null
+    notes?: string | null
+  }
+): Promise<{ error: string | null }> {
+  const role = await getCurrentUserRole()
+  if (role !== 'admin' && role !== 'owner') {
+    return { error: 'Solo los administradores y el dueno pueden modificar pagos' }
+  }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('payments')
+    .select('id, invoice_id, amount')
+    .eq('id', paymentId)
+    .single()
+
+  if (!existing) {
+    return { error: 'Pago no encontrado' }
+  }
+
+  // Validar monto si se modifica: positivo y que no exceda el total de la factura
+  if (input.amount !== undefined) {
+    if (!(input.amount > 0)) {
+      return { error: 'El monto del pago debe ser mayor que cero' }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: inv } = await (supabase as any)
+      .from('invoices')
+      .select('total')
+      .eq('id', existing.invoice_id)
+      .single()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: others } = await (supabase as any)
+      .from('payments')
+      .select('amount')
+      .eq('invoice_id', existing.invoice_id)
+      .neq('id', paymentId)
+      .limit(200)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const otherSum = (others || []).reduce((s: number, p: any) => s + (p.amount || 0), 0)
+    if (inv && input.amount + otherSum > Number(inv.total) + 0.01) {
+      const available = Number(inv.total) - otherSum
+      return { error: `El pago excede el total de la factura (disponible: ${available.toFixed(2)})` }
+    }
+  }
+
+  const updateData: Record<string, unknown> = {}
+  if (input.amount !== undefined) updateData.amount = input.amount
+  if (input.payment_method !== undefined) updateData.payment_method = input.payment_method
+  if (input.reference !== undefined) updateData.reference = input.reference || null
+  if (input.notes !== undefined) updateData.notes = input.notes || null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payments')
+    .update(updateData)
+    .eq('id', paymentId)
+
+  if (error) {
+    console.error('Error updating payment:', error)
+    return { error: 'Error al actualizar el pago' }
+  }
+
+  await recalcInvoicePaymentStatus(supabase, existing.invoice_id)
+  revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${existing.invoice_id}`)
+  return { error: null }
+}
+
+// Eliminar un pago/abono (solo admin y owner). Recalcula el estado de la factura.
+export async function deletePayment(paymentId: string): Promise<{ error: string | null }> {
+  const role = await getCurrentUserRole()
+  if (role !== 'admin' && role !== 'owner') {
+    return { error: 'Solo los administradores y el dueno pueden eliminar pagos' }
+  }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('payments')
+    .select('id, invoice_id')
+    .eq('id', paymentId)
+    .single()
+
+  if (!existing) {
+    return { error: 'Pago no encontrado' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payments')
+    .delete()
+    .eq('id', paymentId)
+
+  if (error) {
+    console.error('Error deleting payment:', error)
+    return { error: 'Error al eliminar el pago' }
+  }
+
+  await recalcInvoicePaymentStatus(supabase, existing.invoice_id)
+  revalidatePath('/facturacion')
+  revalidatePath(`/facturacion/facturas/${existing.invoice_id}`)
+  return { error: null }
+}
+
 // =============================================
 // ESTADISTICAS
 // =============================================
