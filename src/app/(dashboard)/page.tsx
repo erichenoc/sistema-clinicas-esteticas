@@ -29,6 +29,7 @@ import {
   Eye,
   ChevronRight,
   Sparkles,
+  FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -132,6 +133,7 @@ export default function DashboardPage() {
 
   // Data states
   const [mainStats, setMainStats] = useState<MainStat[]>([])
+  const [revenueBreakdown, setRevenueBreakdown] = useState({ pos: 0, invoice: 0, total: 0 })
   const [todayAppointments, setTodayAppointments] = useState<AppointmentDisplay[]>([])
   const [topTreatments, setTopTreatments] = useState<TopTreatment[]>([])
   const [alerts, setAlerts] = useState<AlertItem[]>([])
@@ -173,6 +175,13 @@ export default function DashboardPage() {
 
         const pendingCount = appointmentsData.filter(a => a.status === 'scheduled' || a.status === 'confirmed').length
         const waitingCount = appointmentsData.filter(a => a.status === 'waiting').length
+
+        // Desglose de lo cobrado este mes: POS vs Facturas
+        setRevenueBreakdown({
+          pos: financialData.posRevenue,
+          invoice: financialData.invoiceRevenue,
+          total: financialData.totalRevenue,
+        })
 
         setMainStats([
           {
@@ -367,6 +376,51 @@ export default function DashboardPage() {
           ))
         )}
       </div>
+
+      {/* Desglose de ingresos cobrados: POS vs Facturas */}
+      {!isLoading && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <ShoppingCart className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cobrado por POS</p>
+                  <p className="text-xl font-bold">{formatCurrency(revenueBreakdown.pos)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100">
+                  <FileText className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cobrado por Facturas</p>
+                  <p className="text-xl font-bold">{formatCurrency(revenueBreakdown.invoice)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Cobrado del Mes</p>
+                  <p className="text-xl font-bold">{formatCurrency(revenueBreakdown.total)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Progress Card */}
       <Card>

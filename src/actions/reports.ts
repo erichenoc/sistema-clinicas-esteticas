@@ -9,6 +9,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 export interface FinancialSummary {
   totalRevenue: number
   previousRevenue: number
+  posRevenue: number      // cobrado por POS (ventas)
+  invoiceRevenue: number  // cobrado por facturas (pagos)
   totalExpenses: number
   previousExpenses: number
   netProfit: number
@@ -173,7 +175,8 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
   const previousSalesRevenue = (previousSales || []).reduce((sum: number, s: any) => sum + (s.total || 0), 0)
 
   // Ingreso total = ventas POS + pagos de facturas cobrados
-  const totalRevenue = salesRevenue + sumPayments(currentPayments)
+  const invoiceRevenue = sumPayments(currentPayments)
+  const totalRevenue = salesRevenue + invoiceRevenue
   const previousRevenue = previousSalesRevenue + sumPayments(previousPayments)
 
   // No hay tabla de gastos: no inventar un porcentaje. Reportar 0 hasta que exista
@@ -193,6 +196,8 @@ export async function getFinancialSummary(period: string = 'month'): Promise<Fin
   return {
     totalRevenue,
     previousRevenue,
+    posRevenue: salesRevenue,
+    invoiceRevenue,
     totalExpenses,
     previousExpenses,
     netProfit,
