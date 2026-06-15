@@ -78,11 +78,13 @@ import { Pencil } from 'lucide-react'
 import {
   getInvoiceById,
   getInvoiceItems,
+  getPaymentsByInvoice,
   cancelInvoice,
   registerPayment,
   sendInvoiceEmail,
   type InvoiceListItemData,
   type InvoiceItemData,
+  type PaymentData,
   type PaymentMethod,
 } from '@/actions/billing'
 import { downloadInvoicePDF } from '@/components/pdf/download-invoice-pdf'
@@ -114,19 +116,22 @@ export default function InvoiceDetailPage({
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [emailRecipient, setEmailRecipient] = useState('')
   const [invoice, setInvoice] = useState<(InvoiceListItemData & { items?: InvoiceItemData[] }) | null>(null)
+  const [payments, setPayments] = useState<PaymentData[]>([])
 
   // Fetch invoice data from database
   useEffect(() => {
     async function fetchInvoice() {
       setIsLoading(true)
       try {
-        const [invoiceData, itemsData] = await Promise.all([
+        const [invoiceData, itemsData, paymentsData] = await Promise.all([
           getInvoiceById(id),
           getInvoiceItems(id),
+          getPaymentsByInvoice(id),
         ])
         if (invoiceData) {
           setInvoice({ ...invoiceData, items: itemsData })
         }
+        setPayments(paymentsData)
       } catch (error) {
         console.error('Error fetching invoice:', error)
         toast.error('Error al cargar la factura')
@@ -319,13 +324,15 @@ export default function InvoiceDetailPage({
       setPaymentNotes('')
 
       // Refresh invoice data
-      const [invoiceData, itemsData] = await Promise.all([
+      const [invoiceData, itemsData, paymentsData] = await Promise.all([
         getInvoiceById(id),
         getInvoiceItems(id),
+        getPaymentsByInvoice(id),
       ])
       if (invoiceData) {
         setInvoice({ ...invoiceData, items: itemsData })
       }
+      setPayments(paymentsData)
     } catch (error) {
       console.error('Error registering payment:', error)
       toast.error('Error al registrar el pago')
@@ -694,6 +701,64 @@ export default function InvoiceDetailPage({
               </Table>
             </CardContent>
           </Card>
+
+          {/* Historial de Pagos / Abonos */}
+          {payments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Banknote className="h-5 w-5" />
+                  Historial de Pagos
+                </CardTitle>
+                <CardDescription>
+                  {payments.length} {payments.length === 1 ? 'abono registrado' : 'abonos registrados'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Metodo</TableHead>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>{formatDateTime(p.payment_date)}</TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-2">
+                            {getPaymentMethodIcon(p.payment_method)}
+                            {getPaymentMethodLabel(p.payment_method)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{p.reference || '—'}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600">
+                          {formatCurrency(p.amount, invoice.currency)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-right">Total pagado</TableCell>
+                      <TableCell className="text-right font-medium text-green-600">
+                        {formatCurrency(invoice.paid_amount, invoice.currency)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={3} className="text-right font-bold">Saldo pendiente</TableCell>
+                      <TableCell className={`text-right font-bold ${invoice.amount_due > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                        {formatCurrency(invoice.amount_due, invoice.currency)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Notes */}
           {invoice.notes && (
