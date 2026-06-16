@@ -505,6 +505,40 @@ export async function updateProfessional(
   }
 }
 
+// Actualizar SOLO el sueldo (base_salary / salary_type) de un profesional.
+// Restringido a quien pueda gestionar profesionales (admin/owner) — protege la nomina.
+// A diferencia de updateProfessional, aqui base_salary 0 SI se guarda (no se vuelve null).
+export async function updateProfessionalSalary(
+  id: string,
+  input: { baseSalary?: number | null; salaryType?: string }
+): Promise<{ error: string | null }> {
+  const { ctx, error: permError } = await requirePermission('professionals:manage')
+  if (permError || !ctx) return { error: permError || 'No autorizado' }
+
+  const supabase = createAdminClient()
+
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (input.baseSalary !== undefined) updateData.base_salary = input.baseSalary
+  if (input.salaryType !== undefined) updateData.salary_type = input.salaryType
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('users')
+    .update(updateData)
+    .eq('id', id)
+    .eq('is_professional', true)
+
+  if (error) {
+    console.error('Error updating professional salary:', error)
+    return { error: 'Error al actualizar el sueldo' }
+  }
+
+  revalidatePath('/nomina')
+  revalidatePath('/profesionales')
+  revalidatePath(`/profesionales/${id}`)
+  return { error: null }
+}
+
 // =============================================
 // COMISIONES
 // =============================================

@@ -22,7 +22,8 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { getProfessionals, type ProfessionalSummaryData } from '@/actions/professionals'
+import { getProfessionals, updateProfessionalSalary, type ProfessionalSummaryData } from '@/actions/professionals'
+import { useUser } from '@/contexts/user-context'
 import {
   Card,
   CardContent,
@@ -62,7 +63,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -167,6 +167,8 @@ const mockHistorialNomina: HistorialNominaData[] = [
 ]
 
 export default function NominaPage() {
+  const { hasPermission } = useUser()
+  const canManageSalaries = hasPermission('professionals:manage')
   const [selectedPeriod, setSelectedPeriod] = useState('2024-12')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('nomina')
@@ -174,44 +176,86 @@ export default function NominaPage() {
   const [nomina, setNomina] = useState<NominaData[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Edicion de sueldo (solo admin/dueno)
+  const [editingEmp, setEditingEmp] = useState<EmpleadoData | null>(null)
+  const [editSalary, setEditSalary] = useState('')
+  const [editSalaryType, setEditSalaryType] = useState('monthly')
+  const [isSavingSalary, setIsSavingSalary] = useState(false)
+
   // Cargar profesionales como empleados
-  useEffect(() => {
-    async function loadEmployees() {
-      setIsLoading(true)
-      try {
-        const professionalsData = await getProfessionals({ status: 'active' })
+  async function loadEmployees() {
+    setIsLoading(true)
+    try {
+      const professionalsData = await getProfessionals({ status: 'active' })
 
-        // Convertir profesionales a formato de empleados
-        const employeesList: EmpleadoData[] = professionalsData.map((p: ProfessionalSummaryData) => ({
-          id: p.id,
-          name: p.full_name || `${p.first_name} ${p.last_name}`,
-          cedula: p.license_number || 'Sin cédula',
-          position: p.title || 'Profesional',
-          department: 'Medicina Estética',
-          type: p.employment_type || 'fijo',
-          salary: p.base_salary || 50000, // Salario base por defecto
-          startDate: p.hire_date || '2024-01-01',
-          status: p.status || 'active',
-          bankAccount: '****0000',
-          afp: 'AFP Popular',
-          ars: 'Humano',
-          avatar: p.profile_image_url || null,
-        }))
+      // Convertir profesionales a formato de empleados
+      const employeesList: EmpleadoData[] = professionalsData.map((p: ProfessionalSummaryData) => ({
+        id: p.id,
+        name: p.full_name || `${p.first_name} ${p.last_name}`,
+        cedula: p.license_number || 'Sin cédula',
+        position: p.title || 'Profesional',
+        department: 'Medicina Estética',
+        type: p.salary_type || 'monthly',
+        salary: p.base_salary ?? 0, // Sueldo real (0 = sin definir)
+        startDate: p.hire_date || '2024-01-01',
+        status: p.status || 'active',
+        bankAccount: '****0000',
+        afp: 'AFP Popular',
+        ars: 'Humano',
+        avatar: p.profile_image_url || null,
+      }))
 
-        setEmpleados(employeesList)
+      setEmpleados(employeesList)
 
-        // Generar nómina desde empleados
-        const nominaList = generateNominaFromEmployees(employeesList, selectedPeriod)
-        setNomina(nominaList)
-      } catch (error) {
-        console.error('Error loading employees:', error)
-        toast.error('Error al cargar los empleados')
-      } finally {
-        setIsLoading(false)
-      }
+      // Generar nómina desde empleados
+      const nominaList = generateNominaFromEmployees(employeesList, selectedPeriod)
+      setNomina(nominaList)
+    } catch (error) {
+      console.error('Error loading employees:', error)
+      toast.error('Error al cargar los empleados')
+    } finally {
+      setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
     loadEmployees()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod])
+
+  const openEditSalary = (emp: EmpleadoData) => {
+    setEditingEmp(emp)
+    setEditSalary(emp.salary > 0 ? String(emp.salary) : '')
+    setEditSalaryType(emp.type || 'monthly')
+  }
+
+  const handleSaveSalary = async () => {
+    if (!editingEmp) return
+    const amount = parseFloat(editSalary)
+    if (isNaN(amount) || amount < 0) {
+      toast.error('Ingrese un sueldo valido')
+      return
+    }
+    setIsSavingSalary(true)
+    try {
+      const result = await updateProfessionalSalary(editingEmp.id, {
+        baseSalary: amount,
+        salaryType: editSalaryType,
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`Sueldo de ${editingEmp.name} actualizado`)
+      setEditingEmp(null)
+      await loadEmployees()
+    } catch (error) {
+      console.error('Error saving salary:', error)
+      toast.error('Error al guardar el sueldo')
+    } finally {
+      setIsSavingSalary(false)
+    }
+  }
 
   const filteredEmpleados = empleados.filter((emp) => {
     if (searchTerm && !emp.name.toLowerCase().includes(searchTerm.toLowerCase())) return false
@@ -470,100 +514,12 @@ export default function NominaPage() {
                   Directorio de empleados activos
                 </CardDescription>
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nuevo Empleado
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <DialogHeader>
-                    <DialogTitle>Registrar Nuevo Empleado</DialogTitle>
-                    <DialogDescription>
-                      Ingresa los datos del nuevo empleado
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-4 grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Nombre Completo</Label>
-                        <Input id="name" placeholder="Nombre del empleado" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cedula">Cédula</Label>
-                        <Input id="cedula" placeholder="000-0000000-0" />
-                      </div>
-                    </div>
-                    <div className="grid gap-4 grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="position">Posición</Label>
-                        <Input id="position" placeholder="Cargo del empleado" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="department">Departamento</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="medicina">Medicina Estética</SelectItem>
-                            <SelectItem value="admin">Administración</SelectItem>
-                            <SelectItem value="servicios">Servicios Generales</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid gap-4 grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="salary">Salario Mensual (RD$)</Label>
-                        <Input id="salary" type="number" placeholder="0.00" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="startDate">Fecha de Ingreso</Label>
-                        <Input id="startDate" type="date" />
-                      </div>
-                    </div>
-                    <div className="grid gap-4 grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="afp">AFP</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar AFP" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="popular">AFP Popular</SelectItem>
-                            <SelectItem value="reservas">AFP Reservas</SelectItem>
-                            <SelectItem value="romana">AFP Romana</SelectItem>
-                            <SelectItem value="siembra">AFP Siembra</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ars">ARS</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar ARS" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="humano">Humano</SelectItem>
-                            <SelectItem value="senasa">Senasa</SelectItem>
-                            <SelectItem value="palic">ARS Palic</SelectItem>
-                            <SelectItem value="universal">Universal</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bankAccount">Cuenta Bancaria</Label>
-                      <Input id="bankAccount" placeholder="Número de cuenta para depósito" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit">Registrar Empleado</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <Button asChild>
+                <Link href="/profesionales/nuevo">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Empleado
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -597,7 +553,13 @@ export default function NominaPage() {
                       </TableCell>
                       <TableCell>{emp.position}</TableCell>
                       <TableCell>{emp.department}</TableCell>
-                      <TableCell className="text-right font-medium">{formatPrice(emp.salary)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {emp.salary > 0 ? (
+                          formatPrice(emp.salary)
+                        ) : (
+                          <span className="text-muted-foreground font-normal">Sin definir</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="text-xs">
                           <p>{emp.afp}</p>
@@ -617,13 +579,17 @@ export default function NominaPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver perfil
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Historial de pagos
+                            {canManageSalaries && (
+                              <DropdownMenuItem onSelect={() => openEditSalary(emp)}>
+                                <DollarSign className="mr-2 h-4 w-4" />
+                                Editar sueldo
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem asChild>
+                              <Link href={`/profesionales/${emp.id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver perfil
+                              </Link>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -806,6 +772,55 @@ export default function NominaPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Editar sueldo (solo admin/dueno) */}
+      <Dialog open={!!editingEmp} onOpenChange={(open) => !open && setEditingEmp(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Sueldo</DialogTitle>
+            <DialogDescription>
+              {editingEmp && `Sueldo base de ${editingEmp.name}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-salary">Sueldo Base (RD$)</Label>
+              <Input
+                id="edit-salary"
+                type="number"
+                min="0"
+                placeholder="0.00"
+                value={editSalary}
+                onChange={(e) => setEditSalary(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-salary-type">Tipo de Sueldo</Label>
+              <Select value={editSalaryType} onValueChange={setEditSalaryType}>
+                <SelectTrigger id="edit-salary-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Mensual</SelectItem>
+                  <SelectItem value="biweekly">Quincenal</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="hourly">Por hora</SelectItem>
+                  <SelectItem value="commission_only">Solo comisiones</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingEmp(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveSalary} disabled={isSavingSalary}>
+              {isSavingSalary && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar Sueldo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
