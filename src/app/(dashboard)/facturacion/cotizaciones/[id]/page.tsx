@@ -25,6 +25,7 @@ import {
   AtSign,
   Calendar,
   DollarSign,
+  Receipt,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,7 @@ import {
   deleteQuotation,
   sendQuotationEmail,
   updateQuotationStatus,
+  convertQuotationToInvoice,
   type QuotationData,
 } from '@/actions/quotations'
 import { getCurrentExchangeRate, type CurrencyConversion } from '@/actions/exchange-rates'
@@ -78,6 +80,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
   const [isSending, setIsSending] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
   const [exchangeRate, setExchangeRate] = useState<CurrencyConversion | null>(null)
 
   useEffect(() => {
@@ -125,6 +128,23 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
       toast.success(`Cotizacion marcada como ${status === 'accepted' ? 'aceptada' : 'rechazada'}`)
     } else {
       toast.error(result.error || 'Error al actualizar estado')
+    }
+  }
+
+  const handleConvert = async () => {
+    if (!quotation) return
+    setIsConverting(true)
+    toast.loading('Convirtiendo en factura...', { id: 'convert' })
+
+    const result = await convertQuotationToInvoice(quotation.id)
+
+    toast.dismiss('convert')
+    if (result.success && result.invoiceId) {
+      toast.success('Factura creada. Registra el pago para marcarla como cobrada.')
+      router.push(`/facturacion/facturas/${result.invoiceId}`)
+    } else {
+      toast.error(result.error || 'Error al convertir en factura')
+      setIsConverting(false)
     }
   }
 
@@ -249,6 +269,26 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               )}
               Enviar por Email
             </Button>
+          )}
+
+          {quotation.status === 'accepted' && (
+            <Button onClick={handleConvert} disabled={isConverting}>
+              {isConverting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Receipt className="mr-2 h-4 w-4" />
+              )}
+              Convertir a Factura
+            </Button>
+          )}
+
+          {quotation.status === 'converted' && quotation.converted_invoice_id && (
+            <Link href={`/facturacion/facturas/${quotation.converted_invoice_id}`}>
+              <Button>
+                <Receipt className="mr-2 h-4 w-4" />
+                Ver Factura
+              </Button>
+            </Link>
           )}
 
           <Link href={`/facturacion/cotizaciones/nueva?duplicate=${quotation.id}`}>

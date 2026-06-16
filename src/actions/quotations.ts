@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { sendEmail, generateQuotationEmailHTML } from '@/lib/email'
 import { notifyQuotationSent } from '@/actions/notifications'
 import { getCurrentExchangeRate } from '@/actions/exchange-rates'
+import { createInvoice } from '@/actions/billing'
 import { sanitizeError } from '@/lib/error-utils'
 
 // Types
@@ -347,6 +348,89 @@ export async function updateQuotationStatus(
 
   revalidatePath('/facturacion/cotizaciones')
   return { success: true }
+}
+
+// Convertir una cotizacion en factura (copia cliente, items y totales).
+// La factura se crea como PENDIENTE; luego se puede "Registrar Pago" para marcarla cobrada.
+export async function convertQuotationToInvoice(
+  quotationId: string
+): Promise<{ success: boolean; invoiceId?: string; error?: string }> {
+  const supabase = createAdminClient()
+
+  const quote = await getQuotationById(quotationId)
+  if (!quote) return { success: false, error: 'Cotizacion no encontrada' }
+
+  // Si ya fue convertida, devolver la factura existente (no duplicar)
+  if (quote.status === 'converted' && quote.converted_invoice_id) {
+    return { success: true, invoiceId: quote.converted_invoice_id }
+  }
+
+  // Crear la cabecera de la factura con los totales de la cotizacion
+  const invoiceResult = await createInvoice({
+    patient_id: quote.patient_id,
+    subtotal: quote.subtotal,
+    tax_amount: quote.tax_amount,
+    discount_amount: quote.discount_total,
+    total: quote.total,
+    currency: quote.currency,
+    notes: quote.notes,
+  })
+  if (invoiceResult.error || !invoiceResult.data) {
+    return { success: false, error: invoiceResult.error || 'Error al crear la factura' }
+  }
+  const invoiceId = invoiceResult.data.id
+
+  // Copiar los items (insercion directa para NO recalcular y respetar los totales de la cotizacion)
+  const items = quote.items || []
+  if (items.length > 0) {
+    const itemsToInsert = items.map((it) => {
+      const gross = it.quantity * it.unit_price
+      const discountPercent =
+        it.discount_type === 'percentage'
+          ? it.discount || 0
+          : gross > 0
+            ? ((it.discount || 0) / gross) * 100
+            : 0
+      return {
+        invoice_id: invoiceId,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        discount_percent: discountPercent,
+        tax_percent: quote.tax_rate || 0,
+        subtotal: it.subtotal,
+        treatment_id: it.type === 'treatment' ? it.reference_id || null : null,
+      }
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: itemsError } = await (supabase as any)
+      .from('invoice_items')
+      .insert(itemsToInsert)
+    if (itemsError) {
+      // La factura ya existe con sus totales correctos; los items son solo el detalle.
+      console.error('Error copiando items a la factura:', itemsError)
+    }
+  }
+
+  // Marcar la cotizacion como convertida y enlazar la factura
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: convErr } = await (supabase as any)
+    .from('quotations')
+    .update({
+      status: 'converted',
+      converted_invoice_id: invoiceId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quotationId)
+
+  if (convErr) {
+    console.error('Error marcando la cotizacion como convertida:', convErr)
+  }
+
+  revalidatePath('/facturacion')
+  revalidatePath('/facturacion/cotizaciones')
+  revalidatePath(`/facturacion/cotizaciones/${quotationId}`)
+  return { success: true, invoiceId }
 }
 
 // Send quotation by email
