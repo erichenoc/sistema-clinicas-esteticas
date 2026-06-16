@@ -165,6 +165,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   '/facturacion': ['billing:view'],
   '/inventario': ['inventory:view'],
   '/profesionales': ['professionals:view'],
+  '/nomina': ['professionals:manage'], // Nomina/sueldos: solo admin y dueno
   '/reportes': ['reports:view'],
   '/configuracion': ['settings:view'],
   '/consentimientos': ['consents:view'],

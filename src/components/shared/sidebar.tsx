@@ -25,8 +25,17 @@ import { Separator } from '@/components/ui/separator'
 import { MedLuxeLogoSimple } from './medluxe-logo'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { useUser } from '@/contexts/user-context'
+import type { Permission } from '@/lib/auth/roles'
 
-const navigation = [
+interface NavItem {
+  name: string
+  href: string
+  icon: typeof LayoutDashboard
+  permission?: Permission
+}
+
+const navigation: NavItem[] = [
   {
     name: 'Dashboard',
     href: '/',
@@ -36,70 +45,88 @@ const navigation = [
     name: 'Pacientes',
     href: '/pacientes',
     icon: Users,
+    permission: 'patients:view',
   },
   {
     name: 'Agenda',
     href: '/agenda',
     icon: Calendar,
+    permission: 'appointments:view',
   },
   {
     name: 'Tratamientos',
     href: '/tratamientos',
     icon: Sparkles,
+    permission: 'treatments:view',
   },
   {
     name: 'Sesiones',
     href: '/sesiones',
     icon: ClipboardList,
+    permission: 'sessions:view',
   },
   {
     name: 'POS',
     href: '/pos',
     icon: ShoppingCart,
+    permission: 'pos:view',
   },
   {
     name: 'Facturacion',
     href: '/facturacion',
     icon: Receipt,
+    permission: 'billing:view',
   },
   {
     name: 'Inventario',
     href: '/inventario',
     icon: Package,
+    permission: 'inventory:view',
   },
   {
     name: 'Profesionales',
     href: '/profesionales',
     icon: UserCog,
+    permission: 'professionals:view',
   },
   {
     name: 'Nomina',
     href: '/nomina',
     icon: Wallet,
+    permission: 'professionals:manage', // sueldos: solo admin/dueno
   },
   {
     name: 'Consentimientos',
     href: '/consentimientos',
     icon: FileText,
+    permission: 'consents:view',
   },
   {
     name: 'Reportes',
     href: '/reportes',
     icon: BarChart3,
+    permission: 'reports:view',
   },
 ]
 
-const bottomNavigation = [
+const bottomNavigation: NavItem[] = [
   {
     name: 'Configuracion',
     href: '/configuracion',
     icon: Settings,
+    permission: 'settings:view',
   },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { hasPermission } = useUser()
+
+  // Mostrar solo lo que el rol puede usar (oculta Nomina/sueldos a la cajera, etc.)
+  const canSee = (item: NavItem) => !item.permission || hasPermission(item.permission)
+  const visibleNavigation = navigation.filter(canSee)
+  const visibleBottomNavigation = bottomNavigation.filter(canSee)
 
   const handleLogout = async () => {
     try {
@@ -125,7 +152,7 @@ export function Sidebar() {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-4 py-6">
         <nav className="flex flex-col gap-1">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href))
@@ -160,7 +187,7 @@ export function Sidebar() {
       {/* Bottom Navigation */}
       <div className="border-t border-sidebar-border px-4 py-4">
         <nav className="flex flex-col gap-1">
-          {bottomNavigation.map((item) => {
+          {visibleBottomNavigation.map((item) => {
             const isActive = pathname.startsWith(item.href)
 
             return (
