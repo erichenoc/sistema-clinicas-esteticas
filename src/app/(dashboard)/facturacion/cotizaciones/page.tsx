@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { pdf } from '@react-pdf/renderer'
-import { ArrowLeft, Plus, Search, FileText, Clock, CheckCircle, XCircle, Send, MoreHorizontal, Loader2, Mail, Trash2, Copy, FileCheck, Download } from 'lucide-react'
+import { ArrowLeft, Plus, Search, FileText, Clock, CheckCircle, XCircle, Send, MoreHorizontal, Loader2, Mail, Trash2, Copy, FileCheck, Download, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -42,7 +43,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 
-import { getQuotations, getQuotationStats, deleteQuotation, sendQuotationEmail, updateQuotationStatus, getQuotationById, type QuotationData } from '@/actions/quotations'
+import { getQuotations, getQuotationStats, deleteQuotation, sendQuotationEmail, updateQuotationStatus, convertQuotationToInvoice, getQuotationById, type QuotationData } from '@/actions/quotations'
 import { QuotationPDF } from '@/components/pdf/quotation-pdf'
 
 const statusConfig = {
@@ -55,6 +56,7 @@ const statusConfig = {
 }
 
 export default function CotizacionesPage() {
+  const router = useRouter()
   const [quotations, setQuotations] = useState<QuotationData[]>([])
   const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0, totalValue: 0 })
   const [isLoading, setIsLoading] = useState(true)
@@ -63,6 +65,7 @@ export default function CotizacionesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
 
   // Load data
   useEffect(() => {
@@ -138,6 +141,23 @@ export default function CotizacionesPage() {
       toast.success(`Cotización marcada como ${status === 'accepted' ? 'aceptada' : 'rechazada'}`)
     } else {
       toast.error(result.error || 'Error al actualizar estado')
+    }
+  }
+
+  // Handle convert to invoice
+  const handleConvert = async (id: string) => {
+    setConvertingId(id)
+    toast.loading('Convirtiendo en factura...', { id: 'convert' })
+
+    const result = await convertQuotationToInvoice(id)
+
+    toast.dismiss('convert')
+    if (result.success && result.invoiceId) {
+      toast.success('Factura creada. Registra el pago para marcarla como cobrada.')
+      router.push(`/facturacion/facturas/${result.invoiceId}`)
+    } else {
+      toast.error(result.error || 'Error al convertir en factura')
+      setConvertingId(null)
     }
   }
 
@@ -387,8 +407,8 @@ export default function CotizacionesPage() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={sendingId === quote.id || downloadingId === quote.id}>
-                              {sendingId === quote.id || downloadingId === quote.id ? (
+                            <Button variant="ghost" size="icon" disabled={sendingId === quote.id || downloadingId === quote.id || convertingId === quote.id}>
+                              {sendingId === quote.id || downloadingId === quote.id || convertingId === quote.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <MoreHorizontal className="h-4 w-4" />
@@ -428,6 +448,20 @@ export default function CotizacionesPage() {
                                   Marcar como rechazada
                                 </DropdownMenuItem>
                               </>
+                            )}
+                            {quote.status === 'accepted' && (
+                              <DropdownMenuItem onClick={() => handleConvert(quote.id)}>
+                                <Receipt className="mr-2 h-4 w-4 text-primary" />
+                                Convertir a factura
+                              </DropdownMenuItem>
+                            )}
+                            {quote.status === 'converted' && quote.converted_invoice_id && (
+                              <DropdownMenuItem asChild>
+                                <Link href={`/facturacion/facturas/${quote.converted_invoice_id}`}>
+                                  <Receipt className="mr-2 h-4 w-4 text-primary" />
+                                  Ver factura
+                                </Link>
+                              </DropdownMenuItem>
                             )}
                             <DropdownMenuItem asChild>
                               <Link href={`/facturacion/cotizaciones/nueva?duplicate=${quote.id}`}>
