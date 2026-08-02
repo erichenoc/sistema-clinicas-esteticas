@@ -367,7 +367,7 @@ export default function EditInvoicePage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 min-w-0">
           {/* Client Info (solo lectura: el cliente se define al crear la factura) */}
           <Card>
             <CardHeader>
@@ -425,7 +425,7 @@ export default function EditInvoicePage({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="w-full overflow-x-auto">
               <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow>
