@@ -106,7 +106,7 @@ export default function EditInvoicePage({
 
         // Una factura anulada nunca se edita
         if (invoice.status === 'cancelled') {
-          toast.error('Esta factura esta anulada y no se puede editar')
+          toast.error('Esta factura está anulada y no se puede editar')
           router.push(`/facturacion/facturas/${id}`)
           return
         }
@@ -221,7 +221,7 @@ export default function EditInvoicePage({
 
   const handleRemoveItem = (itemId: string) => {
     if (items.length <= 1) {
-      toast.error('La factura debe tener al menos un item')
+      toast.error('La factura debe tener al menos un ítem')
       return
     }
     setItems(items.filter(item => item.id !== itemId))
@@ -236,7 +236,7 @@ export default function EditInvoicePage({
         taxRate: item.taxRate || DEFAULT_TAX_RATE,
       }))
     )
-    toast.success(taxable ? 'ITBIS aplicado a todos los items' : 'ITBIS retirado de toda la factura')
+    toast.success(taxable ? 'ITBIS aplicado a todos los ítems' : 'ITBIS retirado de toda la factura')
   }
 
   const handleSave = async () => {
@@ -245,7 +245,7 @@ export default function EditInvoicePage({
       return
     }
     if (items.some(item => !item.description.trim())) {
-      toast.error('Todos los items deben tener una descripcion')
+      toast.error('Todos los ítems deben tener una descripción')
       return
     }
 
@@ -305,25 +305,25 @@ export default function EditInvoicePage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href={`/facturacion/facturas/${id}`}>
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Editar Factura</h1>
-            <p className="text-muted-foreground">{invoiceNumber}</p>
+            <h1 className="text-xl sm:text-3xl font-bold">Editar Factura</h1>
+            <p className="text-muted-foreground text-sm">{invoiceNumber}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="flex-1 sm:flex-none" asChild>
             <Link href={`/facturacion/facturas/${id}`}>Cancelar</Link>
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving} className="flex-1 sm:flex-none">
             <Save className="mr-2 h-4 w-4" />
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            {isSaving ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
       </div>
@@ -336,16 +336,16 @@ export default function EditInvoicePage({
             Esta factura ya tiene {formatCurrency(paidAmount)} cobrados
           </AlertTitle>
           <AlertDescription className="text-red-700">
-            Estas editando una factura con pagos registrados. El cambio queda guardado en el
-            historial de auditoria con el detalle anterior, quien lo hizo y cuando.
+            Estás editando una factura con pagos registrados. El cambio queda guardado en el
+            historial de auditoría con el detalle anterior, quién lo hizo y cuándo.
           </AlertDescription>
         </Alert>
       ) : (
         <Alert variant="destructive" className="bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800">Atencion</AlertTitle>
+          <AlertTitle className="text-amber-800">Atención</AlertTitle>
           <AlertDescription className="text-amber-700">
-            Solo los administradores pueden editar facturas. Los cambios quedaran registrados en el historial de la factura.
+            Solo los administradores pueden editar facturas. Los cambios quedarán registrados en el historial de la factura.
           </AlertDescription>
         </Alert>
       )}
@@ -372,7 +372,7 @@ export default function EditInvoicePage({
           <Card>
             <CardHeader>
               <CardTitle>Datos del Cliente</CardTitle>
-              <CardDescription>El cliente no se puede modificar desde la edicion</CardDescription>
+              <CardDescription>El cliente no se puede modificar desde la edición</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -394,9 +394,9 @@ export default function EditInvoicePage({
           <Card>
             <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Items de la Factura</CardTitle>
+                <CardTitle>Ítems de la Factura</CardTitle>
                 <CardDescription>
-                  Marca o desmarca el ITBIS por item, o quitalo de toda la factura
+                  Marca o desmarca el ITBIS por ítem, o quítalo de toda la factura
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -420,15 +420,16 @@ export default function EditInvoicePage({
                 </Button>
                 <Button size="sm" onClick={handleAddItem}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Agregar Item
+                  Agregar Ítem
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <div className="overflow-x-auto">
+              <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[34%]">Descripcion</TableHead>
+                    <TableHead className="w-[34%]">Descripción</TableHead>
                     <TableHead className="text-right w-[10%]">Cant.</TableHead>
                     <TableHead className="text-right w-[14%]">Precio</TableHead>
                     <TableHead className="text-right w-[10%]">Desc. %</TableHead>
@@ -444,7 +445,7 @@ export default function EditInvoicePage({
                         <Input
                           value={item.description}
                           onChange={(e) => handleUpdateItem(item.id, 'description', e.target.value)}
-                          placeholder="Descripcion del item"
+                          placeholder="Descripción del item"
                         />
                       </TableCell>
                       <TableCell>
@@ -528,6 +529,7 @@ export default function EditInvoicePage({
                   </TableRow>
                 </TableFooter>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
