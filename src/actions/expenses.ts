@@ -192,6 +192,8 @@ export async function getExpenses(options?: {
   supplierId?: string
   startDate?: string
   endDate?: string
+  /** Mes concreto 'YYYY-MM': acota el listado a ese mes */
+  period?: string
 }): Promise<{ data: ExpenseListItem[]; error: string | null }> {
   const { error: authError } = await requireAdmin()
   if (authError) return { data: [], error: authError }
@@ -210,6 +212,13 @@ export async function getExpenses(options?: {
   if (options?.supplierId) query = query.eq('supplier_id', options.supplierId)
   if (options?.startDate) query = query.gte('issue_date', options.startDate)
   if (options?.endDate) query = query.lte('issue_date', options.endDate)
+  if (options?.period && /^\d{4}-\d{2}$/.test(options.period)) {
+    const [y, m] = options.period.split('-').map(Number)
+    const lastDay = new Date(y, m, 0).getDate()
+    query = query
+      .gte('issue_date', `${options.period}-01`)
+      .lte('issue_date', `${options.period}-${String(lastDay).padStart(2, '0')}`)
+  }
 
   const { data, error } = await query
 

@@ -14,6 +14,7 @@ import {
   Trash2,
   MoreHorizontal,
   TrendingUp,
+  Repeat,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -54,7 +55,10 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '@/types/expenses'
 import { deleteExpense } from '@/actions/expenses'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
 import type { CashFlowPeriod } from '@/actions/cashflow'
+import { generateRecurringExpenses } from '@/actions/recurring-expenses'
+import type { RecurringExpenseData } from '@/actions/recurring-expenses'
 import { NuevoGastoDialog } from './nuevo-gasto-dialog'
+import { GastosFijosDialog } from './gastos-fijos-dialog'
 import { PagarGastoDialog } from './pagar-gasto-dialog'
 
 type StatusTab = 'all' | 'pending' | 'overdue' | 'paid'
@@ -64,7 +68,20 @@ interface GastosClientProps {
   cashFlow: CashFlowSummary | null
   stats: ExpenseStats | null
   period: CashFlowPeriod
+  recurring: RecurringExpenseData[]
+  recurringPeriod: string
   accessError: string | null
+}
+
+/** Ultimos 12 meses para poder consultar meses anteriores */
+function buildMonthOptions(): { value: string; label: string }[] {
+  const now = new Date()
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const name = d.toLocaleDateString('es-DO', { month: 'long' })
+    return { value, label: `${name.charAt(0).toUpperCase()}${name.slice(1)} ${d.getFullYear()}` }
+  })
 }
 
 export function GastosClient({
@@ -72,8 +89,11 @@ export function GastosClient({
   cashFlow,
   stats,
   period,
+  recurring,
+  recurringPeriod,
   accessError,
 }: GastosClientProps) {
+  const monthOptions = buildMonthOptions()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -89,6 +109,21 @@ export function GastosClient({
 
   const handlePeriodChange = (value: string) => {
     startTransition(() => router.push(`/facturacion/gastos?periodo=${value}`))
+  }
+
+  // Gastos fijos del mes que todavia no se han registrado
+  const pendingRecurring = recurring.filter((r) => r.is_active && !r.generated_this_period)
+
+  const handleGenerateRecurring = async () => {
+    const { created, error } = await generateRecurringExpenses(recurringPeriod)
+    if (error) {
+      toast.error(error)
+      return
+    }
+    toast.success(
+      created === 1 ? '1 gasto fijo registrado' : `${created} gastos fijos registrados`
+    )
+    loadData()
   }
 
   const handleDelete = async (expense: ExpenseListItem) => {
@@ -166,11 +201,39 @@ export function GastosClient({
               <SelectItem value="quarter">Este trimestre</SelectItem>
               <SelectItem value="year">Este año</SelectItem>
               <SelectItem value="all">Histórico</SelectItem>
+              {/* Meses cerrados, para revisar lo que paso antes */}
+              {monthOptions.slice(1).map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          <GastosFijosDialog recurring={recurring} periodLabel={cashFlow?.period_label || ''} />
           <NuevoGastoDialog onCreated={loadData} />
         </div>
       </div>
+
+      {/* Los fijos del mes que faltan por registrar: un clic los crea todos */}
+      {pendingRecurring.length > 0 && (
+        <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950">
+          <Repeat className="h-4 w-4" />
+          <AlertTitle>
+            {pendingRecurring.length === 1
+              ? 'Tienes 1 gasto fijo sin registrar este mes'
+              : `Tienes ${pendingRecurring.length} gastos fijos sin registrar este mes`}
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {pendingRecurring.map((r) => r.concept).join(', ')} ·{' '}
+              {formatCurrency(pendingRecurring.reduce((sum, r) => sum + r.amount, 0))}
+            </span>
+            <Button size="sm" onClick={handleGenerateRecurring} disabled={isPending}>
+              Registrarlos
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Flujo de caja */}
       {cashFlow && (

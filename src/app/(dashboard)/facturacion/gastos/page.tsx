@@ -3,13 +3,21 @@ export const dynamic = 'force-dynamic'
 import { getExpenses } from '@/actions/expenses'
 import { getCashFlowSummary, getExpenseStats } from '@/actions/cashflow'
 import type { CashFlowPeriod } from '@/actions/cashflow'
+import { getRecurringExpenses } from '@/actions/recurring-expenses'
 import { GastosClient } from './_components/gastos-client'
 
 export const metadata = {
   title: 'Gastos y Proveedores',
 }
 
-const VALID_PERIODS: CashFlowPeriod[] = ['month', 'quarter', 'year', 'all']
+const SHORTCUTS: CashFlowPeriod[] = ['month', 'quarter', 'year', 'all']
+const MONTH_PATTERN = /^\d{4}-\d{2}$/
+
+/** Mes actual en formato 'YYYY-MM' */
+function currentMonth(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
 
 export default async function GastosPage({
   searchParams,
@@ -17,14 +25,19 @@ export default async function GastosPage({
   searchParams: Promise<{ periodo?: string }>
 }) {
   const { periodo } = await searchParams
-  const period: CashFlowPeriod = VALID_PERIODS.includes(periodo as CashFlowPeriod)
-    ? (periodo as CashFlowPeriod)
-    : 'month'
+  const isValid =
+    periodo && (SHORTCUTS.includes(periodo as CashFlowPeriod) || MONTH_PATTERN.test(periodo))
+  const period: CashFlowPeriod = isValid ? (periodo as CashFlowPeriod) : 'month'
 
-  const [expensesRes, cashFlowRes, statsRes] = await Promise.all([
-    getExpenses(),
+  // Los gastos fijos se consultan contra un mes concreto; para los atajos se
+  // usa el mes en curso
+  const recurringPeriod = MONTH_PATTERN.test(period) ? period : currentMonth()
+
+  const [expensesRes, cashFlowRes, statsRes, recurringRes] = await Promise.all([
+    getExpenses(MONTH_PATTERN.test(period) ? { period } : undefined),
     getCashFlowSummary(period),
     getExpenseStats(),
+    getRecurringExpenses(recurringPeriod),
   ])
 
   return (
@@ -33,6 +46,8 @@ export default async function GastosPage({
       cashFlow={cashFlowRes.data}
       stats={statsRes.data}
       period={period}
+      recurring={recurringRes.data}
+      recurringPeriod={recurringPeriod}
       accessError={expensesRes.error}
     />
   )

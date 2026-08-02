@@ -16,7 +16,11 @@ import type { ExpenseCategory, ExpenseStats, CashFlowSummary } from '@/actions/e
 // una factura emitida y no cobrada no es dinero disponible.
 // =============================================
 
-export type CashFlowPeriod = 'month' | 'quarter' | 'year' | 'all'
+// Ademas de los atajos, acepta un mes concreto en formato 'YYYY-MM' para poder
+// consultar meses anteriores (ej: '2026-07')
+export type CashFlowPeriod = 'month' | 'quarter' | 'year' | 'all' | string
+
+const MONTH_PATTERN = /^\d{4}-\d{2}$/
 
 // Solo admin/dueno: esto expone la rentabilidad del negocio
 async function requireAdmin(): Promise<string | null> {
@@ -38,9 +42,25 @@ async function requireAdmin(): Promise<string | null> {
   return null
 }
 
-function getPeriodRange(period: CashFlowPeriod): { start: string | null; label: string } {
+function getPeriodRange(period: CashFlowPeriod): {
+  start: string | null
+  end: string | null
+  label: string
+} {
   const now = new Date()
   const year = now.getFullYear()
+
+  // Mes concreto: '2026-07'
+  if (MONTH_PATTERN.test(period)) {
+    const [y, m] = period.split('-').map(Number)
+    const lastDay = new Date(y, m, 0).getDate()
+    const monthName = new Date(y, m - 1, 1).toLocaleDateString('es-DO', { month: 'long' })
+    return {
+      start: `${period}-01`,
+      end: `${period}-${String(lastDay).padStart(2, '0')}`,
+      label: `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${y}`,
+    }
+  }
 
   switch (period) {
     case 'month': {
@@ -48,6 +68,7 @@ function getPeriodRange(period: CashFlowPeriod): { start: string | null; label: 
       const monthName = start.toLocaleDateString('es-DO', { month: 'long' })
       return {
         start: start.toISOString().slice(0, 10),
+        end: null,
         label: `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`,
       }
     }
@@ -56,15 +77,16 @@ function getPeriodRange(period: CashFlowPeriod): { start: string | null; label: 
       const start = new Date(year, quarterStartMonth, 1)
       return {
         start: start.toISOString().slice(0, 10),
+        end: null,
         label: `Trimestre ${Math.floor(now.getMonth() / 3) + 1} de ${year}`,
       }
     }
     case 'year': {
       const start = new Date(year, 0, 1)
-      return { start: start.toISOString().slice(0, 10), label: `Año ${year}` }
+      return { start: start.toISOString().slice(0, 10), end: null, label: `Año ${year}` }
     }
     default:
-      return { start: null, label: 'Histórico completo' }
+      return { start: null, end: null, label: 'Histórico completo' }
   }
 }
 
@@ -75,7 +97,7 @@ export async function getCashFlowSummary(
   if (authError) return { data: null, error: authError }
 
   const supabase = createAdminClient()
-  const { start, label } = getPeriodRange(period)
+  const { start, end, label } = getPeriodRange(period)
 
   // --- ENTRADAS: cobros a pacientes (se excluyen facturas anuladas) ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,6 +105,8 @@ export async function getCashFlowSummary(
     .from('payments')
     .select('amount, payment_date, invoices!inner (status)')
   if (start) incomeQuery = incomeQuery.gte('payment_date', start)
+  // Un mes cerrado se acota tambien por arriba
+  if (end) incomeQuery = incomeQuery.lte('payment_date', `${end}T23:59:59`)
 
   const { data: incomeRows, error: incomeError } = await incomeQuery
   if (incomeError) {
@@ -100,6 +124,7 @@ export async function getCashFlowSummary(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let expenseQuery = (supabase as any).from('expense_payments').select('amount, payment_date')
   if (start) expenseQuery = expenseQuery.gte('payment_date', start)
+  if (end) expenseQuery = expenseQuery.lte('payment_date', end)
 
   const { data: expenseRows, error: expenseError } = await expenseQuery
   if (expenseError) {
