@@ -19,10 +19,16 @@ import {
   FileText,
   Printer,
   Loader2,
+  Percent,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { getProfessionals, updateProfessionalSalary, type ProfessionalSummaryData } from '@/actions/professionals'
+import {
+  getProfessionals,
+  updateProfessionalSalary,
+  updatePayrollDeductions,
+  type ProfessionalSummaryData,
+} from '@/actions/professionals'
 import { useUser } from '@/contexts/user-context'
 import {
   Card,
@@ -83,6 +89,8 @@ interface EmpleadoData {
   afp: string
   ars: string
   avatar: string | null
+  /** false = se le paga el bruto sin AFP, ARS ni ISR */
+  applyDeductions: boolean
 }
 
 interface NominaData {
@@ -102,6 +110,7 @@ interface NominaData {
   totalDeductions: number
   netSalary: number
   status: string
+  applyDeductions: boolean
 }
 
 interface HistorialNominaData {
@@ -130,11 +139,13 @@ function generateNominaFromEmployees(employees: EmpleadoData[], period: string):
     const overtime = 0
     const grossSalary = baseSalary + commissions + bonuses + overtime
 
-    // Deducciones
-    const afpEmployee = grossSalary * 0.0287
-    const arsEmployee = grossSalary * 0.0304
+    // Deducciones de ley: solo si el empleado las lleva. Hay personal que se
+    // paga por honorarios y recibe el bruto completo.
+    const applyDeductions = emp.applyDeductions !== false
+    const afpEmployee = applyDeductions ? grossSalary * 0.0287 : 0
+    const arsEmployee = applyDeductions ? grossSalary * 0.0304 : 0
     const annualGross = grossSalary * 12
-    const isrWithholding = calculateISR(annualGross) / 12
+    const isrWithholding = applyDeductions ? calculateISR(annualGross) / 12 : 0
     const totalDeductions = afpEmployee + arsEmployee + isrWithholding
     const netSalary = grossSalary - totalDeductions
 
@@ -155,6 +166,7 @@ function generateNominaFromEmployees(employees: EmpleadoData[], period: string):
       totalDeductions: Math.round(totalDeductions),
       netSalary: Math.round(netSalary),
       status: 'pending',
+      applyDeductions,
     }
   })
 }
@@ -182,6 +194,9 @@ export default function NominaPage() {
   const [editSalaryType, setEditSalaryType] = useState('monthly')
   const [isSavingSalary, setIsSavingSalary] = useState(false)
 
+  // Descuentos de ley por empleado (solo admin/dueno)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+
   // Cargar profesionales como empleados
   async function loadEmployees() {
     setIsLoading(true)
@@ -203,6 +218,7 @@ export default function NominaPage() {
         afp: 'AFP Popular',
         ars: 'Humano',
         avatar: p.profile_image_url || null,
+        applyDeductions: p.apply_payroll_deductions !== false,
       }))
 
       setEmpleados(employeesList)
@@ -222,6 +238,27 @@ export default function NominaPage() {
     loadEmployees()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod])
+
+  // Decidir si a este empleado se le aplican AFP, ARS e ISR
+  const handleToggleDeductions = async (emp: EmpleadoData) => {
+    const next = !emp.applyDeductions
+    setTogglingId(emp.id)
+    try {
+      const result = await updatePayrollDeductions(emp.id, next)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(
+        next
+          ? `A ${emp.name} se le aplicaran los descuentos de ley`
+          : `A ${emp.name} se le pagara el bruto sin descuentos`
+      )
+      await loadEmployees()
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   const openEditSalary = (emp: EmpleadoData) => {
     setEditingEmp(emp)
@@ -288,8 +325,13 @@ export default function NominaPage() {
   const totalNet = filteredNomina.reduce((acc, n) => acc + n.netSalary, 0)
   const employeeCount = filteredNomina.length
 
-  // Costo patronal estimado (9.97% AFP + 7.09% ARS + otros)
-  const employerCost = totalGross * 0.2206
+  // Costo patronal estimado (9.97% AFP + 7.09% ARS + otros).
+  // Solo sobre quienes cotizan: a quien se le paga sin descuentos tampoco se le
+  // hacen aportes patronales.
+  const cotizableGross = filteredNomina
+    .filter((n) => n.applyDeductions)
+    .reduce((acc, n) => acc + n.grossSalary, 0)
+  const employerCost = cotizableGross * 0.2206
 
   return (
     <div className="space-y-6 p-4 sm:p-0">
@@ -438,7 +480,12 @@ export default function NominaPage() {
                 <TableBody>
                   {filteredNomina.map((nomina) => (
                     <TableRow key={nomina.id}>
-                      <TableCell className="font-medium">{nomina.employeeName}</TableCell>
+                      <TableCell className="font-medium">
+                        {nomina.employeeName}
+                        {!nomina.applyDeductions && (
+                          <Badge className="ml-2 bg-amber-500 text-xs">Sin descuentos</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatPrice(nomina.baseSalary)}</TableCell>
                       <TableCell className="text-right">
                         {nomina.commissions > 0 ? formatPrice(nomina.commissions) : '-'}
@@ -447,7 +494,13 @@ export default function NominaPage() {
                         {nomina.overtime > 0 ? formatPrice(nomina.overtime) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatPrice(nomina.grossSalary)}</TableCell>
-                      <TableCell className="text-right text-red-600">-{formatPrice(nomina.totalDeductions)}</TableCell>
+                      <TableCell className="text-right text-red-600">
+                        {nomina.totalDeductions > 0 ? (
+                          `-${formatPrice(nomina.totalDeductions)}`
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-bold text-green-600">{formatPrice(nomina.netSalary)}</TableCell>
                       <TableCell>
                         <Badge variant={nomina.status === 'paid' ? 'default' : 'secondary'}>
@@ -530,6 +583,7 @@ export default function NominaPage() {
                     <TableHead>Departamento</TableHead>
                     <TableHead className="text-right">Salario Base</TableHead>
                     <TableHead>AFP/ARS</TableHead>
+                    <TableHead>Descuentos</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
@@ -567,6 +621,13 @@ export default function NominaPage() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        {emp.applyDeductions ? (
+                          <Badge variant="outline">De ley</Badge>
+                        ) : (
+                          <Badge className="bg-amber-500">Sin descuentos</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Badge variant={emp.status === 'active' ? 'default' : 'secondary'}>
                           {emp.status === 'active' ? 'Activo' : 'Inactivo'}
                         </Badge>
@@ -583,6 +644,17 @@ export default function NominaPage() {
                               <DropdownMenuItem onSelect={() => openEditSalary(emp)}>
                                 <DollarSign className="mr-2 h-4 w-4" />
                                 Editar sueldo
+                              </DropdownMenuItem>
+                            )}
+                            {canManageSalaries && (
+                              <DropdownMenuItem
+                                onSelect={() => handleToggleDeductions(emp)}
+                                disabled={togglingId === emp.id}
+                              >
+                                <Percent className="mr-2 h-4 w-4" />
+                                {emp.applyDeductions
+                                  ? 'Pagar sin descuentos'
+                                  : 'Aplicar descuentos de ley'}
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem asChild>

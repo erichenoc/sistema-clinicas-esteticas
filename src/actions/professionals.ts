@@ -25,6 +25,8 @@ export interface ProfessionalData {
   termination_date: string | null
   base_salary: number | null
   salary_type: string
+  /** false = se le paga el bruto sin AFP, ARS ni ISR */
+  apply_payroll_deductions: boolean
   default_commission_rate: number
   commission_type: string
   max_daily_appointments: number
@@ -158,6 +160,7 @@ export async function getProfessionals(options?: {
       termination_date: null,
       base_salary: user.base_salary || null,
       salary_type: user.salary_type || 'monthly',
+      apply_payroll_deductions: user.apply_payroll_deductions ?? true,
       default_commission_rate: user.commission_rate ?? 15,
       commission_type: user.commission_type || 'percentage',
       max_daily_appointments: user.max_daily_appointments || 20,
@@ -222,6 +225,7 @@ export async function getProfessionalById(id: string): Promise<ProfessionalSumma
     termination_date: null,
     base_salary: user.base_salary || null,
     salary_type: user.salary_type || 'monthly',
+    apply_payroll_deductions: user.apply_payroll_deductions ?? true,
     default_commission_rate: user.commission_rate || 15,
     commission_type: user.commission_type || 'percentage',
     max_daily_appointments: user.max_daily_appointments || 20,
@@ -348,6 +352,7 @@ export async function createProfessional(
         termination_date: null,
         base_salary: null,
         salary_type: 'monthly',
+        apply_payroll_deductions: true,
         default_commission_rate: 15,
         commission_type: 'percentage',
         max_daily_appointments: 20,
@@ -536,6 +541,35 @@ export async function updateProfessionalSalary(
   revalidatePath('/nomina')
   revalidatePath('/profesionales')
   revalidatePath(`/profesionales/${id}`)
+  return { error: null }
+}
+
+// Decidir si a un empleado se le aplican los descuentos de ley (AFP, ARS, ISR).
+// Hay personal que se paga por honorarios y recibe el bruto completo.
+export async function updatePayrollDeductions(
+  id: string,
+  applyDeductions: boolean
+): Promise<{ error: string | null }> {
+  const { ctx, error: permError } = await requirePermission('professionals:manage')
+  if (permError || !ctx) return { error: permError || 'No autorizado' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('users')
+    .update({
+      apply_payroll_deductions: applyDeductions,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error updating payroll deductions:', error)
+    return { error: 'Error al actualizar los descuentos' }
+  }
+
+  revalidatePath('/nomina')
   return { error: null }
 }
 
