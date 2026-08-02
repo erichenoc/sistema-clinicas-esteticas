@@ -40,6 +40,9 @@ export type Permission =
   | 'billing:create'
   | 'billing:edit'
   | 'billing:void'
+  // Gastos y flujo de caja: informacion de dueno, solo admin/owner
+  | 'expenses:view'
+  | 'expenses:manage'
   // Inventario
   | 'inventory:view'
   | 'inventory:manage'
@@ -70,6 +73,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'sessions:view', 'sessions:create', 'sessions:edit',
     'pos:view', 'pos:sell', 'pos:discount', 'pos:void',
     'billing:view', 'billing:create', 'billing:edit', 'billing:void',
+    'expenses:view', 'expenses:manage',
     'inventory:view', 'inventory:manage', 'inventory:adjust',
     'professionals:view', 'professionals:manage',
     'reports:view', 'reports:export', 'reports:financial',
@@ -85,6 +89,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'sessions:view', 'sessions:create', 'sessions:edit',
     'pos:view', 'pos:sell', 'pos:discount', 'pos:void',
     'billing:view', 'billing:create', 'billing:edit', 'billing:void',
+    'expenses:view', 'expenses:manage',
     'inventory:view', 'inventory:manage', 'inventory:adjust',
     'professionals:view', 'professionals:manage',
     'reports:view', 'reports:export', 'reports:financial',
@@ -163,6 +168,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   '/sesiones': ['sessions:view'],
   '/pos': ['pos:view'],
   '/facturacion': ['billing:view'],
+  '/facturacion/gastos': ['expenses:view'], // Gastos y flujo de caja: solo admin y dueno
+  '/facturacion/cuentas-por-pagar': ['expenses:view'],
   '/inventario': ['inventory:view'],
   '/profesionales': ['professionals:view'],
   '/nomina': ['professionals:manage'], // Nomina/sueldos: solo admin y dueno

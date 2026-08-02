@@ -260,6 +260,23 @@ export default function ContabilidadPage() {
         </div>
       </div>
 
+      {/* Los numeros de esta pantalla todavia son de ejemplo: no salen de las
+          facturas ni de los gastos reales. Se avisa para que nadie declare
+          con ellos hasta que el 606/607 se conecte a la base de datos. */}
+      <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4 dark:bg-amber-950 dark:border-amber-800">
+        <p className="font-semibold text-amber-800 dark:text-amber-200">
+          Datos de ejemplo — no uses esta pantalla para declarar
+        </p>
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          Las cifras de ITBIS, secuencias NCF y reportes 606/607 de abajo son de muestra y no
+          provienen de tus facturas ni de tus gastos reales. Para cifras reales usa{' '}
+          <Link href="/facturacion/gastos" className="underline font-medium">
+            Gastos y Proveedores
+          </Link>{' '}
+          y el listado de facturas.
+        </p>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

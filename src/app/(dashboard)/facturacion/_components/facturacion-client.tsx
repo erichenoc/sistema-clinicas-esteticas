@@ -25,6 +25,7 @@ import {
   Building2,
   Loader2,
   Calculator,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -379,6 +380,16 @@ export function FacturacionClient({ invoices, quotes, stats, isAdmin = false }: 
           <p className="text-muted-foreground">Cotizaciones, facturas y comprobantes fiscales</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Gastos y flujo de caja: solo admin y dueno */}
+          {isAdmin && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/facturacion/gastos">
+                <Wallet className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Gastos y Proveedores</span>
+                <span className="sm:hidden">Gastos</span>
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link href="/facturacion/contabilidad">
               <Calculator className="mr-2 h-4 w-4" />
