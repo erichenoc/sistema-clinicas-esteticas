@@ -45,9 +45,10 @@ function getPeriodRange(period: CashFlowPeriod): { start: string | null; label: 
   switch (period) {
     case 'month': {
       const start = new Date(year, now.getMonth(), 1)
+      const monthName = start.toLocaleDateString('es-DO', { month: 'long' })
       return {
         start: start.toISOString().slice(0, 10),
-        label: start.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' }),
+        label: `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`,
       }
     }
     case 'quarter': {
@@ -60,10 +61,10 @@ function getPeriodRange(period: CashFlowPeriod): { start: string | null; label: 
     }
     case 'year': {
       const start = new Date(year, 0, 1)
-      return { start: start.toISOString().slice(0, 10), label: `Ano ${year}` }
+      return { start: start.toISOString().slice(0, 10), label: `Año ${year}` }
     }
     default:
-      return { start: null, label: 'Historico completo' }
+      return { start: null, label: 'Histórico completo' }
   }
 }
 

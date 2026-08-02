@@ -94,7 +94,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
     const finalSupplierName = selectedSupplier?.name || supplierName.trim()
 
     if (!finalSupplierName) {
-      toast.error('Indica a quien se le paga')
+      toast.error('Indica a quién se le paga')
       return
     }
     if (!concept.trim()) {
@@ -170,7 +170,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
         <DialogHeader>
           <DialogTitle>Registrar Gasto</DialogTitle>
           <DialogDescription>
-            Registra lo que la clinica paga: proveedores, servicios, nomina o inversion en productos
+            Registra lo que la clínica paga: proveedores, servicios, nómina o inversión en productos
           </DialogDescription>
         </DialogHeader>
 
@@ -195,22 +195,22 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="supplierName">
-                {supplierId === NO_SUPPLIER ? 'A quien se le paga *' : 'A quien se le paga'}
+                {supplierId === NO_SUPPLIER ? 'A quién se le paga *' : 'A quién se le paga'}
               </Label>
               <Input
                 id="supplierName"
                 value={supplierId === NO_SUPPLIER ? supplierName : suppliers.find((s) => s.id === supplierId)?.name || ''}
                 onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="Ej: EDESUR, Claro, Juan Perez"
+                placeholder="Ej: EDESUR, Claro, Juan Pérez"
                 disabled={supplierId !== NO_SUPPLIER}
               />
             </div>
           </div>
 
-          {/* Categoria */}
+          {/* Categoría */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Categoria *</Label>
+              <Label>Categoría *</Label>
               <Select
                 value={category}
                 onValueChange={(v) => {
@@ -265,7 +265,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
               id="concept"
               value={concept}
               onChange={(e) => setConcept(e.target.value)}
-              placeholder="Ej: Factura de luz de enero, compra de acido hialuronico"
+              placeholder="Ej: Factura de luz de enero, compra de ácido hialurónico"
             />
           </div>
 
@@ -358,7 +358,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Fecha limite de pago</Label>
+              <Label htmlFor="dueDate">Fecha límite de pago</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -371,7 +371,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
           {/* Pago */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Metodo de pago</Label>
+              <Label>Método de pago</Label>
               <Select
                 value={paymentMethod}
                 onValueChange={(v) => setPaymentMethod(v as ExpensePaymentMethod)}
@@ -397,7 +397,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
                   onCheckedChange={(checked) => setPayNow(!!checked)}
                 />
                 <label htmlFor="payNow" className="text-sm text-muted-foreground cursor-pointer">
-                  Ya esta pagado completo
+                  Ya está pagado completo
                 </label>
               </div>
             </div>

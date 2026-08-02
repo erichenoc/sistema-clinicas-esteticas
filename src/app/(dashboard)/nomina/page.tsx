@@ -231,7 +231,7 @@ export default function NominaPage() {
 
     const { data } = await getPayrollPeriod(selectedPeriod, Object.values(next))
     if (data) setPayroll(data)
-    toast.success('Ajuste aplicado. Se guardara al cerrar la nomina.')
+    toast.success('Ajuste aplicado. Se guardará al cerrar la nómina.')
   }
 
   // Cerrar el mes: congela el calculo actual como documento historico
@@ -240,9 +240,9 @@ export default function NominaPage() {
     const label = payroll.periodLabel
     if (
       !confirm(
-        `Cerrar la nomina de ${label}?\n\n` +
+        `Cerrar la nómina de ${label}?\n\n` +
           `${payroll.employeeCount} empleados · Total a pagar ${formatPrice(payroll.totalNet)}\n\n` +
-          'Los montos quedan congelados. Podras reabrirla mientras no la marques como pagada.'
+          'Los montos quedan congelados. Podrás reabrirla mientras no la marques como pagada.'
       )
     ) {
       return
@@ -255,7 +255,7 @@ export default function NominaPage() {
         toast.error(error)
         return
       }
-      toast.success(`Nomina de ${label} cerrada`)
+      toast.success(`Nómina de ${label} cerrada`)
       setAdjustments({})
       await loadEmployees()
     } finally {
@@ -268,8 +268,8 @@ export default function NominaPage() {
     if (!payroll?.id) return
     if (
       !confirm(
-        `Marcar como pagada la nomina de ${payroll.periodLabel}?\n\n` +
-          `Se registrara un gasto de ${formatPrice(payroll.totalNet)} en la categoria Nomina, ` +
+        `Marcar como pagada la nómina de ${payroll.periodLabel}?\n\n` +
+          `Se registrará un gasto de ${formatPrice(payroll.totalNet)} en la categoría Nómina, ` +
           'para que aparezca en el flujo de caja.'
       )
     ) {
@@ -284,9 +284,9 @@ export default function NominaPage() {
         return
       }
       if (expenseError) {
-        toast.warning(`Nomina marcada como pagada, pero el gasto no se registro: ${expenseError}`)
+        toast.warning(`Nómina marcada como pagada, pero el gasto no se registró: ${expenseError}`)
       } else {
-        toast.success('Nomina pagada y registrada en el flujo de caja')
+        toast.success('Nómina pagada y registrada en el flujo de caja')
       }
       await loadEmployees()
     } finally {
@@ -296,7 +296,7 @@ export default function NominaPage() {
 
   const handleReopenPayroll = async () => {
     if (!payroll?.id) return
-    if (!confirm(`Reabrir la nomina de ${payroll.periodLabel}? Se borrara el cierre y volvera a calcularse.`)) {
+    if (!confirm(`Reabrir la nómina de ${payroll.periodLabel}? Se borrará el cierre y volverá a calcularse.`)) {
       return
     }
 
@@ -307,7 +307,7 @@ export default function NominaPage() {
         toast.error(error)
         return
       }
-      toast.success('Nomina reabierta')
+      toast.success('Nómina reabierta')
       await loadEmployees()
     } finally {
       setIsProcessing(false)
@@ -326,8 +326,8 @@ export default function NominaPage() {
       }
       toast.success(
         next
-          ? `A ${emp.name} se le aplicaran los descuentos de ley`
-          : `A ${emp.name} se le pagara el bruto sin descuentos`
+          ? `A ${emp.name} se le aplicarán los descuentos de ley`
+          : `A ${emp.name} se le pagará el bruto sin descuentos`
       )
       await loadEmployees()
     } finally {

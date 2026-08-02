@@ -153,7 +153,7 @@ export function PagarGastoDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Metodo</Label>
+              <Label>Método</Label>
               <Select value={method} onValueChange={(v) => setMethod(v as ExpensePaymentMethod)}>
                 <SelectTrigger>
                   <SelectValue />

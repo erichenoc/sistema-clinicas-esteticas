@@ -113,7 +113,7 @@ export function MovimientoStockDialog({ products }: { products: ProductOption[] 
           return
         }
         if (expenseError) {
-          toast.warning(`Stock actualizado, pero el gasto no se registro: ${expenseError}`)
+          toast.warning(`Stock actualizado, pero el gasto no se registró: ${expenseError}`)
         } else {
           toast.success(
             registerExpense
@@ -172,7 +172,7 @@ export function MovimientoStockDialog({ products }: { products: ProductOption[] 
         <DialogHeader>
           <DialogTitle>Movimiento de Inventario</DialogTitle>
           <DialogDescription>
-            Registra mercancia que entra, corrige el conteo o descarga una merma
+            Registra mercancía que entra, corrige el conteo o descarga una merma
           </DialogDescription>
         </DialogHeader>
 
@@ -278,7 +278,7 @@ export function MovimientoStockDialog({ products }: { products: ProductOption[] 
                 operation === 'loss'
                   ? 'Ej: producto vencido, frasco roto'
                   : operation === 'adjust'
-                    ? 'Ej: conteo fisico de fin de mes'
+                    ? 'Ej: conteo físico de fin de mes'
                     : 'Ej: compra a proveedor X'
               }
               rows={2}
@@ -293,7 +293,7 @@ export function MovimientoStockDialog({ products }: { products: ProductOption[] 
                 onCheckedChange={(checked) => setRegisterExpense(!!checked)}
               />
               <label htmlFor="registerExpense" className="text-sm cursor-pointer">
-                Registrar tambien como gasto de inversion ({formatCurrency(qty * cost)})
+                Registrar también como gasto de inversión ({formatCurrency(qty * cost)})
               </label>
             </div>
           )}

@@ -152,7 +152,7 @@ export function GastosClient({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Gastos y Proveedores</h1>
             <p className="text-muted-foreground">
-              Lo que paga la clinica y cuanto dinero queda realmente
+              Lo que paga la clínica y cuánto dinero queda realmente
             </p>
           </div>
         </div>
@@ -164,8 +164,8 @@ export function GastosClient({
             <SelectContent>
               <SelectItem value="month">Este mes</SelectItem>
               <SelectItem value="quarter">Este trimestre</SelectItem>
-              <SelectItem value="year">Este ano</SelectItem>
-              <SelectItem value="all">Historico</SelectItem>
+              <SelectItem value="year">Este año</SelectItem>
+              <SelectItem value="all">Histórico</SelectItem>
             </SelectContent>
           </Select>
           <NuevoGastoDialog onCreated={loadData} />
@@ -184,7 +184,7 @@ export function GastosClient({
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ArrowDownCircle className="h-4 w-4 text-green-600" />
-                  Entro (cobrado)
+                  Entró (cobrado)
                 </div>
                 <p className="mt-1 text-xl font-bold text-green-600 break-words">
                   {formatCurrency(cashFlow.income)}
@@ -193,7 +193,7 @@ export function GastosClient({
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ArrowUpCircle className="h-4 w-4 text-red-600" />
-                  Salio (pagado)
+                  Salió (pagado)
                 </div>
                 <p className="mt-1 text-xl font-bold text-red-600 break-words">
                   {formatCurrency(cashFlow.expenses)}
@@ -285,7 +285,7 @@ export function GastosClient({
       {stats && stats.by_category.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Gastos por categoria</CardTitle>
+            <CardTitle className="text-lg">Gastos por categoría</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -328,7 +328,7 @@ export function GastosClient({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por proveedor, concepto o numero..."
+            placeholder="Buscar por proveedor, concepto o número..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -339,7 +339,7 @@ export function GastosClient({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas las categorias</SelectItem>
+            <SelectItem value="all">Todas las categorías</SelectItem>
             {EXPENSE_CATEGORIES.map((c) => (
               <SelectItem key={c.key} value={c.key}>
                 {c.label}
@@ -357,7 +357,7 @@ export function GastosClient({
               <TableRow>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Concepto</TableHead>
-                <TableHead>Categoria</TableHead>
+                <TableHead>Categoría</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Pendiente</TableHead>
                 <TableHead>Vence</TableHead>
@@ -376,8 +376,8 @@ export function GastosClient({
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                     {expenses.length === 0
-                      ? 'Aun no hay gastos registrados. Agrega el primero con "Nuevo Gasto".'
-                      : 'Ningun gasto coincide con el filtro.'}
+                      ? 'Aún no hay gastos registrados. Agrega el primero con "Nuevo Gasto".'
+                      : 'Ningún gasto coincide con el filtro.'}
                   </TableCell>
                 </TableRow>
               ) : (
