@@ -29,7 +29,7 @@ export async function getUsers(options?: {
   let query = (supabase as any)
     .from('users')
     .select('*')
-    .order('full_name', { ascending: true })
+    .order('first_name', { ascending: true })
 
   if (options?.role) {
     query = query.eq('role', options.role)
@@ -77,7 +77,7 @@ export async function getProfessionals(): Promise<UserData[]> {
     .select('*')
     .in('role', ['professional', 'admin'])
     .eq('is_active', true)
-    .order('full_name', { ascending: true })
+    .order('first_name', { ascending: true })
 
   if (error) {
     console.error('Error fetching professionals:', error)

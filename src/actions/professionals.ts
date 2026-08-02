@@ -603,7 +603,8 @@ export async function getCommissions(options?: {
       .select(`
         *,
         professional:professional_id (
-          user_id
+          first_name,
+          last_name
         )
       `)
       .order('created_at', { ascending: false })
@@ -632,7 +633,9 @@ export async function getCommissions(options?: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data || []).map((c: any) => ({
       ...c,
-      professional_name: 'Profesional',
+      professional_name: c.professional
+        ? `${c.professional.first_name || ''} ${c.professional.last_name || ''}`.trim() || 'Profesional'
+        : 'Profesional',
       reference_description: `${c.reference_type || 'N/A'} - ${c.reference_id || 'N/A'}`,
     }))
   } catch {

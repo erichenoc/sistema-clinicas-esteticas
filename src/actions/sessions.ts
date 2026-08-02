@@ -84,6 +84,22 @@ export interface UpdateSessionInput {
   next_session_recommended_at?: string
 }
 
+// Los productos usados en una sesion se guardan en la columna jsonb
+// `sessions.products_used`; no existe una tabla session_products.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sumProductsUsed(productsUsed: any): number {
+  if (!Array.isArray(productsUsed)) return 0
+  return productsUsed.reduce((sum: number, p: unknown) => {
+    const item = p as { total_cost?: number; cost?: number; quantity?: number; unit_cost?: number }
+    if (typeof item?.total_cost === 'number') return sum + item.total_cost
+    if (typeof item?.cost === 'number') return sum + item.cost
+    if (typeof item?.unit_cost === 'number' && typeof item?.quantity === 'number') {
+      return sum + item.unit_cost * item.quantity
+    }
+    return sum
+  }, 0)
+}
+
 // =============================================
 // SESIONES
 // =============================================
@@ -110,7 +126,8 @@ export async function getSessions(options?: {
         avatar_url
       ),
       users!sessions_professional_id_fkey (
-        full_name
+        first_name,
+        last_name
       ),
       treatments (
         name,
@@ -120,8 +137,7 @@ export async function getSessions(options?: {
           color
         )
       ),
-      session_images (id),
-      session_products (total_cost)
+      session_images (id)
     `)
     .order('started_at', { ascending: false })
     .limit(500)
@@ -157,17 +173,15 @@ export async function getSessions(options?: {
       : 'Paciente',
     patient_phone: session.patients?.phone || null,
     patient_avatar: session.patients?.avatar_url || null,
-    professional_name: session.users?.full_name || 'Profesional',
+    professional_name: session.users
+      ? `${session.users.first_name || ''} ${session.users.last_name || ''}`.trim() || 'Profesional'
+      : 'Profesional',
     treatment_display_name: session.treatments?.name || session.treatment_name,
     treatment_price: session.treatments?.price || null,
     category_name: session.treatments?.treatment_categories?.name || null,
     category_color: session.treatments?.treatment_categories?.color || null,
     image_count: session.session_images?.length || 0,
-    total_product_cost: session.session_products?.reduce(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sum: number, p: any) => sum + (p.total_cost || 0),
-      0
-    ) || 0,
+    total_product_cost: sumProductsUsed(session.products_used),
   }))
 }
 
@@ -190,7 +204,8 @@ export async function getSessionById(id: string): Promise<SessionListItemData | 
       ),
       users!sessions_professional_id_fkey (
         id,
-        full_name,
+        first_name,
+        last_name,
         avatar_url
       ),
       treatments (
@@ -210,10 +225,6 @@ export async function getSessionById(id: string): Promise<SessionListItemData | 
         status
       ),
       session_images (*),
-      session_products (
-        *,
-        products (name, sku)
-      ),
       clinical_notes (*)
     `)
     .eq('id', id)
@@ -232,17 +243,15 @@ export async function getSessionById(id: string): Promise<SessionListItemData | 
       : 'Paciente',
     patient_phone: session.patients?.phone || null,
     patient_avatar: session.patients?.avatar_url || null,
-    professional_name: session.users?.full_name || 'Profesional',
+    professional_name: session.users
+      ? `${session.users.first_name || ''} ${session.users.last_name || ''}`.trim() || 'Profesional'
+      : 'Profesional',
     treatment_display_name: session.treatments?.name || session.treatment_name,
     treatment_price: session.treatments?.price || null,
     category_name: session.treatments?.treatment_categories?.name || null,
     category_color: session.treatments?.treatment_categories?.color || null,
     image_count: session.session_images?.length || 0,
-    total_product_cost: session.session_products?.reduce(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sum: number, p: any) => sum + (p.total_cost || 0),
-      0
-    ) || 0,
+    total_product_cost: sumProductsUsed(session.products_used),
   }
 }
 

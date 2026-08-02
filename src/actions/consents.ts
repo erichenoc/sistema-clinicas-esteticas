@@ -96,12 +96,8 @@ export async function getConsentTemplates(options?: {
   let query = (supabase as any)
     .from('consent_templates')
     .select('*')
-    .eq('is_current', true)
     .order('name', { ascending: true })
 
-  if (options?.category) {
-    query = query.eq('category', options.category)
-  }
   if (options?.isActive !== undefined) {
     query = query.eq('is_active', options.isActive)
   }
@@ -179,22 +175,15 @@ export async function getSignedConsents(options?: {
       *,
       consent_templates (
         name,
-        category,
-        code
+        treatments ( name )
       ),
       patients (
         first_name,
         last_name,
         document_number
-      ),
-      users!signed_consents_obtained_by_fkey (
-        full_name
-      ),
-      treatments (
-        name
       )
     `)
-    .order('patient_signed_at', { ascending: false })
+    .order('signed_at', { ascending: false })
     .limit(500)
 
   if (options?.patientId) {
@@ -207,10 +196,10 @@ export async function getSignedConsents(options?: {
     query = query.eq('status', options.status)
   }
   if (options?.startDate) {
-    query = query.gte('patient_signed_at', options.startDate)
+    query = query.gte('signed_at', options.startDate)
   }
   if (options?.endDate) {
-    query = query.lte('patient_signed_at', options.endDate)
+    query = query.lte('signed_at', options.endDate)
   }
 
   const { data, error } = await query
@@ -230,14 +219,14 @@ export async function getSignedConsents(options?: {
     return {
       ...c,
       template_name: c.consent_templates?.name || 'Plantilla',
-      template_category: c.consent_templates?.category || 'general',
-      template_code: c.consent_templates?.code || null,
+      template_category: 'general',
+      template_code: null,
       patient_name: c.patients
         ? `${c.patients.first_name || ''} ${c.patients.last_name || ''}`.trim()
         : 'Paciente',
       patient_document: c.patients?.document_number || null,
-      obtained_by_name: c.users?.full_name || 'Usuario',
-      treatment_name: c.treatments?.name || null,
+      obtained_by_name: 'Usuario',
+      treatment_name: c.consent_templates?.treatments?.name || null,
       is_valid: isValid,
     }
   })
@@ -253,20 +242,13 @@ export async function getSignedConsentById(id: string): Promise<SignedConsentDat
       *,
       consent_templates (
         name,
-        category,
-        code,
-        content
+        content,
+        treatments ( name )
       ),
       patients (
         first_name,
         last_name,
         document_number
-      ),
-      users!signed_consents_obtained_by_fkey (
-        full_name
-      ),
-      treatments (
-        name
       )
     `)
     .eq('id', id)
@@ -284,14 +266,14 @@ export async function getSignedConsentById(id: string): Promise<SignedConsentDat
   return {
     ...data,
     template_name: data.consent_templates?.name || 'Plantilla',
-    template_category: data.consent_templates?.category || 'general',
-    template_code: data.consent_templates?.code || null,
+    template_category: 'general',
+    template_code: null,
     patient_name: data.patients
       ? `${data.patients.first_name || ''} ${data.patients.last_name || ''}`.trim()
       : 'Paciente',
     patient_document: data.patients?.document_number || null,
-    obtained_by_name: data.users?.full_name || 'Usuario',
-    treatment_name: data.treatments?.name || null,
+    obtained_by_name: 'Usuario',
+    treatment_name: data.consent_templates?.treatments?.name || null,
     is_valid: isValid,
   }
 }
@@ -415,7 +397,6 @@ export async function getConsentStats(): Promise<{
   const { data: templates } = await (supabase as any)
     .from('consent_templates')
     .select('id, is_active')
-    .eq('is_current', true)
     .limit(100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
