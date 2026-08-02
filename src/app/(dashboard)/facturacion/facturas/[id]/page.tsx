@@ -604,14 +604,18 @@ export default function InvoiceDetailPage({
                 </DropdownMenuItem>
               )}
               {invoice.patient_id && <DropdownMenuSeparator />}
+              {/* Sin pagos edita cualquiera con permiso. Con pagos (ej: quitarle el
+                  ITBIS a una factura ya cobrada) solo admin/dueno, y queda auditado. */}
               {canEditInvoice &&
                 invoice.status !== 'cancelled' &&
-                invoice.status !== 'paid' &&
-                invoice.paid_amount === 0 && (
+                (canManagePayments ||
+                  (invoice.status !== 'paid' && invoice.paid_amount === 0)) && (
                 <DropdownMenuItem asChild>
                   <Link href={`/facturacion/facturas/${invoice.id}/editar`}>
                     <Pencil className="mr-2 h-4 w-4" />
-                    Editar factura
+                    {invoice.paid_amount > 0 || invoice.status === 'paid'
+                      ? 'Editar factura (auditado)'
+                      : 'Editar factura'}
                   </Link>
                 </DropdownMenuItem>
               )}

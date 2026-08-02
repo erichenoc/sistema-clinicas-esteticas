@@ -294,13 +294,15 @@ export interface EditableInvoiceItemInput {
 }
 
 // Actualizar factura completa (cabecera + items) recalculando los totales.
-// Solo permitido mientras la factura este PENDIENTE: si ya tiene pagos
-// registrados, esta pagada o anulada, la edicion se rechaza.
+// Una factura anulada nunca se edita.
+// Si la factura ya tiene pagos registrados, solo admin/dueno puede editarla
+// (caso tipico: quitarle el ITBIS a una factura ya cobrada) y el cambio queda
+// registrado en audit_logs con el snapshot anterior completo.
 export async function updateInvoiceWithItems(
   id: string,
   header: { notes?: string | null },
   items: EditableInvoiceItemInput[]
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; overpaid?: number }> {
   const supabase = createAdminClient()
 
   // Validaciones basicas
@@ -311,11 +313,27 @@ export async function updateInvoiceWithItems(
     return { error: 'Todos los items deben tener una descripcion' }
   }
 
-  // Verificar estado y pagos actuales (defensa en el servidor)
+  // Identificar al usuario actual (permisos + auditoria)
+  const authClient = await createClient()
+  const { data: { user: authUser } } = await authClient.auth.getUser()
+  if (!authUser) {
+    return { error: 'No autorizado' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: userData } = await (supabase as any)
+    .from('users')
+    .select('role')
+    .eq('id', authUser.id)
+    .single()
+
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'owner'
+
+  // Snapshot previo completo: sirve de defensa en el servidor y de rastro DGII
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: current, error: fetchError } = await (supabase as any)
     .from('invoices')
-    .select('status, payments(amount)')
+    .select('*, invoice_items(*), payments(*)')
     .eq('id', id)
     .single()
 
@@ -329,8 +347,12 @@ export async function updateInvoiceWithItems(
   if (current.status === 'cancelled') {
     return { error: 'No se puede editar una factura anulada' }
   }
-  if (current.status === 'paid' || paidAmount > 0) {
-    return { error: 'No se puede editar una factura que ya tiene pagos registrados' }
+
+  const hasPayments = current.status === 'paid' || paidAmount > 0
+  if (hasPayments && !isAdmin) {
+    return {
+      error: 'Esta factura ya tiene pagos registrados: solo un administrador o el dueno puede editarla',
+    }
   }
 
   // Calcular totales a partir de los items (mismo criterio que la creacion)
@@ -358,6 +380,52 @@ export async function updateInvoiceWithItems(
   })
   const total = subtotal + taxAmount
 
+  // Recalcular el estado segun lo ya cobrado (tolerancia de 1 centavo por redondeo)
+  let newStatus: InvoiceStatus = current.status
+  if (paidAmount <= 0) {
+    newStatus = current.status === 'overdue' ? 'overdue' : 'pending'
+  } else if (paidAmount + 0.01 >= total) {
+    newStatus = 'paid'
+  } else {
+    newStatus = 'partial'
+  }
+
+  // Si el nuevo total queda por debajo de lo ya pagado, el excedente es saldo a favor
+  const overpaid = Math.round(Math.max(0, paidAmount - total) * 100) / 100
+
+  // Registrar la edicion en auditoria ANTES de tocar los datos.
+  // Si la factura tenia pagos, el rastro es obligatorio: sin auditoria no se edita.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: auditError } = await (supabase as any)
+    .from('audit_logs')
+    .insert({
+      clinic_id: current.clinic_id ?? null,
+      user_id: authUser.id,
+      action: 'edit_invoice',
+      table_name: 'invoices',
+      record_id: id,
+      old_data: current,
+      new_data: {
+        subtotal,
+        tax_amount: taxAmount,
+        discount_amount: discountAmount,
+        total,
+        status: newStatus,
+        notes: header.notes ?? null,
+        items: itemsToInsert,
+        paid_amount: paidAmount,
+        overpaid,
+        had_payments: hasPayments,
+      },
+    })
+
+  if (auditError) {
+    console.error('Error writing audit log for invoice edit:', auditError)
+    if (hasPayments) {
+      return { error: 'No se pudo registrar la auditoria. La factura no fue modificada.' }
+    }
+  }
+
   // Reemplazar items: borrar los actuales e insertar los nuevos
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: delError } = await (supabase as any)
@@ -379,17 +447,29 @@ export async function updateInvoiceWithItems(
   }
 
   // Actualizar cabecera y totales recalculados
+  const updatePayload: Record<string, unknown> = {
+    subtotal,
+    tax_amount: taxAmount,
+    discount_amount: discountAmount,
+    total,
+    status: newStatus,
+    notes: header.notes ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Dejar constancia del saldo a favor en las notas internas
+  if (overpaid > 0) {
+    const stamp = new Date().toISOString().slice(0, 10)
+    const creditNote = `[${stamp}] Factura editada: total ${total.toFixed(2)} menor a lo cobrado ${paidAmount.toFixed(2)}. Saldo a favor del paciente: ${overpaid.toFixed(2)}.`
+    updatePayload.internal_notes = current.internal_notes
+      ? `${current.internal_notes}\n${creditNote}`
+      : creditNote
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('invoices')
-    .update({
-      subtotal,
-      tax_amount: taxAmount,
-      discount_amount: discountAmount,
-      total,
-      notes: header.notes ?? null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', id)
 
   if (error) {
@@ -398,8 +478,9 @@ export async function updateInvoiceWithItems(
   }
 
   revalidatePath('/facturacion')
+  revalidatePath('/facturacion/facturas')
   revalidatePath(`/facturacion/facturas/${id}`)
-  return { error: null }
+  return { error: null, overpaid }
 }
 
 // Cancelar (anular) factura — registra auditoria de quien la anulo

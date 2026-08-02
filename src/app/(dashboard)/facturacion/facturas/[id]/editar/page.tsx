@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   AlertTriangle,
+  Percent,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +30,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { useUser } from '@/contexts/user-context'
 import { formatCurrency } from '@/types/billing'
@@ -37,6 +39,8 @@ import {
   getInvoiceItems,
   updateInvoiceWithItems,
 } from '@/actions/billing'
+
+const DEFAULT_TAX_RATE = 18 // ITBIS Republica Dominicana
 
 interface InvoiceItem {
   id: string
@@ -57,9 +61,11 @@ export default function EditInvoicePage({
 }) {
   const { id } = use(params)
   const router = useRouter()
-  const { hasPermission, isLoading: userLoading } = useUser()
+  const { user, hasPermission, isLoading: userLoading } = useUser()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
 
   // Form state
   const [invoiceNumber, setInvoiceNumber] = useState('')
@@ -67,6 +73,10 @@ export default function EditInvoicePage({
   const [clientRnc, setClientRnc] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
+
+  // Estado de cobro de la factura (define si el ITBIS se edita bajo auditoria)
+  const [paidAmount, setPaidAmount] = useState(0)
+  const [invoiceStatus, setInvoiceStatus] = useState<string>('pending')
 
   // Check permissions
   useEffect(() => {
@@ -78,6 +88,8 @@ export default function EditInvoicePage({
 
   // Cargar datos reales de la factura
   useEffect(() => {
+    if (userLoading) return
+
     const loadInvoice = async () => {
       setIsLoading(true)
       try {
@@ -92,13 +104,17 @@ export default function EditInvoicePage({
           return
         }
 
-        // Solo se puede editar mientras la factura no tenga pagos ni este anulada
-        const locked =
-          invoice.status === 'paid' ||
-          invoice.status === 'cancelled' ||
-          invoice.paid_amount > 0
-        if (locked) {
-          toast.error('Esta factura ya no se puede editar (pagada o anulada)')
+        // Una factura anulada nunca se edita
+        if (invoice.status === 'cancelled') {
+          toast.error('Esta factura esta anulada y no se puede editar')
+          router.push(`/facturacion/facturas/${id}`)
+          return
+        }
+
+        // Con pagos registrados solo admin/dueno puede editar (queda auditado)
+        const hasPayments = invoice.status === 'paid' || invoice.paid_amount > 0
+        if (hasPayments && !isAdmin) {
+          toast.error('Esta factura ya tiene pagos: solo un administrador puede editarla')
           router.push(`/facturacion/facturas/${id}`)
           return
         }
@@ -107,6 +123,8 @@ export default function EditInvoicePage({
         setClientName(invoice.patient_name || 'Cliente General')
         setClientRnc(invoice.ncf || '')
         setNotes(invoice.notes || '')
+        setPaidAmount(invoice.paid_amount || 0)
+        setInvoiceStatus(invoice.status)
         setItems(
           itemsData.map((item) => ({
             id: item.id,
@@ -116,7 +134,7 @@ export default function EditInvoicePage({
             discount: item.discount_percent || 0,
             discountType: 'percentage' as const,
             taxable: (item.tax_percent || 0) > 0,
-            taxRate: (item.tax_percent || 0) > 0 ? item.tax_percent : 18,
+            taxRate: (item.tax_percent || 0) > 0 ? item.tax_percent : DEFAULT_TAX_RATE,
             treatmentId: item.treatment_id,
           }))
         )
@@ -129,7 +147,7 @@ export default function EditInvoicePage({
     }
 
     loadInvoice()
-  }, [id, router])
+  }, [id, router, userLoading, isAdmin])
 
   const calculateItemTotal = (item: InvoiceItem) => {
     let subtotal = item.quantity * item.unitPrice
@@ -184,6 +202,9 @@ export default function EditInvoicePage({
   }
 
   const handleAddItem = () => {
+    // Hereda el criterio de ITBIS de la factura: si ningun item lleva ITBIS,
+    // el nuevo tampoco (facturas exentas)
+    const anyTaxable = items.some((item) => item.taxable)
     const newItem: InvoiceItem = {
       id: Date.now().toString(),
       description: '',
@@ -191,8 +212,8 @@ export default function EditInvoicePage({
       unitPrice: 0,
       discount: 0,
       discountType: 'percentage',
-      taxable: true,
-      taxRate: 18,
+      taxable: anyTaxable,
+      taxRate: DEFAULT_TAX_RATE,
       treatmentId: null,
     }
     setItems([...items, newItem])
@@ -204,6 +225,18 @@ export default function EditInvoicePage({
       return
     }
     setItems(items.filter(item => item.id !== itemId))
+  }
+
+  // Quitar o aplicar el ITBIS a toda la factura de una sola vez
+  const handleToggleAllTax = (taxable: boolean) => {
+    setItems(
+      items.map((item) => ({
+        ...item,
+        taxable,
+        taxRate: item.taxRate || DEFAULT_TAX_RATE,
+      }))
+    )
+    toast.success(taxable ? 'ITBIS aplicado a todos los items' : 'ITBIS retirado de toda la factura')
   }
 
   const handleSave = async () => {
@@ -219,7 +252,7 @@ export default function EditInvoicePage({
     setIsSaving(true)
 
     try {
-      const { error } = await updateInvoiceWithItems(
+      const { error, overpaid } = await updateInvoiceWithItems(
         id,
         { notes: notes.trim() || null },
         items.map((item) => ({
@@ -237,7 +270,14 @@ export default function EditInvoicePage({
         return
       }
 
-      toast.success('Factura actualizada exitosamente')
+      if (overpaid && overpaid > 0) {
+        toast.success(
+          `Factura actualizada. Queda un saldo a favor del paciente de ${formatCurrency(overpaid)}`,
+          { duration: 8000 }
+        )
+      } else {
+        toast.success('Factura actualizada exitosamente')
+      }
       router.push(`/facturacion/facturas/${id}`)
     } catch (error) {
       console.error('Error updating invoice:', error)
@@ -248,6 +288,11 @@ export default function EditInvoicePage({
   }
 
   const totals = calculateTotals()
+  const hasPayments = invoiceStatus === 'paid' || paidAmount > 0
+  const allTaxable = items.length > 0 && items.every((item) => item.taxable)
+  const noneTaxable = items.length > 0 && items.every((item) => !item.taxable)
+  // Excedente si el nuevo total queda por debajo de lo ya cobrado
+  const overpaidPreview = Math.max(0, paidAmount - totals.total)
 
   if (userLoading || isLoading) {
     return (
@@ -284,13 +329,41 @@ export default function EditInvoicePage({
       </div>
 
       {/* Warning */}
-      <Alert variant="destructive" className="bg-amber-50 border-amber-200">
-        <AlertTriangle className="h-4 w-4 text-amber-600" />
-        <AlertTitle className="text-amber-800">Atencion</AlertTitle>
-        <AlertDescription className="text-amber-700">
-          Solo los administradores pueden editar facturas. Los cambios quedaran registrados en el historial de la factura.
-        </AlertDescription>
-      </Alert>
+      {hasPayments ? (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">
+            Esta factura ya tiene {formatCurrency(paidAmount)} cobrados
+          </AlertTitle>
+          <AlertDescription className="text-red-700">
+            Estas editando una factura con pagos registrados. El cambio queda guardado en el
+            historial de auditoria con el detalle anterior, quien lo hizo y cuando.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert variant="destructive" className="bg-amber-50 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Atencion</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            Solo los administradores pueden editar facturas. Los cambios quedaran registrados en el historial de la factura.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Aviso de saldo a favor: el nuevo total quedo por debajo de lo cobrado */}
+      {overpaidPreview > 0 && (
+        <Alert variant="destructive" className="bg-blue-50 border-blue-200">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-800">
+            Quedara un saldo a favor de {formatCurrency(overpaidPreview)}
+          </AlertTitle>
+          <AlertDescription className="text-blue-700">
+            El nuevo total ({formatCurrency(totals.total)}) es menor a lo ya cobrado
+            ({formatCurrency(paidAmount)}). Al guardar, la factura queda saldada y la diferencia
+            se registra como saldo a favor del paciente en las notas internas.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Form */}
@@ -319,26 +392,49 @@ export default function EditInvoicePage({
 
           {/* Items */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>Items de la Factura</CardTitle>
-                <CardDescription>Productos y servicios facturados</CardDescription>
+                <CardDescription>
+                  Marca o desmarca el ITBIS por item, o quitalo de toda la factura
+                </CardDescription>
               </div>
-              <Button size="sm" onClick={handleAddItem}>
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar Item
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleToggleAllTax(false)}
+                  disabled={noneTaxable}
+                >
+                  <Percent className="mr-2 h-4 w-4" />
+                  Quitar ITBIS a todo
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleToggleAllTax(true)}
+                  disabled={allTaxable}
+                >
+                  <Percent className="mr-2 h-4 w-4" />
+                  Aplicar ITBIS a todo
+                </Button>
+                <Button size="sm" onClick={handleAddItem}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Item
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40%]">Descripcion</TableHead>
+                    <TableHead className="w-[34%]">Descripcion</TableHead>
                     <TableHead className="text-right w-[10%]">Cant.</TableHead>
-                    <TableHead className="text-right w-[15%]">Precio</TableHead>
+                    <TableHead className="text-right w-[14%]">Precio</TableHead>
                     <TableHead className="text-right w-[10%]">Desc. %</TableHead>
+                    <TableHead className="text-center w-[8%]">ITBIS</TableHead>
                     <TableHead className="text-right w-[15%]">Total</TableHead>
-                    <TableHead className="w-[10%]"></TableHead>
+                    <TableHead className="w-[9%]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -380,6 +476,13 @@ export default function EditInvoicePage({
                           className="text-right"
                         />
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={item.taxable}
+                          onCheckedChange={(checked) => handleUpdateItem(item.id, 'taxable', !!checked)}
+                          aria-label={`Aplicar ITBIS a ${item.description || 'este item'}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(calculateItemTotal(item))}
                       </TableCell>
@@ -398,13 +501,13 @@ export default function EditInvoicePage({
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-right">Subtotal</TableCell>
+                    <TableCell colSpan={5} className="text-right">Subtotal</TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.subtotal)}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                   {totals.discountTotal > 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-right">Descuento</TableCell>
+                      <TableCell colSpan={5} className="text-right">Descuento</TableCell>
                       <TableCell className="text-right text-red-600">
                         -{formatCurrency(totals.discountTotal)}
                       </TableCell>
@@ -412,12 +515,14 @@ export default function EditInvoicePage({
                     </TableRow>
                   )}
                   <TableRow>
-                    <TableCell colSpan={4} className="text-right">ITBIS (18%)</TableCell>
+                    <TableCell colSpan={5} className="text-right">
+                      {noneTaxable ? 'ITBIS (factura exenta)' : `ITBIS (${DEFAULT_TAX_RATE}%)`}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.taxTotal)}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                   <TableRow className="bg-muted/50">
-                    <TableCell colSpan={4} className="text-right font-bold text-lg">Total</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold text-lg">Total</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(totals.total)}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
@@ -461,12 +566,34 @@ export default function EditInvoicePage({
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">ITBIS</span>
-                <span>{formatCurrency(totals.taxTotal)}</span>
+                {noneTaxable ? (
+                  <span className="text-muted-foreground">Exenta</span>
+                ) : (
+                  <span>{formatCurrency(totals.taxTotal)}</span>
+                )}
               </div>
               <div className="flex justify-between pt-3 border-t">
                 <span className="font-bold">Total</span>
                 <span className="font-bold text-lg">{formatCurrency(totals.total)}</span>
               </div>
+              {paidAmount > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ya cobrado</span>
+                    <span className="text-green-600">{formatCurrency(paidAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {overpaidPreview > 0 ? 'Saldo a favor' : 'Pendiente'}
+                    </span>
+                    <span className={overpaidPreview > 0 ? 'text-blue-600 font-medium' : 'font-medium'}>
+                      {formatCurrency(
+                        overpaidPreview > 0 ? overpaidPreview : totals.total - paidAmount
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
