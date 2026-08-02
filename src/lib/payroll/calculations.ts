@@ -74,10 +74,14 @@ export function calculateEmployerCost(lines: { grossSalary: number; applyDeducti
   return round(cotizable * EMPLOYER_COST_RATE)
 }
 
-/** '2026-08' -> 'agosto 2026' */
+/**
+ * '2026-08' -> 'Agosto 2026'
+ * Devuelve la etiqueta ya capitalizada para no depender de `capitalize` en CSS,
+ * que pondria mayuscula a cada palabra ("De Agosto De 2026").
+ */
 export function formatPeriodLabel(period: string): string {
   const [year, month] = period.split('-').map(Number)
   if (!year || !month) return period
-  const date = new Date(year, month - 1, 1)
-  return date.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' })
+  const monthName = new Date(year, month - 1, 1).toLocaleDateString('es-DO', { month: 'long' })
+  return `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`
 }

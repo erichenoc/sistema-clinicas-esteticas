@@ -415,7 +415,7 @@ export default function NominaPage() {
             </SelectTrigger>
             <SelectContent>
               {periodOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="capitalize">
+                <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
               ))}
@@ -475,7 +475,7 @@ export default function NominaPage() {
                 : 'border-amber-300 bg-amber-50 dark:bg-amber-950'
           }
         >
-          <AlertTitle className="capitalize">
+          <AlertTitle>
             {isPaid
               ? `Nómina de ${payroll.periodLabel} pagada`
               : isClosed
@@ -493,14 +493,14 @@ export default function NominaPage() {
       )}
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Salario Bruto
             </CardDescription>
-            <CardTitle className="text-2xl">{formatPrice(totalGross)}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl break-words">{formatPrice(totalGross)}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -510,7 +510,7 @@ export default function NominaPage() {
               <TrendingUp className="h-4 w-4 text-red-500" />
               Deducciones
             </CardDescription>
-            <CardTitle className="text-2xl text-red-600">{formatPrice(totalDeductions)}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl text-red-600 break-words">{formatPrice(totalDeductions)}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -520,7 +520,7 @@ export default function NominaPage() {
               <CheckCircle className="h-4 w-4 text-green-500" />
               Salario Neto
             </CardDescription>
-            <CardTitle className="text-2xl text-green-600">{formatPrice(totalNet)}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl text-primary break-words">{formatPrice(totalNet)}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -530,7 +530,7 @@ export default function NominaPage() {
               <Briefcase className="h-4 w-4 text-blue-500" />
               Costo Patronal
             </CardDescription>
-            <CardTitle className="text-2xl text-blue-600">{formatPrice(employerCost)}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl break-words">{formatPrice(employerCost)}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -540,7 +540,7 @@ export default function NominaPage() {
               <Users className="h-4 w-4" />
               Empleados
             </CardDescription>
-            <CardTitle className="text-2xl">{employeeCount}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">{employeeCount}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -559,7 +559,7 @@ export default function NominaPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="capitalize">Nómina {payroll?.periodLabel || ''}</CardTitle>
+                <CardTitle>Nómina {payroll?.periodLabel || ''}</CardTitle>
                 <CardDescription>
                   {isClosed
                     ? 'Detalle congelado al momento del cierre'
@@ -629,7 +629,7 @@ export default function NominaPage() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-green-600">{formatPrice(nomina.netSalary)}</TableCell>
+                      <TableCell className="text-right font-bold text-primary">{formatPrice(nomina.netSalary)}</TableCell>
                       <TableCell>
                         {isPaid ? (
                           <Badge className="bg-green-500">Pagado</Badge>
@@ -681,7 +681,7 @@ export default function NominaPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total a Pagar</p>
-                    <p className="text-xl font-bold text-green-600">{formatPrice(totalNet)}</p>
+                    <p className="text-xl font-bold text-primary">{formatPrice(totalNet)}</p>
                   </div>
                 </div>
               </div>
@@ -838,7 +838,7 @@ export default function NominaPage() {
                   )}
                   {history.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell className="font-medium capitalize">{entry.periodLabel}</TableCell>
+                      <TableCell className="font-medium">{entry.periodLabel}</TableCell>
                       <TableCell>{entry.employeeCount}</TableCell>
                       <TableCell className="text-right">{formatPrice(entry.totalGross)}</TableCell>
                       <TableCell className="text-right font-medium text-green-600">
@@ -1089,7 +1089,7 @@ export default function NominaPage() {
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Volante de pago</DialogTitle>
-            <DialogDescription className="capitalize">
+            <DialogDescription>
               {receiptLine?.employeeName} — {payroll?.periodLabel}
             </DialogDescription>
           </DialogHeader>

@@ -177,7 +177,7 @@ export function GastosClient({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Flujo de caja</CardTitle>
-            <CardDescription className="capitalize">{cashFlow.period_label}</CardDescription>
+            <CardDescription>{cashFlow.period_label}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -186,7 +186,7 @@ export function GastosClient({
                   <ArrowDownCircle className="h-4 w-4 text-green-600" />
                   Entro (cobrado)
                 </div>
-                <p className="mt-1 text-2xl font-bold text-green-600">
+                <p className="mt-1 text-xl font-bold text-green-600 break-words">
                   {formatCurrency(cashFlow.income)}
                 </p>
               </div>
@@ -195,7 +195,7 @@ export function GastosClient({
                   <ArrowUpCircle className="h-4 w-4 text-red-600" />
                   Salio (pagado)
                 </div>
-                <p className="mt-1 text-2xl font-bold text-red-600">
+                <p className="mt-1 text-xl font-bold text-red-600 break-words">
                   {formatCurrency(cashFlow.expenses)}
                 </p>
               </div>
@@ -205,8 +205,8 @@ export function GastosClient({
                   Queda
                 </div>
                 <p
-                  className={`mt-1 text-2xl font-bold ${
-                    cashFlow.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                  className={`mt-1 text-xl font-bold break-words ${
+                    cashFlow.balance >= 0 ? 'text-primary' : 'text-red-600'
                   }`}
                 >
                   {formatCurrency(cashFlow.balance)}
@@ -239,11 +239,11 @@ export function GastosClient({
 
       {/* Stats de gastos */}
       {stats && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total por pagar</CardDescription>
-              <CardTitle className="text-3xl">{formatCurrency(stats.total_pending)}</CardTitle>
+              <CardTitle className="text-lg sm:text-2xl break-words">{formatCurrency(stats.total_pending)}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
@@ -257,7 +257,7 @@ export function GastosClient({
                 <AlertTriangle className="h-4 w-4 text-red-500" />
                 Vencido
               </CardDescription>
-              <CardTitle className="text-3xl text-red-600">
+              <CardTitle className="text-lg sm:text-2xl text-red-600 break-words">
                 {formatCurrency(stats.total_overdue)}
               </CardTitle>
             </CardHeader>
@@ -268,7 +268,7 @@ export function GastosClient({
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Pagado este mes</CardDescription>
-              <CardTitle className="text-3xl text-green-600">
+              <CardTitle className="text-lg sm:text-2xl text-primary break-words">
                 {formatCurrency(stats.paid_this_month)}
               </CardTitle>
             </CardHeader>

@@ -211,6 +211,27 @@ export async function initializeDefaultCategories(): Promise<{ created: number; 
   return { created, error: null }
 }
 
+// Algunos productos guardan en `category` el UUID de una categoria (asi lo
+// manda el formulario) y otros un texto libre. Si es un UUID se resuelve
+// contra product_categories; si no existe, no se muestra nada en vez del UUID.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function getCategoryNameMap(): Promise<Map<string, string>> {
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any).from('product_categories').select('id, name').limit(200)
+  const map = new Map<string, string>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const c of (data || []) as any[]) map.set(c.id, c.name)
+  return map
+}
+
+function resolveCategoryName(value: string | null, categories: Map<string, string>): string | null {
+  if (!value) return null
+  if (UUID_PATTERN.test(value)) return categories.get(value) ?? null
+  return value
+}
+
 // =============================================
 // PRODUCTOS
 // =============================================
@@ -255,7 +276,7 @@ export async function getProducts(options?: {
   }
 
   // Existencias reales desde la tabla `inventory`
-  const stockLevels = await getStockLevels()
+  const [stockLevels, categoryNames] = await Promise.all([getStockLevels(), getCategoryNameMap()])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mapped = (data || []).map((p: any) => {
@@ -310,7 +331,7 @@ export async function getProducts(options?: {
       notes: null,
       created_at: p.created_at,
       updated_at: p.updated_at,
-      category_name: p.category || null,
+      category_name: resolveCategoryName(p.category, categoryNames),
       category_color: null,
       current_stock: currentStock,
       reserved_stock: 0,
@@ -346,7 +367,7 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
   }
 
   const p = data
-  const stockLevels = await getStockLevels()
+  const [stockLevels, categoryNames] = await Promise.all([getStockLevels(), getCategoryNameMap()])
   const level = stockLevels.get(p.id)
   const currentStock = level?.quantity ?? 0
   const trackStock = p.track_stock !== false
@@ -394,7 +415,7 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
     notes: null,
     created_at: p.created_at,
     updated_at: p.updated_at,
-    category_name: p.category || null,
+    category_name: resolveCategoryName(p.category, categoryNames),
     category_color: null,
     current_stock: currentStock,
     reserved_stock: 0,
@@ -593,7 +614,7 @@ export async function searchProducts(query: string): Promise<ProductListItemData
     return []
   }
 
-  const stockLevels = await getStockLevels()
+  const [stockLevels, categoryNames] = await Promise.all([getStockLevels(), getCategoryNameMap()])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((p: any) => {
@@ -621,7 +642,7 @@ export async function searchProducts(query: string): Promise<ProductListItemData
       is_sellable: p.is_for_sale,
       track_stock: trackStock,
       min_stock: minStock,
-      category_name: p.category || null,
+      category_name: resolveCategoryName(p.category, categoryNames),
       category_color: null,
       current_stock: currentStock,
       reserved_stock: 0,

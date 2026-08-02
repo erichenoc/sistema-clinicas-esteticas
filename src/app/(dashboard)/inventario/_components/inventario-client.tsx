@@ -285,7 +285,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
@@ -294,7 +294,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
             <Package className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+            <div className="text-lg sm:text-2xl font-bold">{stats.totalProducts}</div>
             <p className="text-xs text-gray-500 mt-1">productos en catalogo</p>
           </CardContent>
         </Card>
@@ -307,7 +307,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
             <BarChart3 className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</div>
+            <div className="text-lg sm:text-2xl font-bold text-primary break-words">{formatCurrency(stats.totalValue)}</div>
             <p className="text-xs text-gray-500 mt-1">a precio de costo</p>
           </CardContent>
         </Card>
@@ -320,7 +320,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.lowStockCount}</div>
+            <div className="text-lg sm:text-2xl font-bold text-amber-600">{stats.lowStockCount}</div>
             <p className="text-xs text-gray-500 mt-1">productos por reabastecer</p>
           </CardContent>
         </Card>
@@ -333,7 +333,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
             <Clock className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{alerts.length + stats.expiringSoonCount}</div>
+            <div className="text-lg sm:text-2xl font-bold text-red-600">{alerts.length + stats.expiringSoonCount}</div>
             <p className="text-xs text-gray-500 mt-1">requieren atencion</p>
           </CardContent>
         </Card>
