@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { applyStockMovement, getStockLevels } from '@/actions/inventory-movements'
 
 // Tipos para POS
 export interface POSTreatment {
@@ -108,12 +109,13 @@ export async function getPOSPackages(): Promise<POSPackage[]> {
 export async function getPOSProducts(): Promise<POSProduct[]> {
   const supabase = createAdminClient()
 
+  // El esquema real usa `price` / `is_for_sale`, no `sell_price` / `is_sellable`
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('products')
-    .select('id, name, sell_price, current_stock')
+    .select('id, name, price, track_stock')
     .eq('is_active', true)
-    .eq('is_sellable', true)
+    .eq('is_for_sale', true)
     .order('name', { ascending: true })
 
   if (error) {
@@ -121,12 +123,15 @@ export async function getPOSProducts(): Promise<POSProduct[]> {
     return []
   }
 
+  // Existencias reales
+  const stockLevels = await getStockLevels()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((p: any) => ({
     id: p.id,
     name: p.name,
-    price: p.sell_price || 0,
-    stock: p.current_stock || 0,
+    price: Number(p.price || 0),
+    stock: p.track_stock === false ? Infinity : stockLevels.get(p.id)?.quantity ?? 0,
   }))
 }
 
@@ -189,6 +194,7 @@ export interface CreateSaleInput {
 export async function createSale(input: CreateSaleInput): Promise<{
   data: { id: string; sale_number: string } | null
   error: string | null
+  stockWarning?: string | null
 }> {
   const supabase = createAdminClient()
 
@@ -253,7 +259,35 @@ export async function createSale(input: CreateSaleInput): Promise<{
     return { data: null, error: 'Error al registrar los productos de la venta' }
   }
 
+  // Descontar del inventario los productos vendidos.
+  // La venta ya esta cobrada, asi que un descuadre de stock no debe revertirla:
+  // se permite saldo negativo y se avisa para que se corrija con un conteo.
+  const stockWarnings: string[] = []
+  for (const item of input.items.filter((i) => i.item_type === 'product')) {
+    const { error: stockError } = await applyStockMovement({
+      productId: item.item_id,
+      quantity: -Math.abs(item.quantity),
+      movementType: 'sale',
+      referenceType: 'sale',
+      referenceId: sale.id,
+      notes: `Venta ${sale.sale_number}`,
+      allowNegative: true,
+    })
+    if (stockError) {
+      console.error(`Error discounting stock for product ${item.item_id}:`, stockError)
+      stockWarnings.push(item.item_name)
+    }
+  }
+
   revalidatePath('/pos')
   revalidatePath('/facturacion')
-  return { data: { id: sale.id, sale_number: sale.sale_number }, error: null }
+  revalidatePath('/inventario')
+
+  return {
+    data: { id: sale.id, sale_number: sale.sale_number },
+    error: null,
+    stockWarning: stockWarnings.length
+      ? `La venta se registro, pero no se pudo descontar el inventario de: ${stockWarnings.join(', ')}`
+      : null,
+  }
 }

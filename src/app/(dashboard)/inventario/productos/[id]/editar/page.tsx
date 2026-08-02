@@ -181,7 +181,6 @@ export default function EditarProductoPage() {
         cost_price: data.costPrice,
         sell_price: data.sellingPrice,
         tax_rate: data.taxRate,
-        track_stock: true,
         min_stock: data.minStock,
         max_stock: data.maxStock || undefined,
         reorder_point: data.reorderPoint,

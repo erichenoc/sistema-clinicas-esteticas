@@ -76,6 +76,7 @@ import {
   getProductStatusConfig,
   getMovementTypeConfig,
 } from '@/types/inventory'
+import { MovimientoStockDialog } from './movimiento-stock-dialog'
 
 // Product type options for filtering
 const PRODUCT_TYPE_FILTERS = [
@@ -265,7 +266,16 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
               <span className="truncate">Ordenes de Compra</span>
             </Link>
           </Button>
-          <Button asChild className="w-full sm:w-auto">
+          <MovimientoStockDialog
+            products={products.map((p) => ({
+              id: p.id,
+              name: p.name,
+              currentStock: p.currentStock,
+              trackStock: p.trackStock,
+              costPrice: p.costPrice,
+            }))}
+          />
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/inventario/productos/nuevo">
               <Plus className="h-4 w-4 mr-2" />
               <span className="truncate">Nuevo Producto</span>

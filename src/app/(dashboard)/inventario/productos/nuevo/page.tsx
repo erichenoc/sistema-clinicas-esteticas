@@ -199,7 +199,8 @@ export default function NuevoProductoPage() {
         cost_price: data.costPrice,
         sell_price: data.sellingPrice,
         tax_rate: data.taxRate,
-        track_stock: true,
+        // Los equipos y aparatos no llevan existencias
+        track_stock: productType !== 'equipment',
         min_stock: data.minStock,
         max_stock: data.maxStock || undefined,
         reorder_point: data.reorderPoint,

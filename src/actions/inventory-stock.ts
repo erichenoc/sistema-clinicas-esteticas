@@ -703,11 +703,12 @@ export interface BranchData {
 export async function getBranches(): Promise<BranchData[]> {
   const supabase = createAdminClient()
 
+  // `branches` no tiene columna is_active en el esquema real
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('branches')
     .select('id, name')
-    .eq('is_active', true)
+    .order('is_main', { ascending: false })
     .order('name', { ascending: true })
     .limit(100)
 

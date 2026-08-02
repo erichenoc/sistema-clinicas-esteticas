@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sanitizeError } from '@/lib/error-utils'
+import { getStockLevels } from '@/actions/inventory-movements'
 
 // Tipos
 export type ProductType = 'consumable' | 'retail' | 'equipment' | 'injectable' | 'topical'
@@ -62,6 +63,8 @@ export interface ProductListItemData extends ProductData {
   reserved_stock: number
   available_stock: number
   stock_status: StockStatus
+  /** Costo promedio ponderado calculado en las entradas de mercancia */
+  average_cost: number | null
   nearest_expiry: string | null
 }
 
@@ -251,12 +254,28 @@ export async function getProducts(options?: {
     return []
   }
 
+  // Existencias reales desde la tabla `inventory`
+  const stockLevels = await getStockLevels()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((p: any) => {
-    // Production doesn't have inventory/stock tracking tables yet
-    // So we use 0 for stock values
-    const currentStock = 0
-    const stockStatus: StockStatus = 'not_tracked'
+  let mapped = (data || []).map((p: any) => {
+    const level = stockLevels.get(p.id)
+    const currentStock = level?.quantity ?? 0
+    const trackStock = p.track_stock !== false
+    const minStock = p.min_stock || 0
+
+    // Sin minimo configurado no se alerta: evita marcar como "bajo" todo lo
+    // que este en cero solo porque nunca se le puso minimo
+    let stockStatus: StockStatus = 'not_tracked'
+    if (trackStock) {
+      if (currentStock <= 0) {
+        stockStatus = 'out_of_stock'
+      } else if (minStock > 0 && currentStock <= minStock) {
+        stockStatus = 'low_stock'
+      } else {
+        stockStatus = 'in_stock'
+      }
+    }
 
     // Map production columns to expected interface
     // Production: code, cost, price, is_consumable, is_for_sale
@@ -275,8 +294,8 @@ export async function getProducts(options?: {
       cost_price: p.cost || 0, // production uses 'cost'
       sell_price: p.price || 0, // production uses 'price'
       tax_rate: 16,
-      track_stock: false, // production doesn't have track_stock
-      min_stock: p.min_stock || 0,
+      track_stock: trackStock,
+      min_stock: minStock,
       max_stock: null,
       reorder_point: null,
       reorder_quantity: null,
@@ -297,9 +316,16 @@ export async function getProducts(options?: {
       reserved_stock: 0,
       available_stock: currentStock,
       stock_status: stockStatus,
+      average_cost: level?.average_cost ?? null,
       nearest_expiry: null,
     }
   }) as ProductListItemData[]
+
+  if (options?.stockStatus) {
+    mapped = mapped.filter((p) => p.stock_status === options.stockStatus)
+  }
+
+  return mapped
 }
 
 export async function getProductById(id: string): Promise<ProductListItemData | null> {
@@ -320,6 +346,23 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
   }
 
   const p = data
+  const stockLevels = await getStockLevels()
+  const level = stockLevels.get(p.id)
+  const currentStock = level?.quantity ?? 0
+  const trackStock = p.track_stock !== false
+  const minStock = p.min_stock || 0
+
+  let stockStatus: StockStatus = 'not_tracked'
+  if (trackStock) {
+    if (currentStock <= 0) {
+      stockStatus = 'out_of_stock'
+    } else if (minStock > 0 && currentStock <= minStock) {
+      stockStatus = 'low_stock'
+    } else {
+      stockStatus = 'in_stock'
+    }
+  }
+
   // Map production columns to expected interface
   return {
     id: p.id,
@@ -335,8 +378,8 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
     cost_price: p.cost || 0,
     sell_price: p.price || 0,
     tax_rate: 16,
-    track_stock: false,
-    min_stock: p.min_stock || 0,
+    track_stock: trackStock,
+    min_stock: minStock,
     max_stock: null,
     reorder_point: null,
     reorder_quantity: null,
@@ -353,10 +396,11 @@ export async function getProductById(id: string): Promise<ProductListItemData | 
     updated_at: p.updated_at,
     category_name: p.category || null,
     category_color: null,
-    current_stock: 0,
+    current_stock: currentStock,
     reserved_stock: 0,
-    available_stock: 0,
-    stock_status: 'not_tracked' as StockStatus,
+    available_stock: currentStock,
+    stock_status: stockStatus,
+    average_cost: level?.average_cost ?? null,
     nearest_expiry: null,
   }
 }
@@ -383,6 +427,8 @@ export async function createProduct(
     is_for_sale: input.is_sellable ?? (input.type === 'retail'), // production uses 'is_for_sale' not 'is_sellable'
     is_active: input.is_active ?? true,
     supplier_id: input.default_supplier_id || null, // proveedor que vende este producto
+    // Los equipos no llevan existencias; el resto si
+    track_stock: input.track_stock ?? input.type !== 'equipment',
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -426,6 +472,8 @@ export async function updateProduct(
   if (input.is_active !== undefined) updateData.is_active = input.is_active
   if (input.is_sellable !== undefined) updateData.is_for_sale = input.is_sellable // production uses 'is_for_sale'
   if (input.default_supplier_id !== undefined) updateData.supplier_id = input.default_supplier_id
+  if (input.track_stock !== undefined) updateData.track_stock = input.track_stock
+  else if (input.type === 'equipment') updateData.track_stock = false
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
@@ -475,18 +523,11 @@ export async function getInventoryStats(): Promise<InventoryStats> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: products } = await (supabase as any)
     .from('products')
-    .select(`
-      id,
-      min_stock,
-      track_stock,
-      is_active,
-      inventory (
-        quantity,
-        total_value
-      )
-    `)
+    .select('id, min_stock, track_stock, is_active')
     .eq('is_active', true)
     .limit(500)
+
+  const stockLevels = await getStockLevels()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: expiringLots } = await (supabase as any)
@@ -505,17 +546,20 @@ export async function getInventoryStats(): Promise<InventoryStats> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   products?.forEach((p: any) => {
     totalProducts++
-    const stock = p.inventory?.[0]?.quantity || 0
-    const value = p.inventory?.[0]?.total_value || 0
 
-    totalValue += value
+    // Los equipos (track_stock = false) no cuentan como existencias
+    if (p.track_stock === false) return
 
-    if (p.track_stock) {
-      if (stock <= 0) {
-        outOfStockCount++
-      } else if (stock <= p.min_stock) {
-        lowStockCount++
-      }
+    const level = stockLevels.get(p.id)
+    const stock = level?.quantity ?? 0
+    const minStock = p.min_stock || 0
+
+    totalValue += stock * (level?.average_cost ?? 0)
+
+    if (stock <= 0) {
+      outOfStockCount++
+    } else if (minStock > 0 && stock <= minStock) {
+      lowStockCount++
     }
   })
 
@@ -538,12 +582,7 @@ export async function searchProducts(query: string): Promise<ProductListItemData
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('products')
-    .select(`
-      *,
-      inventory (
-        quantity
-      )
-    `)
+    .select('*')
     .or(`name.ilike.%${query.replace(/[%_,()\\]/g, '\\$&')}%,code.ilike.%${query.replace(/[%_,()\\]/g, '\\$&')}%`)
     .eq('is_active', true)
     .order('name', { ascending: true })
@@ -554,29 +593,41 @@ export async function searchProducts(query: string): Promise<ProductListItemData
     return []
   }
 
+  const stockLevels = await getStockLevels()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data || []).map((p: any) => {
-    const inv = p.inventory?.[0] || {}
-    const currentStock = inv.quantity || 0
-    const reservedStock = inv.reserved_quantity || 0
+    const level = stockLevels.get(p.id)
+    const currentStock = level?.quantity ?? 0
+    const trackStock = p.track_stock !== false
+    const minStock = p.min_stock || 0
 
-    let stockStatus: StockStatus = 'in_stock'
-    if (!p.track_stock) {
-      stockStatus = 'not_tracked'
-    } else if (currentStock <= 0) {
-      stockStatus = 'out_of_stock'
-    } else if (currentStock <= p.min_stock) {
-      stockStatus = 'low_stock'
+    let stockStatus: StockStatus = 'not_tracked'
+    if (trackStock) {
+      if (currentStock <= 0) {
+        stockStatus = 'out_of_stock'
+      } else if (minStock > 0 && currentStock <= minStock) {
+        stockStatus = 'low_stock'
+      } else {
+        stockStatus = 'in_stock'
+      }
     }
 
     return {
       ...p,
-      category_name: p.product_categories?.name || null,
-      category_color: p.product_categories?.color || null,
+      sku: p.code || null,
+      cost_price: p.cost || 0,
+      sell_price: p.price || 0,
+      is_sellable: p.is_for_sale,
+      track_stock: trackStock,
+      min_stock: minStock,
+      category_name: p.category || null,
+      category_color: null,
       current_stock: currentStock,
-      reserved_stock: reservedStock,
-      available_stock: inv.available_quantity || currentStock - reservedStock,
+      reserved_stock: 0,
+      available_stock: currentStock,
       stock_status: stockStatus,
+      average_cost: level?.average_cost ?? null,
       nearest_expiry: null,
     }
   }) as ProductListItemData[]

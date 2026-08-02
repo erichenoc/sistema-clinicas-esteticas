@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { getStockLevels } from '@/actions/inventory-movements'
 
 // =============================================
 // TIPOS PARA REPORTES
@@ -615,25 +616,32 @@ export async function getProfessionalPerformance(): Promise<ProfessionalPerforma
 export async function getInventoryAlerts(): Promise<InventoryAlert[]> {
   const supabase = createAdminClient()
 
-  // Get products with low stock
+  // El stock real vive en `inventory`, no en una columna de products
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: products } = await (supabase as any)
     .from('products')
-    .select('name, current_stock, min_stock')
+    .select('id, name, min_stock, track_stock')
     .eq('is_active', true)
-    .or('current_stock.lte.min_stock')
-    .limit(100)
+    .gt('min_stock', 0) // sin minimo configurado no hay nada que alertar
+    .limit(200)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stockLevels = await getStockLevels()
+
   return (products || [])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((p: any) => p.current_stock <= p.min_stock)
+    .filter((p: any) => p.track_stock !== false)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((p: any) => ({
-      product: p.name,
-      stock: p.current_stock || 0,
-      minStock: p.min_stock || 10,
-      status: p.current_stock <= (p.min_stock / 2) ? 'critical' as const : 'low' as const,
+      product: p.name as string,
+      stock: stockLevels.get(p.id)?.quantity ?? 0,
+      minStock: p.min_stock as number,
+    }))
+    .filter((p: { stock: number; minStock: number }) => p.stock <= p.minStock)
+    .map((p: { product: string; stock: number; minStock: number }) => ({
+      product: p.product,
+      stock: p.stock,
+      minStock: p.minStock,
+      status: p.stock <= p.minStock / 2 ? ('critical' as const) : ('low' as const),
     }))
     .slice(0, 10)
 }
@@ -650,21 +658,32 @@ export async function getInventoryStats(): Promise<{
 }> {
   const supabase = createAdminClient()
 
+  // El esquema real usa `cost` y guarda las existencias en `inventory`
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: products } = await (supabase as any)
     .from('products')
-    .select('current_stock, cost_price, min_stock')
+    .select('id, cost, min_stock, track_stock')
     .eq('is_active', true)
     .limit(500)
 
+  const stockLevels = await getStockLevels()
+
+  // Valor al costo promedio real; si no hay entradas con costo, se usa el costo del producto
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalValue = (products || []).reduce((sum: number, p: any) =>
-    sum + ((p.current_stock || 0) * (p.cost_price || 0)), 0
-  )
+  const totalValue = (products || []).reduce((sum: number, p: any) => {
+    if (p.track_stock === false) return sum
+    const level = stockLevels.get(p.id)
+    const qty = level?.quantity ?? 0
+    const unitCost = level?.average_cost ?? Number(p.cost || 0)
+    return sum + qty * unitCost
+  }, 0)
 
   const totalProducts = products?.length || 0
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lowStock = (products || []).filter((p: any) => p.current_stock <= p.min_stock).length
+  const lowStock = (products || []).filter((p: any) => {
+    if (p.track_stock === false || !p.min_stock || p.min_stock <= 0) return false
+    return (stockLevels.get(p.id)?.quantity ?? 0) <= p.min_stock
+  }).length
 
   // Get expiring products
   const thirtyDaysFromNow = new Date()

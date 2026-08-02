@@ -263,12 +263,14 @@ export interface ProductForLot {
 export async function getProductsForLots(): Promise<ProductForLot[]> {
   const supabase = createAdminClient()
 
+  // El esquema real no tiene `requires_lot_tracking`: los lotes aplican a los
+  // consumibles (inyectables, cremas), que son los que vencen
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('products')
     .select('id, name, description')
     .eq('is_active', true)
-    .eq('requires_lot_tracking', true)
+    .eq('is_consumable', true)
     .order('name', { ascending: true })
     .limit(500)
 

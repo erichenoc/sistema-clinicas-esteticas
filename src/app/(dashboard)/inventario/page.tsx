@@ -1,14 +1,17 @@
-export const revalidate = 30
+// El stock cambia con cada venta: no se cachea
+export const dynamic = 'force-dynamic'
 
 import { getProducts, getInventoryStats, getProductLots } from '@/actions/inventory'
+import { getStockMovements } from '@/actions/inventory-movements'
 import { InventarioClient } from './_components/inventario-client'
 import type { ProductStatus, MovementType, UnitType } from '@/types/inventory'
 
 export default async function InventarioPage() {
-  const [dbProducts, dbStats, dbLots] = await Promise.all([
+  const [dbProducts, dbStats, dbLots, dbMovements] = await Promise.all([
     getProducts(),
     getInventoryStats(),
     getProductLots({ expiringWithinDays: 30 }),
+    getStockMovements({ limit: 100 }),
   ])
 
   // Transform products data
@@ -39,9 +42,10 @@ export default async function InventarioPage() {
   // Generate alerts from low stock products and expiring lots
   const alerts = []
 
-  // Low stock alerts
+  // Solo se alerta sobre productos con minimo configurado: sin minimo no hay
+  // criterio para decir que falta algo
   const lowStockProducts = products.filter(
-    (p) => p.trackStock && p.currentStock <= p.minStock && p.currentStock > 0
+    (p) => p.trackStock && p.minStock > 0 && p.currentStock <= p.minStock && p.currentStock > 0
   )
   for (const p of lowStockProducts) {
     alerts.push({
@@ -57,9 +61,9 @@ export default async function InventarioPage() {
     })
   }
 
-  // Out of stock alerts
+  // Agotado solo importa si es un producto que se repone (tiene minimo)
   const outOfStockProducts = products.filter(
-    (p) => p.trackStock && p.currentStock <= 0
+    (p) => p.trackStock && p.minStock > 0 && p.currentStock <= 0
   )
   for (const p of outOfStockProducts) {
     alerts.push({
@@ -76,10 +80,11 @@ export default async function InventarioPage() {
   }
 
   // Expiring soon alerts from lots
+  const today = new Date().getTime()
   for (const lot of dbLots) {
     if (lot.expiry_date && lot.current_quantity > 0) {
       const daysToExpiry = Math.ceil(
-        (new Date(lot.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        (new Date(lot.expiry_date).getTime() - today) / (1000 * 60 * 60 * 24)
       )
       if (daysToExpiry > 0 && daysToExpiry <= 30) {
         alerts.push({
@@ -97,34 +102,23 @@ export default async function InventarioPage() {
     }
   }
 
-  // Mock movements - TODO: Create inventory_movements query
-  const movements: {
-    id: string
-    productName: string
-    productSku: string | null
-    movementType: MovementType
-    quantity: number
-    previousStock: number
-    newStock: number
-    lotNumber: string | null
-    notes: string | null
-    createdAt: string
-    createdByName: string
-  }[] = [
-    {
-      id: '1',
-      productName: 'Producto de ejemplo',
-      productSku: 'SKU-001',
-      movementType: 'purchase' as MovementType,
-      quantity: 20,
-      previousStock: 0,
-      newStock: 20,
-      lotNumber: 'LOT-2024-001',
-      notes: 'Compra inicial',
-      createdAt: new Date().toISOString(),
-      createdByName: 'Admin',
-    },
-  ]
+  // Historial real de entradas y salidas
+  const movements = dbMovements.map((m) => {
+    const newStock = m.balance_after ?? 0
+    return {
+      id: m.id,
+      productName: m.product_name,
+      productSku: null,
+      movementType: m.movement_type as MovementType,
+      quantity: m.quantity,
+      previousStock: newStock - m.quantity,
+      newStock,
+      lotNumber: null,
+      notes: m.notes,
+      createdAt: m.created_at,
+      createdByName: m.created_by_name || 'Sistema',
+    }
+  })
 
   // Transform stats
   const stats = {

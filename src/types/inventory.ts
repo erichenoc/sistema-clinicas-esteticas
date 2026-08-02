@@ -7,7 +7,9 @@ export type ProductCategory = 'consumables' | 'equipment' | 'cosmetics' | 'suppl
 export type ProductStatus = 'active' | 'inactive' | 'discontinued' | 'out_of_stock'
 export type SupplierStatus = 'active' | 'inactive' | 'blocked'
 export type LotStatus = 'active' | 'expired' | 'depleted' | 'returned' | 'damaged'
-export type MovementType = 'purchase' | 'sale' | 'adjustment_in' | 'adjustment_out' | 'transfer_in' | 'transfer_out' | 'return' | 'damaged' | 'expired' | 'initial'
+// 'adjustment', 'loss' y 'consumption' son los tipos que guarda la base de datos
+// (ver inventory_movements_type_check); el resto se mantiene por compatibilidad
+export type MovementType = 'purchase' | 'sale' | 'adjustment' | 'adjustment_in' | 'adjustment_out' | 'consumption' | 'loss' | 'transfer_in' | 'transfer_out' | 'return' | 'damaged' | 'expired' | 'initial'
 export type PurchaseOrderStatus = 'draft' | 'pending' | 'approved' | 'ordered' | 'partial' | 'received' | 'cancelled'
 export type InventoryCountStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled'
 export type TransferStatus = 'pending' | 'in_transit' | 'received' | 'cancelled'
@@ -550,6 +552,9 @@ export const MOVEMENT_TYPE_OPTIONS: {
 }[] = [
   { value: 'purchase', label: 'Compra', direction: 'in', color: '#22c55e' },
   { value: 'sale', label: 'Venta', direction: 'out', color: '#3b82f6' },
+  { value: 'adjustment', label: 'Ajuste por conteo', direction: 'in', color: '#8b5cf6' },
+  { value: 'consumption', label: 'Uso en sesion', direction: 'out', color: '#f97316' },
+  { value: 'loss', label: 'Merma', direction: 'out', color: '#ef4444' },
   { value: 'adjustment_in', label: 'Ajuste entrada', direction: 'in', color: '#8b5cf6' },
   { value: 'adjustment_out', label: 'Ajuste salida', direction: 'out', color: '#f59e0b' },
   { value: 'transfer_in', label: 'Transferencia entrada', direction: 'in', color: '#06b6d4' },

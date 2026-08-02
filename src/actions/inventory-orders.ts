@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { applyStockMovement } from '@/actions/inventory-movements'
 
 // =============================================
 // ORDENES DE COMPRA (PURCHASE ORDERS)
@@ -278,8 +279,18 @@ export async function createPurchaseOrder(
 export async function updatePurchaseOrderStatus(
   id: string,
   status: PurchaseOrderStatus
-): Promise<{ success: boolean; error: string | null }> {
+): Promise<{ success: boolean; error: string | null; warning?: string | null }> {
   const supabase = createAdminClient()
+
+  // Evitar que una orden ya recibida vuelva a sumar stock si se marca dos veces
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: currentOrder } = await (supabase as any)
+    .from('purchase_orders')
+    .select('status, order_number')
+    .eq('id', id)
+    .single()
+
+  const isNewReception = status === 'received' && currentOrder?.status !== 'received'
 
   const updateData: Record<string, unknown> = {
     status,
@@ -301,8 +312,53 @@ export async function updatePurchaseOrderStatus(
     return { success: false, error: 'Error al actualizar el estado' }
   }
 
+  // Al recibir la orden, la mercancia entra al inventario al costo de la compra
+  let warning: string | null = null
+  if (isNewReception) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: items } = await (supabase as any)
+      .from('purchase_order_items')
+      .select('product_id, quantity_ordered, quantity_received, unit_cost')
+      .eq('purchase_order_id', id)
+
+    const failed: string[] = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const item of (items || []) as any[]) {
+      if (!item.product_id) continue
+      // Si no se capturo cantidad recibida, se asume que llego lo pedido
+      const qty = Number(item.quantity_received) || Number(item.quantity_ordered) || 0
+      if (qty <= 0) continue
+
+      const { error: stockError } = await applyStockMovement({
+        productId: item.product_id,
+        quantity: qty,
+        movementType: 'purchase',
+        referenceType: 'purchase_order',
+        referenceId: id,
+        unitCost: Number(item.unit_cost) || null,
+        notes: `Recepcion de orden ${currentOrder?.order_number || ''}`.trim(),
+      })
+      if (stockError) failed.push(item.product_id)
+
+      // Dejar constancia de lo recibido cuando no se habia capturado
+      if (!Number(item.quantity_received)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('purchase_order_items')
+          .update({ quantity_received: qty })
+          .eq('purchase_order_id', id)
+          .eq('product_id', item.product_id)
+      }
+    }
+
+    if (failed.length > 0) {
+      warning = `La orden se marco como recibida, pero ${failed.length} producto(s) no entraron al inventario`
+    }
+    revalidatePath('/inventario')
+  }
+
   revalidatePath('/inventario/ordenes-compra')
-  return { success: true, error: null }
+  return { success: true, error: null, warning }
 }
 
 export async function deletePurchaseOrder(id: string): Promise<{ success: boolean; error: string | null }> {
