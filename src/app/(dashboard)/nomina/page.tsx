@@ -41,7 +41,7 @@ import {
   type PayrollAdjustment,
   type PayrollLine,
 } from '@/actions/payroll'
-import { formatPeriodLabel } from '@/lib/payroll/calculations'
+import { recentPeriods } from '@/lib/periods'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useUser } from '@/contexts/user-context'
 import {
@@ -106,20 +106,10 @@ interface EmpleadoData {
   applyDeductions: boolean
 }
 
-// Ultimos 12 meses, del mas reciente al mas antiguo
-function buildPeriodOptions(): { value: string; label: string }[] {
-  const now = new Date()
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    return { value, label: formatPeriodLabel(value) }
-  })
-}
-
 export default function NominaPage() {
   const { hasPermission } = useUser()
   const canManageSalaries = hasPermission('professionals:manage')
-  const periodOptions = buildPeriodOptions()
+  const periodOptions = recentPeriods()
   const [selectedPeriod, setSelectedPeriod] = useState(periodOptions[0].value)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('nomina')

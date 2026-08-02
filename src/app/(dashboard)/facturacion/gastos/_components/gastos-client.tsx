@@ -55,6 +55,7 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '@/types/expenses'
 import { deleteExpense } from '@/actions/expenses'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
 import type { CashFlowPeriod } from '@/actions/cashflow'
+import { recentPeriods } from '@/lib/periods'
 import { generateRecurringExpenses } from '@/actions/recurring-expenses'
 import type { RecurringExpenseData } from '@/actions/recurring-expenses'
 import { NuevoGastoDialog } from './nuevo-gasto-dialog'
@@ -73,17 +74,6 @@ interface GastosClientProps {
   accessError: string | null
 }
 
-/** Ultimos 12 meses para poder consultar meses anteriores */
-function buildMonthOptions(): { value: string; label: string }[] {
-  const now = new Date()
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const name = d.toLocaleDateString('es-DO', { month: 'long' })
-    return { value, label: `${name.charAt(0).toUpperCase()}${name.slice(1)} ${d.getFullYear()}` }
-  })
-}
-
 export function GastosClient({
   expenses,
   cashFlow,
@@ -93,7 +83,7 @@ export function GastosClient({
   recurringPeriod,
   accessError,
 }: GastosClientProps) {
-  const monthOptions = buildMonthOptions()
+  const monthOptions = recentPeriods()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 

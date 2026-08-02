@@ -36,7 +36,7 @@ export default async function GastosPage({
   const [expensesRes, cashFlowRes, statsRes, recurringRes] = await Promise.all([
     getExpenses(MONTH_PATTERN.test(period) ? { period } : undefined),
     getCashFlowSummary(period),
-    getExpenseStats(),
+    getExpenseStats(period),
     getRecurringExpenses(recurringPeriod),
   ])
 

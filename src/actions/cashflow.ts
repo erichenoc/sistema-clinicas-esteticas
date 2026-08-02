@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import type { ExpenseCategory, ExpenseStats, CashFlowSummary } from '@/actions/expenses'
+import { MONTH_NAMES, formatPeriodLabel, periodBounds } from '@/lib/periods'
 
 // =============================================
 // FLUJO DE CAJA
@@ -52,24 +53,17 @@ function getPeriodRange(period: CashFlowPeriod): {
 
   // Mes concreto: '2026-07'
   if (MONTH_PATTERN.test(period)) {
-    const [y, m] = period.split('-').map(Number)
-    const lastDay = new Date(y, m, 0).getDate()
-    const monthName = new Date(y, m - 1, 1).toLocaleDateString('es-DO', { month: 'long' })
-    return {
-      start: `${period}-01`,
-      end: `${period}-${String(lastDay).padStart(2, '0')}`,
-      label: `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${y}`,
-    }
+    const { start, end } = periodBounds(period)
+    return { start, end, label: formatPeriodLabel(period) }
   }
 
   switch (period) {
     case 'month': {
       const start = new Date(year, now.getMonth(), 1)
-      const monthName = start.toLocaleDateString('es-DO', { month: 'long' })
       return {
         start: start.toISOString().slice(0, 10),
         end: null,
-        label: `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`,
+        label: `${MONTH_NAMES[now.getMonth()]} ${year}`,
       }
     }
     case 'quarter': {
@@ -185,16 +179,26 @@ export async function getCashFlowSummary(
   }
 }
 
-export async function getExpenseStats(): Promise<{ data: ExpenseStats | null; error: string | null }> {
+// Las cifras se acotan al mismo periodo que el flujo de caja, para que toda la
+// pantalla hable del mismo rango de fechas.
+export async function getExpenseStats(
+  period: CashFlowPeriod = 'month'
+): Promise<{ data: ExpenseStats | null; error: string | null }> {
   const authError = await requireAdmin()
   if (authError) return { data: null, error: authError }
 
   const supabase = createAdminClient()
+  const { start, end } = getPeriodRange(period)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('expenses')
-    .select('total, status, category, due_date, expense_payments (amount, payment_date)')
+    .select('total, status, category, due_date, issue_date, expense_payments (amount, payment_date)')
+
+  if (start) query = query.gte('issue_date', start)
+  if (end) query = query.lte('issue_date', end)
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching expense stats:', error)
@@ -202,7 +206,8 @@ export async function getExpenseStats(): Promise<{ data: ExpenseStats | null; er
   }
 
   const today = new Date()
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
+  const paidFrom = start || '0001-01-01'
+  const paidTo = end || '9999-12-31'
 
   let totalPending = 0
   let totalOverdue = 0
@@ -236,7 +241,7 @@ export async function getExpenseStats(): Promise<{ data: ExpenseStats | null; er
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const p of payments as any[]) {
-      if (p.payment_date && p.payment_date >= monthStart) {
+      if (p.payment_date && p.payment_date >= paidFrom && p.payment_date <= paidTo) {
         paidThisMonth += Number(p.amount || 0)
         paidCountThisMonth += 1
       }
