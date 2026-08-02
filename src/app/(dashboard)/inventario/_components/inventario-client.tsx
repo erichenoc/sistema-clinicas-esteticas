@@ -263,7 +263,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
           <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/inventario/ordenes-compra">
               <Truck className="h-4 w-4 mr-2" />
-              <span className="truncate">Ordenes de Compra</span>
+              <span className="truncate">Órdenes de Compra</span>
             </Link>
           </Button>
           <MovimientoStockDialog
@@ -295,7 +295,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold">{stats.totalProducts}</div>
-            <p className="text-xs text-gray-500 mt-1">productos en catalogo</p>
+            <p className="text-xs text-gray-500 mt-1">productos en catálogo</p>
           </CardContent>
         </Card>
 
@@ -334,7 +334,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold text-red-600">{alerts.length + stats.expiringSoonCount}</div>
-            <p className="text-xs text-gray-500 mt-1">requieren atencion</p>
+            <p className="text-xs text-gray-500 mt-1">requieren atención</p>
           </CardContent>
         </Card>
       </div>
@@ -446,7 +446,7 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
                   <TableHead>Producto</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Categoria</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Costo</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
