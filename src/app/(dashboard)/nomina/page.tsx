@@ -6,7 +6,6 @@ import {
   DollarSign,
   Users,
   Calendar,
-  Download,
   Search,
   Plus,
   Eye,
@@ -15,11 +14,13 @@ import {
   Calculator,
   CheckCircle,
   Briefcase,
-  CreditCard,
   FileText,
   Printer,
   Loader2,
   Percent,
+  Lock,
+  Unlock,
+  Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -29,6 +30,19 @@ import {
   updatePayrollDeductions,
   type ProfessionalSummaryData,
 } from '@/actions/professionals'
+import {
+  getPayrollPeriod,
+  getPayrollHistory,
+  closePayrollPeriod,
+  markPayrollAsPaid,
+  reopenPayrollPeriod,
+  type PayrollPeriodData,
+  type PayrollHistoryEntry,
+  type PayrollAdjustment,
+  type PayrollLine,
+} from '@/actions/payroll'
+import { formatPeriodLabel } from '@/lib/payroll/calculations'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useUser } from '@/contexts/user-context'
 import {
   Card,
@@ -72,7 +86,6 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
 
 // Interfaces para datos
 interface EmpleadoData {
@@ -93,100 +106,42 @@ interface EmpleadoData {
   applyDeductions: boolean
 }
 
-interface NominaData {
-  id: string
-  employeeId: string
-  employeeName: string
-  period: string
-  baseSalary: number
-  commissions: number
-  bonuses: number
-  overtime: number
-  grossSalary: number
-  afpEmployee: number
-  arsEmployee: number
-  isrWithholding: number
-  otherDeductions: number
-  totalDeductions: number
-  netSalary: number
-  status: string
-  applyDeductions: boolean
-}
-
-interface HistorialNominaData {
-  period: string
-  totalGross: number
-  totalNet: number
-  employeeCount: number
-  status: string
-  paidDate: string
-}
-
-// Función para calcular ISR según tabla DGII 2024
-function calculateISR(annualSalary: number): number {
-  if (annualSalary <= 416220) return 0
-  if (annualSalary <= 624329) return (annualSalary - 416220) * 0.15
-  if (annualSalary <= 867123) return 31216 + (annualSalary - 624329) * 0.20
-  return 79776 + (annualSalary - 867123) * 0.25
-}
-
-// Función para generar nómina desde empleados
-function generateNominaFromEmployees(employees: EmpleadoData[], period: string): NominaData[] {
-  return employees.map(emp => {
-    const baseSalary = emp.salary
-    const commissions = 0 // TODO: Calcular desde comisiones reales
-    const bonuses = 0
-    const overtime = 0
-    const grossSalary = baseSalary + commissions + bonuses + overtime
-
-    // Deducciones de ley: solo si el empleado las lleva. Hay personal que se
-    // paga por honorarios y recibe el bruto completo.
-    const applyDeductions = emp.applyDeductions !== false
-    const afpEmployee = applyDeductions ? grossSalary * 0.0287 : 0
-    const arsEmployee = applyDeductions ? grossSalary * 0.0304 : 0
-    const annualGross = grossSalary * 12
-    const isrWithholding = applyDeductions ? calculateISR(annualGross) / 12 : 0
-    const totalDeductions = afpEmployee + arsEmployee + isrWithholding
-    const netSalary = grossSalary - totalDeductions
-
-    return {
-      id: `nom-${emp.id}`,
-      employeeId: emp.id,
-      employeeName: emp.name,
-      period,
-      baseSalary,
-      commissions,
-      bonuses,
-      overtime,
-      grossSalary,
-      afpEmployee: Math.round(afpEmployee),
-      arsEmployee: Math.round(arsEmployee),
-      isrWithholding: Math.round(isrWithholding),
-      otherDeductions: 0,
-      totalDeductions: Math.round(totalDeductions),
-      netSalary: Math.round(netSalary),
-      status: 'pending',
-      applyDeductions,
-    }
+// Ultimos 12 meses, del mas reciente al mas antiguo
+function buildPeriodOptions(): { value: string; label: string }[] {
+  const now = new Date()
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return { value, label: formatPeriodLabel(value) }
   })
 }
-
-// Historial de nóminas (mock por ahora - TODO: crear tabla en BD)
-const mockHistorialNomina: HistorialNominaData[] = [
-  { period: '2024-11', totalGross: 365500, totalNet: 318723, employeeCount: 5, status: 'paid', paidDate: '2024-11-30' },
-  { period: '2024-10', totalGross: 358000, totalNet: 311890, employeeCount: 5, status: 'paid', paidDate: '2024-10-31' },
-  { period: '2024-09', totalGross: 362000, totalNet: 315200, employeeCount: 5, status: 'paid', paidDate: '2024-09-30' },
-]
 
 export default function NominaPage() {
   const { hasPermission } = useUser()
   const canManageSalaries = hasPermission('professionals:manage')
-  const [selectedPeriod, setSelectedPeriod] = useState('2024-12')
+  const periodOptions = buildPeriodOptions()
+  const [selectedPeriod, setSelectedPeriod] = useState(periodOptions[0].value)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('nomina')
   const [empleados, setEmpleados] = useState<EmpleadoData[]>([])
-  const [nomina, setNomina] = useState<NominaData[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // Nomina del periodo: la guardada si el mes ya se cerro, o el calculo al vuelo
+  const [payroll, setPayroll] = useState<PayrollPeriodData | null>(null)
+  const [history, setHistory] = useState<PayrollHistoryEntry[]>([])
+  const [adjustments, setAdjustments] = useState<Record<string, PayrollAdjustment>>({})
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [accessError, setAccessError] = useState<string | null>(null)
+
+  // Ajustes del mes (comisiones, bonos, descuentos) antes de cerrar
+  const [adjustingLine, setAdjustingLine] = useState<PayrollLine | null>(null)
+  const [adjCommissions, setAdjCommissions] = useState('')
+  const [adjBonuses, setAdjBonuses] = useState('')
+  const [adjOvertime, setAdjOvertime] = useState('')
+  const [adjOther, setAdjOther] = useState('')
+
+  // Volante de pago del empleado
+  const [receiptLine, setReceiptLine] = useState<PayrollLine | null>(null)
 
   // Edicion de sueldo (solo admin/dueno)
   const [editingEmp, setEditingEmp] = useState<EmpleadoData | null>(null)
@@ -223,9 +178,20 @@ export default function NominaPage() {
 
       setEmpleados(employeesList)
 
-      // Generar nómina desde empleados
-      const nominaList = generateNominaFromEmployees(employeesList, selectedPeriod)
-      setNomina(nominaList)
+      // Nomina y historial reales desde la base de datos
+      const adjustmentList = Object.values(adjustments)
+      const [payrollRes, historyRes] = await Promise.all([
+        getPayrollPeriod(selectedPeriod, adjustmentList),
+        getPayrollHistory(),
+      ])
+
+      if (payrollRes.error) {
+        setAccessError(payrollRes.error)
+      } else {
+        setAccessError(null)
+        setPayroll(payrollRes.data)
+        setHistory(historyRes.data)
+      }
     } catch (error) {
       console.error('Error loading employees:', error)
       toast.error('Error al cargar los empleados')
@@ -238,6 +204,115 @@ export default function NominaPage() {
     loadEmployees()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod])
+
+  const openAdjustments = (line: PayrollLine) => {
+    setAdjustingLine(line)
+    setAdjCommissions(line.commissions ? String(line.commissions) : '')
+    setAdjBonuses(line.bonuses ? String(line.bonuses) : '')
+    setAdjOvertime(line.overtime ? String(line.overtime) : '')
+    setAdjOther(line.otherDeductions ? String(line.otherDeductions) : '')
+  }
+
+  // Los ajustes viven en pantalla hasta que se cierra el mes; ahi se guardan
+  const handleSaveAdjustments = async () => {
+    if (!adjustingLine?.userId) return
+    const next: Record<string, PayrollAdjustment> = {
+      ...adjustments,
+      [adjustingLine.userId]: {
+        userId: adjustingLine.userId,
+        commissions: parseFloat(adjCommissions) || 0,
+        bonuses: parseFloat(adjBonuses) || 0,
+        overtime: parseFloat(adjOvertime) || 0,
+        otherDeductions: parseFloat(adjOther) || 0,
+      },
+    }
+    setAdjustments(next)
+    setAdjustingLine(null)
+
+    const { data } = await getPayrollPeriod(selectedPeriod, Object.values(next))
+    if (data) setPayroll(data)
+    toast.success('Ajuste aplicado. Se guardara al cerrar la nomina.')
+  }
+
+  // Cerrar el mes: congela el calculo actual como documento historico
+  const handleClosePayroll = async () => {
+    if (!payroll) return
+    const label = payroll.periodLabel
+    if (
+      !confirm(
+        `Cerrar la nomina de ${label}?\n\n` +
+          `${payroll.employeeCount} empleados · Total a pagar ${formatPrice(payroll.totalNet)}\n\n` +
+          'Los montos quedan congelados. Podras reabrirla mientras no la marques como pagada.'
+      )
+    ) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const { error } = await closePayrollPeriod(selectedPeriod, Object.values(adjustments))
+      if (error) {
+        toast.error(error)
+        return
+      }
+      toast.success(`Nomina de ${label} cerrada`)
+      setAdjustments({})
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Marcar como pagada: genera el gasto para que salga en el flujo de caja
+  const handleMarkPaid = async () => {
+    if (!payroll?.id) return
+    if (
+      !confirm(
+        `Marcar como pagada la nomina de ${payroll.periodLabel}?\n\n` +
+          `Se registrara un gasto de ${formatPrice(payroll.totalNet)} en la categoria Nomina, ` +
+          'para que aparezca en el flujo de caja.'
+      )
+    ) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const { error, expenseError } = await markPayrollAsPaid(payroll.id)
+      if (error) {
+        toast.error(error)
+        return
+      }
+      if (expenseError) {
+        toast.warning(`Nomina marcada como pagada, pero el gasto no se registro: ${expenseError}`)
+      } else {
+        toast.success('Nomina pagada y registrada en el flujo de caja')
+      }
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleReopenPayroll = async () => {
+    if (!payroll?.id) return
+    if (!confirm(`Reabrir la nomina de ${payroll.periodLabel}? Se borrara el cierre y volvera a calcularse.`)) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const { error } = await reopenPayrollPeriod(payroll.id)
+      if (error) {
+        toast.error(error)
+        return
+      }
+      toast.success('Nomina reabierta')
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   // Decidir si a este empleado se le aplican AFP, ARS e ISR
   const handleToggleDeductions = async (emp: EmpleadoData) => {
@@ -299,9 +374,9 @@ export default function NominaPage() {
     return true
   })
 
-  const filteredNomina = nomina.filter((nom) => {
-    if (nom.period !== selectedPeriod) return false
-    if (searchTerm && !nom.employeeName.toLowerCase().includes(searchTerm.toLowerCase())) return false
+  // La busqueda solo filtra la tabla; los totales son del periodo completo
+  const filteredNomina = (payroll?.lines || []).filter((line) => {
+    if (searchTerm && !line.employeeName.toLowerCase().includes(searchTerm.toLowerCase())) return false
     return true
   })
 
@@ -312,26 +387,15 @@ export default function NominaPage() {
     }).format(price)
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr + '-01').toLocaleDateString('es-DO', {
-      month: 'long',
-      year: 'numeric',
-    })
-  }
+  // Totales del periodo, calculados en el servidor
+  const totalGross = payroll?.totalGross ?? 0
+  const totalDeductions = payroll?.totalDeductions ?? 0
+  const totalNet = payroll?.totalNet ?? 0
+  const employeeCount = payroll?.employeeCount ?? 0
+  const employerCost = payroll?.employerCost ?? 0
 
-  // Estadísticas de la nómina actual
-  const totalGross = filteredNomina.reduce((acc, n) => acc + n.grossSalary, 0)
-  const totalDeductions = filteredNomina.reduce((acc, n) => acc + n.totalDeductions, 0)
-  const totalNet = filteredNomina.reduce((acc, n) => acc + n.netSalary, 0)
-  const employeeCount = filteredNomina.length
-
-  // Costo patronal estimado (9.97% AFP + 7.09% ARS + otros).
-  // Solo sobre quienes cotizan: a quien se le paga sin descuentos tampoco se le
-  // hacen aportes patronales.
-  const cotizableGross = filteredNomina
-    .filter((n) => n.applyDeductions)
-    .reduce((acc, n) => acc + n.grossSalary, 0)
-  const employerCost = cotizableGross * 0.2206
+  const isClosed = payroll?.status === 'closed' || payroll?.status === 'paid'
+  const isPaid = payroll?.status === 'paid'
 
   return (
     <div className="space-y-6 p-4 sm:p-0">
@@ -350,24 +414,83 @@ export default function NominaPage() {
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2024-12">Diciembre 2024</SelectItem>
-              <SelectItem value="2024-11">Noviembre 2024</SelectItem>
-              <SelectItem value="2024-10">Octubre 2024</SelectItem>
-              <SelectItem value="2024-09">Septiembre 2024</SelectItem>
+              {periodOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="capitalize">
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1 sm:flex-none">
-              <Download className="mr-2 h-4 w-4" />
-              Exportar
-            </Button>
-            <Button className="flex-1 sm:flex-none">
-              <Calculator className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Calcular </span>Nómina
-            </Button>
+            {canManageSalaries && !isClosed && (
+              <Button
+                className="flex-1 sm:flex-none"
+                onClick={handleClosePayroll}
+                disabled={isProcessing || isLoading || employeeCount === 0}
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                {isProcessing ? 'Procesando...' : 'Cerrar Nómina'}
+              </Button>
+            )}
+            {canManageSalaries && isClosed && !isPaid && (
+              <>
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  onClick={handleReopenPayroll}
+                  disabled={isProcessing}
+                >
+                  <Unlock className="mr-2 h-4 w-4" />
+                  Reabrir
+                </Button>
+                <Button
+                  className="flex-1 sm:flex-none"
+                  onClick={handleMarkPaid}
+                  disabled={isProcessing}
+                >
+                  <Wallet className="mr-2 h-4 w-4" />
+                  {isProcessing ? 'Procesando...' : 'Marcar Pagada'}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {accessError && (
+        <Alert variant="destructive">
+          <AlertTitle>Acceso restringido</AlertTitle>
+          <AlertDescription>{accessError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Estado del periodo */}
+      {payroll && (
+        <Alert
+          className={
+            isPaid
+              ? 'border-green-300 bg-green-50 dark:bg-green-950'
+              : isClosed
+                ? 'border-blue-300 bg-blue-50 dark:bg-blue-950'
+                : 'border-amber-300 bg-amber-50 dark:bg-amber-950'
+          }
+        >
+          <AlertTitle className="capitalize">
+            {isPaid
+              ? `Nómina de ${payroll.periodLabel} pagada`
+              : isClosed
+                ? `Nómina de ${payroll.periodLabel} cerrada`
+                : `Nómina de ${payroll.periodLabel} sin cerrar`}
+          </AlertTitle>
+          <AlertDescription>
+            {isPaid
+              ? `Pagada el ${payroll.paidAt ? new Date(payroll.paidAt).toLocaleDateString('es-DO') : '—'}. Los montos quedaron congelados y el pago aparece en el flujo de caja.`
+              : isClosed
+                ? `Cerrada${payroll.closedByName ? ` por ${payroll.closedByName}` : ''}${payroll.closedAt ? ` el ${new Date(payroll.closedAt).toLocaleDateString('es-DO')}` : ''}. Marcala como pagada cuando entregues el dinero.`
+                : 'Estos montos se calculan al momento y cambian si editas sueldos. Cierra el mes para dejarlos fijos como documento histórico.'}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-5">
@@ -436,21 +559,17 @@ export default function NominaPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Nómina {formatDate(selectedPeriod)}</CardTitle>
+                <CardTitle className="capitalize">Nómina {payroll?.periodLabel || ''}</CardTitle>
                 <CardDescription>
-                  Detalle de pagos para el período seleccionado
+                  {isClosed
+                    ? 'Detalle congelado al momento del cierre'
+                    : 'Detalle calculado con los sueldos actuales'}
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Printer className="mr-2 h-4 w-4" />
-                  Imprimir
-                </Button>
-                <Button size="sm">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Procesar Pagos
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="relative mb-4">
@@ -478,8 +597,17 @@ export default function NominaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {filteredNomina.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                        {isLoading
+                          ? 'Cargando...'
+                          : 'No hay empleados con sueldo definido para este período'}
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {filteredNomina.map((nomina) => (
-                    <TableRow key={nomina.id}>
+                    <TableRow key={nomina.id || nomina.userId}>
                       <TableCell className="font-medium">
                         {nomina.employeeName}
                         {!nomina.applyDeductions && (
@@ -503,9 +631,13 @@ export default function NominaPage() {
                       </TableCell>
                       <TableCell className="text-right font-bold text-green-600">{formatPrice(nomina.netSalary)}</TableCell>
                       <TableCell>
-                        <Badge variant={nomina.status === 'paid' ? 'default' : 'secondary'}>
-                          {nomina.status === 'paid' ? 'Pagado' : 'Pendiente'}
-                        </Badge>
+                        {isPaid ? (
+                          <Badge className="bg-green-500">Pagado</Badge>
+                        ) : isClosed ? (
+                          <Badge className="bg-blue-500">Cerrado</Badge>
+                        ) : (
+                          <Badge variant="secondary">Borrador</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -515,19 +647,19 @@ export default function NominaPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver detalle
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setReceiptLine(nomina)}>
                               <FileText className="mr-2 h-4 w-4" />
-                              Generar volante
+                              Ver volante de pago
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <CreditCard className="mr-2 h-4 w-4" />
-                              Procesar pago
-                            </DropdownMenuItem>
+                            {canManageSalaries && !isClosed && nomina.userId && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => openAdjustments(nomina)}>
+                                  <Calculator className="mr-2 h-4 w-4" />
+                                  Ajustar comisiones y bonos
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -697,24 +829,42 @@ export default function NominaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockHistorialNomina.map((nomina, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium capitalize">
-                        {formatDate(nomina.period)}
+                  {history.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        Aún no hay nóminas cerradas. Cierra el mes actual para que quede registrado.
                       </TableCell>
-                      <TableCell>{nomina.employeeCount}</TableCell>
-                      <TableCell className="text-right">{formatPrice(nomina.totalGross)}</TableCell>
+                    </TableRow>
+                  )}
+                  {history.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium capitalize">{entry.periodLabel}</TableCell>
+                      <TableCell>{entry.employeeCount}</TableCell>
+                      <TableCell className="text-right">{formatPrice(entry.totalGross)}</TableCell>
                       <TableCell className="text-right font-medium text-green-600">
-                        {formatPrice(nomina.totalNet)}
+                        {formatPrice(entry.totalNet)}
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-green-500">Pagado</Badge>
+                        {entry.status === 'paid' ? (
+                          <Badge className="bg-green-500">Pagado</Badge>
+                        ) : entry.status === 'cancelled' ? (
+                          <Badge variant="outline">Anulado</Badge>
+                        ) : (
+                          <Badge className="bg-blue-500">Cerrado</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
-                        {new Date(nomina.paidDate).toLocaleDateString('es-DO')}
+                        {entry.paidAt ? new Date(entry.paidAt).toLocaleDateString('es-DO') : '—'}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPeriod(entry.period)
+                            setActiveTab('nomina')
+                          }}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -889,6 +1039,141 @@ export default function NominaPage() {
             <Button onClick={handleSaveSalary} disabled={isSavingSalary}>
               {isSavingSalary && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar Sueldo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ajustes del mes: comisiones, bonos, horas extra y otros descuentos */}
+      <Dialog open={!!adjustingLine} onOpenChange={(open) => !open && setAdjustingLine(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Ajustar {adjustingLine?.employeeName}</DialogTitle>
+            <DialogDescription>
+              Sueldo base {formatPrice(adjustingLine?.baseSalary || 0)}. Los ajustes se guardan al
+              cerrar la nómina.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="adj-com">Comisiones (RD$)</Label>
+              <Input id="adj-com" type="number" min="0" step="0.01" value={adjCommissions}
+                onChange={(e) => setAdjCommissions(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adj-bon">Bonificaciones (RD$)</Label>
+              <Input id="adj-bon" type="number" min="0" step="0.01" value={adjBonuses}
+                onChange={(e) => setAdjBonuses(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adj-ext">Horas extra (RD$)</Label>
+              <Input id="adj-ext" type="number" min="0" step="0.01" value={adjOvertime}
+                onChange={(e) => setAdjOvertime(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adj-oth">Otros descuentos (RD$)</Label>
+              <Input id="adj-oth" type="number" min="0" step="0.01" value={adjOther}
+                onChange={(e) => setAdjOther(e.target.value)} placeholder="0.00" />
+              <p className="text-xs text-muted-foreground">Adelantos, préstamos</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustingLine(null)}>Cancelar</Button>
+            <Button onClick={handleSaveAdjustments}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Volante de pago */}
+      <Dialog open={!!receiptLine} onOpenChange={(open) => !open && setReceiptLine(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Volante de pago</DialogTitle>
+            <DialogDescription className="capitalize">
+              {receiptLine?.employeeName} — {payroll?.periodLabel}
+            </DialogDescription>
+          </DialogHeader>
+          {receiptLine && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="font-medium">Ingresos</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sueldo base</span>
+                  <span>{formatPrice(receiptLine.baseSalary)}</span>
+                </div>
+                {receiptLine.commissions > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Comisiones</span>
+                    <span>{formatPrice(receiptLine.commissions)}</span>
+                  </div>
+                )}
+                {receiptLine.bonuses > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bonificaciones</span>
+                    <span>{formatPrice(receiptLine.bonuses)}</span>
+                  </div>
+                )}
+                {receiptLine.overtime > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Horas extra</span>
+                    <span>{formatPrice(receiptLine.overtime)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-2 font-medium">
+                  <span>Total bruto</span>
+                  <span>{formatPrice(receiptLine.grossSalary)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="font-medium">Deducciones</p>
+                {receiptLine.applyDeductions ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">AFP (2.87%)</span>
+                      <span className="text-red-600">-{formatPrice(receiptLine.afpEmployee)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ARS (3.04%)</span>
+                      <span className="text-red-600">-{formatPrice(receiptLine.arsEmployee)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ISR</span>
+                      <span className="text-red-600">-{formatPrice(receiptLine.isrWithholding)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Se paga el bruto completo, sin descuentos de ley
+                  </p>
+                )}
+                {receiptLine.otherDeductions > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Otros descuentos</span>
+                    <span className="text-red-600">-{formatPrice(receiptLine.otherDeductions)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-2 font-medium">
+                  <span>Total deducciones</span>
+                  <span className="text-red-600">
+                    {receiptLine.totalDeductions > 0
+                      ? `-${formatPrice(receiptLine.totalDeductions)}`
+                      : formatPrice(0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-between rounded-md bg-muted p-3 text-base font-bold">
+                <span>Neto a recibir</span>
+                <span className="text-green-600">{formatPrice(receiptLine.netSalary)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiptLine(null)}>Cerrar</Button>
+            <Button onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
             </Button>
           </DialogFooter>
         </DialogContent>
