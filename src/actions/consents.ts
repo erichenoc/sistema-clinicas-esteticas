@@ -2,69 +2,56 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getAuthContext } from '@/lib/auth/guards'
 
 // Tipos
 export type ConsentStatus = 'pending' | 'signed' | 'revoked' | 'expired'
-export type ConsentCategory = 'general' | 'inyectable' | 'laser' | 'cirugia' | 'estetica' | 'medico' | 'otro'
+// Debe coincidir con ConsentCategory de @/types/consents, que alimenta la UI
+export type ConsentCategory = 'general' | 'facial' | 'corporal' | 'inyectable' | 'laser' | 'quirurgico' | 'otro'
 
+// Refleja las columnas REALES de consent_templates en Supabase.
 export interface ConsentTemplateData {
   id: string
-  clinic_id: string
+  clinic_id: string | null
   name: string
   code: string | null
   description: string | null
   category: ConsentCategory
-  treatment_ids: string[] | null
+  treatment_id: string | null
   content: string
-  risks_section: string | null
-  alternatives_section: string | null
-  contraindications_section: string | null
-  aftercare_section: string | null
-  required_fields: unknown[]
   version: number
-  is_current: boolean
-  previous_version_id: string | null
   is_active: boolean
   is_required: boolean
   requires_witness: boolean
-  requires_photo_id: boolean
   expiry_days: number | null
+  created_by: string | null
   created_at: string
   updated_at: string
-  created_by: string | null
+  // Calculados, no son columnas
   total_signed: number
   active_signed: number
   last_signed_at: string | null
 }
 
+// Refleja las columnas REALES de signed_consents en Supabase.
+// La firma se guarda en patient_signature_url como data URI.
 export interface SignedConsentData {
   id: string
-  clinic_id: string
-  branch_id: string | null
+  clinic_id: string | null
   template_id: string
   patient_id: string
   session_id: string | null
   appointment_id: string | null
   treatment_id: string | null
-  obtained_by: string
+  obtained_by: string | null
   template_version: number
   content_snapshot: string | null
   additional_fields: Record<string, unknown> | null
   patient_signature_url: string | null
-  patient_signature_data: string | null
-  patient_signed_at: string
-  professional_signature_url: string | null
-  professional_signed_at: string | null
-  witness_name: string | null
-  witness_id_number: string | null
   witness_signature_url: string | null
-  witness_signed_at: string | null
-  patient_id_photo_url: string | null
+  signed_at: string
   ip_address: string | null
-  user_agent: string | null
-  device_info: string | null
   pdf_url: string | null
-  pdf_generated_at: string | null
   status: ConsentStatus
   revoked_at: string | null
   revoked_by: string | null
@@ -72,6 +59,7 @@ export interface SignedConsentData {
   expires_at: string | null
   created_at: string
   updated_at: string
+  // Calculados / unidos, no son columnas
   template_name: string
   template_category: ConsentCategory
   template_code: string | null
@@ -153,6 +141,136 @@ export async function getConsentTemplateById(id: string): Promise<ConsentTemplat
     active_signed: 0,
     last_signed_at: null,
   }
+}
+
+export interface ConsentTemplateInput {
+  name: string
+  content: string
+  category?: ConsentCategory
+  code?: string | null
+  description?: string | null
+  treatment_id?: string | null
+  expiry_days?: number | null
+  requires_witness?: boolean
+  is_required?: boolean
+  is_active?: boolean
+}
+
+export async function createConsentTemplate(
+  input: ConsentTemplateInput
+): Promise<{ data: ConsentTemplateData | null; error: string | null }> {
+  const ctx = await getAuthContext()
+  if (!ctx) return { data: null, error: 'No autorizado' }
+
+  if (!input.name?.trim()) return { data: null, error: 'El nombre es requerido' }
+  if (!input.content?.trim()) return { data: null, error: 'El texto del consentimiento es requerido' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('consent_templates')
+    .insert({
+      clinic_id: ctx.clinicId,
+      name: input.name.trim(),
+      content: input.content.trim(),
+      category: input.category || 'general',
+      code: input.code?.trim() || null,
+      description: input.description?.trim() || null,
+      treatment_id: input.treatment_id || null,
+      expiry_days: input.expiry_days ?? null,
+      requires_witness: input.requires_witness ?? false,
+      is_required: input.is_required ?? false,
+      is_active: input.is_active ?? true,
+      version: 1,
+      created_by: ctx.userId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating consent template:', error)
+    return { data: null, error: 'Error al crear la plantilla' }
+  }
+
+  revalidatePath('/consentimientos/plantillas')
+  revalidatePath('/consentimientos')
+  return { data: { ...data, total_signed: 0, active_signed: 0, last_signed_at: null }, error: null }
+}
+
+// Editar el texto de una plantilla sube su version. Los consentimientos ya
+// firmados guardan su propio content_snapshot, asi que no se ven afectados.
+export async function updateConsentTemplate(
+  id: string,
+  input: Partial<ConsentTemplateInput>
+): Promise<{ error: string | null }> {
+  const ctx = await getAuthContext()
+  if (!ctx) return { error: 'No autorizado' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: current } = await (supabase as any)
+    .from('consent_templates')
+    .select('content, version')
+    .eq('id', id)
+    .single()
+
+  if (!current) return { error: 'La plantilla no existe' }
+
+  const contentChanged =
+    input.content !== undefined && input.content.trim() !== current.content
+
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (input.name !== undefined) updateData.name = input.name.trim()
+  if (input.content !== undefined) updateData.content = input.content.trim()
+  if (input.category !== undefined) updateData.category = input.category
+  if (input.code !== undefined) updateData.code = input.code?.trim() || null
+  if (input.description !== undefined) updateData.description = input.description?.trim() || null
+  if (input.treatment_id !== undefined) updateData.treatment_id = input.treatment_id || null
+  if (input.expiry_days !== undefined) updateData.expiry_days = input.expiry_days
+  if (input.requires_witness !== undefined) updateData.requires_witness = input.requires_witness
+  if (input.is_required !== undefined) updateData.is_required = input.is_required
+  if (input.is_active !== undefined) updateData.is_active = input.is_active
+  if (contentChanged) updateData.version = (current.version || 1) + 1
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('consent_templates')
+    .update(updateData)
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error updating consent template:', error)
+    return { error: 'Error al actualizar la plantilla' }
+  }
+
+  revalidatePath('/consentimientos/plantillas')
+  revalidatePath('/consentimientos')
+  return { error: null }
+}
+
+// Nunca se borra fisicamente: una plantilla con firmas es evidencia legal.
+// Se desactiva para que deje de ofrecerse al firmar.
+export async function deactivateConsentTemplate(id: string): Promise<{ error: string | null }> {
+  const ctx = await getAuthContext()
+  if (!ctx) return { error: 'No autorizado' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('consent_templates')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deactivating consent template:', error)
+    return { error: 'Error al desactivar la plantilla' }
+  }
+
+  revalidatePath('/consentimientos/plantillas')
+  return { error: null }
 }
 
 // =============================================
@@ -281,13 +399,21 @@ export async function getSignedConsentById(id: string): Promise<SignedConsentDat
 export async function signConsent(input: {
   templateId: string
   patientId: string
-  obtainedBy: string
   patientSignatureData: string
   additionalFields?: Record<string, unknown>
   treatmentId?: string
   sessionId?: string
   appointmentId?: string
 }): Promise<{ data: SignedConsentData | null; error: string | null }> {
+  // Quien obtiene el consentimiento SIEMPRE sale del servidor: es la persona
+  // que responde legalmente por la firma, no puede venir del cliente.
+  const ctx = await getAuthContext()
+  if (!ctx) return { data: null, error: 'No autorizado' }
+
+  if (!input.patientSignatureData?.trim()) {
+    return { data: null, error: 'Falta la firma del paciente' }
+  }
+
   const supabase = createAdminClient()
 
   // Get template for expiry calculation
@@ -298,6 +424,10 @@ export async function signConsent(input: {
     .eq('id', input.templateId)
     .single()
 
+  if (!template) {
+    return { data: null, error: 'La plantilla de consentimiento no existe' }
+  }
+
   let expiresAt = null
   if (template?.expiry_days) {
     const expiry = new Date()
@@ -306,18 +436,20 @@ export async function signConsent(input: {
   }
 
   const consentData = {
-    clinic_id: '00000000-0000-0000-0000-000000000001',
+    clinic_id: ctx.clinicId,
     template_id: input.templateId,
     patient_id: input.patientId,
-    obtained_by: input.obtainedBy,
+    obtained_by: ctx.userId,
     template_version: template?.version || 1,
+    // Se congela el texto exacto que el paciente firmo: si la plantilla
+    // cambia despues, el consentimiento firmado no puede cambiar con ella.
     content_snapshot: template?.content,
     additional_fields: input.additionalFields || {},
-    patient_signature_data: input.patientSignatureData,
-    patient_signed_at: new Date().toISOString(),
-    treatment_id: input.treatmentId,
-    session_id: input.sessionId,
-    appointment_id: input.appointmentId,
+    patient_signature_url: input.patientSignatureData,
+    signed_at: new Date().toISOString(),
+    treatment_id: input.treatmentId || null,
+    session_id: input.sessionId || null,
+    appointment_id: input.appointmentId || null,
     status: 'signed',
     expires_at: expiresAt,
   }

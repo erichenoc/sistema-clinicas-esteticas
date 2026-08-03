@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -11,23 +11,12 @@ import {
   User,
   FileText,
   Eraser,
-  Download,
-  Camera,
   AlertCircle,
   CheckCircle2,
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Card,
   CardContent,
@@ -51,85 +40,35 @@ import {
 } from '@/components/ui/popover'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import type { ConsentTemplate, SignedConsentInput } from '@/types/consents'
-import { CONSENT_CATEGORIES, replaceTemplateVariables, DEFAULT_CONSENT_TEMPLATE } from '@/types/consents'
+import { toast } from 'sonner'
+import { CONSENT_CATEGORIES, replaceTemplateVariables } from '@/types/consents'
+import { getConsentTemplates, signConsent } from '@/actions/consents'
+import { getPatients } from '@/actions/medical-history'
 
-// Mock data
-const mockPatients = [
-  { id: 'p1', name: 'María García López', document: '12345678A', phone: '5512345678' },
-  { id: 'p2', name: 'Carlos Rodríguez', document: '87654321B', phone: '5598765432' },
-  { id: 'p3', name: 'Laura Fernández', document: '11223344C', phone: '5511223344' },
-  { id: 'p4', name: 'Ana Martínez Ruiz', document: '55667788D', phone: '5555667788' },
-]
+// Paciente y plantilla tal como se necesitan en esta pantalla
+interface PatientOption {
+  id: string
+  name: string
+  document: string
+  phone: string
+  birthDate: string | null
+}
 
-const mockTemplates: ConsentTemplate[] = [
-  {
-    id: '1',
-    clinicId: '1',
-    name: 'Consentimiento General de Tratamiento',
-    code: 'CON-001',
-    description: 'Consentimiento básico para todos los tratamientos',
-    category: 'general',
-    treatmentIds: [],
-    content: DEFAULT_CONSENT_TEMPLATE,
-    risksSection: null,
-    alternativesSection: null,
-    contraindicationsSection: null,
-    aftercareSection: null,
-    requiredFields: [
-      { key: 'allergies_confirmed', label: 'He informado sobre todas mis alergias', type: 'boolean', required: true },
-      { key: 'medications_confirmed', label: 'He informado sobre todos mis medicamentos', type: 'boolean', required: true },
-    ],
-    version: 1,
-    isCurrent: true,
-    previousVersionId: null,
-    isActive: true,
-    isRequired: true,
-    requiresWitness: false,
-    requiresPhotoId: false,
-    expiryDays: 365,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-    createdBy: '1',
-  },
-  {
-    id: '2',
-    clinicId: '1',
-    name: 'Consentimiento para Botox',
-    code: 'CON-002',
-    description: 'Consentimiento específico para aplicación de toxina botulínica',
-    category: 'inyectable',
-    treatmentIds: [],
-    content: '# Consentimiento para Botox\n\nYo, {{patient_name}}, autorizo...',
-    risksSection: 'Posibles efectos secundarios incluyen: hinchazón temporal, moretones...',
-    alternativesSection: null,
-    contraindicationsSection: 'No se debe aplicar si: está embarazada, en lactancia...',
-    aftercareSection: 'Evitar ejercicio intenso por 24 horas...',
-    requiredFields: [
-      { key: 'pregnant', label: '¿Está embarazada o en período de lactancia?', type: 'boolean', required: true },
-      { key: 'previous_botox', label: '¿Ha tenido aplicaciones previas de Botox?', type: 'boolean', required: true },
-    ],
-    version: 2,
-    isCurrent: true,
-    previousVersionId: null,
-    isActive: true,
-    isRequired: true,
-    requiresWitness: false,
-    requiresPhotoId: false,
-    expiryDays: 180,
-    createdAt: '2024-01-10T10:00:00Z',
-    updatedAt: '2024-01-12T10:00:00Z',
-    createdBy: '1',
-  },
-]
+interface TemplateOption {
+  id: string
+  name: string
+  description: string | null
+  category: string
+  content: string
+  version: number
+  expiryDays: number | null
+}
 
 const STEPS = [
   { id: 1, title: 'Selección', description: 'Paciente y plantilla' },
   { id: 2, title: 'Revisión', description: 'Leer contenido' },
-  { id: 3, title: 'Campos', description: 'Información adicional' },
-  { id: 4, title: 'Firma', description: 'Capturar firma' },
+  { id: 3, title: 'Firma', description: 'Capturar firma' },
 ]
 
 export default function FirmarConsentimientoPage() {
@@ -142,12 +81,44 @@ export default function FirmarConsentimientoPage() {
   // Form state
   const [selectedPatient, setSelectedPatient] = useState<string>('')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const [additionalFields, setAdditionalFields] = useState<Record<string, unknown>>({})
   const [hasSignature, setHasSignature] = useState(false)
   const [patientOpen, setPatientOpen] = useState(false)
 
-  const patient = mockPatients.find((p) => p.id === selectedPatient)
-  const template = mockTemplates.find((t) => t.id === selectedTemplate)
+  // Datos reales
+  const [patients, setPatients] = useState<PatientOption[]>([])
+  const [templates, setTemplates] = useState<TemplateOption[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([getPatients(), getConsentTemplates({ isActive: true })])
+      .then(([dbPatients, dbTemplates]) => {
+        setPatients(
+          dbPatients.map((p) => ({
+            id: p.id,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Paciente',
+            document: p.document_number || 'Sin documento',
+            phone: p.phone || '',
+            birthDate: p.date_of_birth || null,
+          }))
+        )
+        setTemplates(
+          dbTemplates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            category: t.category || 'general',
+            content: t.content,
+            version: t.version || 1,
+            expiryDays: t.expiry_days,
+          }))
+        )
+      })
+      .catch(() => toast.error('Error al cargar pacientes y plantillas'))
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const patient = patients.find((p) => p.id === selectedPatient)
+  const template = templates.find((t) => t.id === selectedTemplate)
 
   // Canvas drawing functions
   const startDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -213,19 +184,26 @@ export default function FirmarConsentimientoPage() {
   const getProcessedContent = () => {
     if (!template || !patient) return ''
 
+    const age = patient.birthDate
+      ? `${Math.floor((Date.now() - new Date(patient.birthDate).getTime()) / 31557600000)} años`
+      : ''
+    const now = new Date()
+
     const variables: Record<string, string> = {
       '{{patient_name}}': patient.name,
       '{{patient_document}}': patient.document,
-      '{{patient_birthdate}}': '15/03/1990', // Mock
-      '{{patient_age}}': '34 años', // Mock
-      '{{treatment_name}}': 'Tratamiento seleccionado',
-      '{{professional_name}}': 'Dr. Juan Pérez', // Mock
-      '{{professional_license}}': '12345678', // Mock
-      '{{date}}': new Date().toLocaleDateString('es-MX'),
-      '{{time}}': new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
-      '{{clinic_name}}': 'Clínica Estética', // Mock
-      '{{branch_name}}': 'Sucursal Centro', // Mock
-      '{{branch_address}}': 'Av. Principal 123', // Mock
+      '{{patient_birthdate}}': patient.birthDate
+        ? new Date(patient.birthDate).toLocaleDateString('es-DO')
+        : '',
+      '{{patient_age}}': age,
+      '{{treatment_name}}': '',
+      '{{professional_name}}': '',
+      '{{professional_license}}': '',
+      '{{date}}': now.toLocaleDateString('es-DO'),
+      '{{time}}': now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }),
+      '{{clinic_name}}': 'Med Luxe Aesthetics',
+      '{{branch_name}}': '',
+      '{{branch_address}}': '',
     }
 
     return replaceTemplateVariables(template.content, variables)
@@ -235,18 +213,10 @@ export default function FirmarConsentimientoPage() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return selectedPatient && selectedTemplate
+        return Boolean(selectedPatient && selectedTemplate)
       case 2:
         return true
       case 3:
-        if (!template) return true
-        const requiredFields = template.requiredFields.filter((f) => f.required)
-        return requiredFields.every((f) => {
-          const value = additionalFields[f.key]
-          if (f.type === 'boolean') return value === true || value === false
-          return value !== undefined && value !== ''
-        })
-      case 4:
         return hasSignature
       default:
         return false
@@ -256,21 +226,31 @@ export default function FirmarConsentimientoPage() {
   const handleSubmit = async () => {
     if (!hasSignature || !selectedPatient || !selectedTemplate) return
 
-    setIsSubmitting(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
     const signatureData = getSignatureDataUrl()
-    console.log('Consent data:', {
-      patientId: selectedPatient,
-      templateId: selectedTemplate,
-      additionalFields,
-      signatureDataUrl: signatureData?.substring(0, 50) + '...',
-    })
+    if (!signatureData) {
+      toast.error('No se pudo capturar la firma')
+      return
+    }
 
-    setIsSubmitting(false)
-    router.push('/consentimientos?success=true')
+    setIsSubmitting(true)
+    try {
+      const { error } = await signConsent({
+        patientId: selectedPatient,
+        templateId: selectedTemplate,
+        patientSignatureData: signatureData,
+      })
+
+      if (error) {
+        toast.error(error)
+        return
+      }
+
+      toast.success('Consentimiento firmado y archivado')
+      router.push('/consentimientos')
+      router.refresh()
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -375,7 +355,7 @@ export default function FirmarConsentimientoPage() {
                       <CommandList>
                         <CommandEmpty>No se encontraron pacientes</CommandEmpty>
                         <CommandGroup>
-                          {mockPatients.map((p) => (
+                          {patients.map((p) => (
                             <CommandItem
                               key={p.id}
                               value={p.name}
@@ -408,8 +388,17 @@ export default function FirmarConsentimientoPage() {
               {/* Template Selection */}
               <div className="space-y-2">
                 <Label>Plantilla de Consentimiento *</Label>
+                {!isLoading && templates.length === 0 && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>No hay plantillas activas</AlertTitle>
+                    <AlertDescription>
+                      Crea una plantilla en Consentimientos &gt; Plantillas antes de poder firmar.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="grid gap-3">
-                  {mockTemplates.map((t) => (
+                  {templates.map((t) => (
                     <div
                       key={t.id}
                       onClick={() => setSelectedTemplate(t.id)}
@@ -474,35 +463,6 @@ export default function FirmarConsentimientoPage() {
                   {getProcessedContent()}
                 </pre>
 
-                {template?.risksSection && (
-                  <>
-                    <Separator className="my-4" />
-                    <h4 className="text-red-600">Riesgos del Procedimiento</h4>
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                      {template.risksSection}
-                    </pre>
-                  </>
-                )}
-
-                {template?.contraindicationsSection && (
-                  <>
-                    <Separator className="my-4" />
-                    <h4 className="text-amber-600">Contraindicaciones</h4>
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                      {template.contraindicationsSection}
-                    </pre>
-                  </>
-                )}
-
-                {template?.aftercareSection && (
-                  <>
-                    <Separator className="my-4" />
-                    <h4 className="text-green-600">Cuidados Post-tratamiento</h4>
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                      {template.aftercareSection}
-                    </pre>
-                  </>
-                )}
               </div>
             </CardContent>
             <CardFooter className="justify-between">
@@ -518,83 +478,8 @@ export default function FirmarConsentimientoPage() {
           </Card>
         )}
 
-        {/* Step 3: Additional Fields */}
+        {/* Step 3: Signature */}
         {currentStep === 3 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Información Adicional</CardTitle>
-              <CardDescription>
-                Complete los siguientes campos requeridos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {template?.requiredFields && template.requiredFields.length > 0 ? (
-                template.requiredFields.map((field) => (
-                  <div key={field.key} className="space-y-2">
-                    {field.type === 'boolean' ? (
-                      <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                        <Checkbox
-                          id={field.key}
-                          checked={additionalFields[field.key] === true}
-                          onCheckedChange={(checked) =>
-                            setAdditionalFields({
-                              ...additionalFields,
-                              [field.key]: checked,
-                            })
-                          }
-                        />
-                        <Label htmlFor={field.key} className="cursor-pointer">
-                          {field.label}
-                          {field.required && <span className="text-destructive ml-1">*</span>}
-                        </Label>
-                      </div>
-                    ) : (
-                      <>
-                        <Label htmlFor={field.key}>
-                          {field.label}
-                          {field.required && <span className="text-destructive ml-1">*</span>}
-                        </Label>
-                        <Input
-                          id={field.key}
-                          type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                          placeholder={field.placeholder}
-                          value={(additionalFields[field.key] as string) || ''}
-                          onChange={(e) =>
-                            setAdditionalFields({
-                              ...additionalFields,
-                              [field.key]: e.target.value,
-                            })
-                          }
-                        />
-                      </>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Sin campos adicionales</AlertTitle>
-                  <AlertDescription>
-                    Esta plantilla no requiere información adicional. Continúe al siguiente paso.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-            <CardFooter className="justify-between">
-              <Button variant="outline" onClick={() => setCurrentStep(2)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Atrás
-              </Button>
-              <Button onClick={() => setCurrentStep(4)} disabled={!canProceed()}>
-                Continuar a Firma
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </CardFooter>
-          </Card>
-        )}
-
-        {/* Step 4: Signature */}
-        {currentStep === 4 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -649,42 +534,9 @@ export default function FirmarConsentimientoPage() {
                 </p>
               </div>
 
-              {/* Photo ID (if required) */}
-              {template?.requiresPhotoId && (
-                <div className="space-y-2">
-                  <Label>Foto de identificación</Label>
-                  <Button variant="outline" className="w-full h-32 flex-col gap-2">
-                    <Camera className="h-8 w-8" />
-                    <span>Capturar foto de identificación</span>
-                  </Button>
-                </div>
-              )}
-
-              {/* Witness (if required) */}
-              {template?.requiresWitness && (
-                <div className="space-y-4 p-4 border rounded-lg">
-                  <h4 className="font-medium">Testigo</h4>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Nombre del testigo *</Label>
-                      <Input placeholder="Nombre completo" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Documento de identidad *</Label>
-                      <Input placeholder="Número de documento" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Firma del testigo</Label>
-                    <div className="border-2 border-dashed rounded-lg p-4 h-32 flex items-center justify-center text-muted-foreground">
-                      Área de firma del testigo
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
             <CardFooter className="justify-between">
-              <Button variant="outline" onClick={() => setCurrentStep(3)}>
+              <Button variant="outline" onClick={() => setCurrentStep(2)}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Atrás
               </Button>
