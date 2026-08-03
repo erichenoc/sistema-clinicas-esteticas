@@ -34,6 +34,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { getTreatments } from '@/actions/treatments'
+import { createPackage } from '@/actions/packages'
 
 interface Treatment {
   id: string
@@ -164,15 +165,28 @@ function NuevoPaqueteContent() {
     toast.loading('Creando paquete...', { id: 'create-package' })
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // El precio guardado es el YA descontado: es lo que el paciente paga
+      const { error } = await createPackage({
+        name: formData.name.trim(),
+        description: formData.description.trim() || undefined,
+        total_sessions: items.reduce((sum, i) => sum + i.quantity, 0),
+        price: Math.round(total * 100) / 100,
+        currency: 'DOP',
+        validity_days: formData.validityDays,
+        is_active: formData.isActive,
+        treatments: items.map((i) => ({ treatment_id: i.treatmentId, quantity: i.quantity })),
+      })
 
       toast.dismiss('create-package')
+
+      if (error) {
+        toast.error(error)
+        return
+      }
+
       toast.success('Paquete creado exitosamente')
       router.push('/tratamientos/paquetes')
-    } catch (error) {
-      toast.dismiss('create-package')
-      toast.error('Error al crear el paquete')
+      router.refresh()
     } finally {
       setIsSubmitting(false)
     }

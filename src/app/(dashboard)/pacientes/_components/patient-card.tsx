@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { deletePatient } from '@/actions/patients'
 import {
   MoreVertical,
   Pencil,
@@ -57,6 +59,7 @@ const statusConfig: Record<
 }
 
 export function PatientCard({ patient }: PatientCardProps) {
+  const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -68,14 +71,19 @@ export function PatientCard({ patient }: PatientCardProps) {
     setIsDeleting(true)
     toast.loading('Eliminando paciente...', { id: 'delete-patient' })
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    const { error } = await deletePatient(patient.id)
 
     toast.dismiss('delete-patient')
-    toast.success(`Paciente ${patient.firstName} ${patient.lastName} eliminado`)
     setIsDeleting(false)
+
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    toast.success(`Paciente ${patient.firstName} ${patient.lastName} eliminado`)
     setShowDeleteDialog(false)
-    // In production, this would call a server action and refresh the page
+    router.refresh()
   }
 
   const formatPrice = (price: number) => {
