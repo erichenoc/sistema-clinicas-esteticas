@@ -387,7 +387,7 @@ export function ConsentimientosClient({
                     filteredConsents.map((consent) => (
                       <TableRow key={consent.id}>
                         <TableCell className="text-sm">
-                          {formatDateTime(consent.patientSignedAt)}
+                          {formatDateTime(consent.signedAt)}
                         </TableCell>
                         <TableCell>
                           <div>

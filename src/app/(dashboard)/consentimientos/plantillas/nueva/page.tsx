@@ -2,25 +2,20 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import {
   ArrowLeft,
   Save,
   Eye,
-  Plus,
-  Trash2,
-  Info,
   FileText,
   AlertTriangle,
   Heart,
   Shield,
-  GripVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -53,17 +48,10 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Badge } from '@/components/ui/badge'
 import { consentTemplateSchema, type ConsentTemplateFormData } from '@/lib/validations/consents'
+import { toast } from 'sonner'
+import { createConsentTemplate } from '@/actions/consents'
 import { CONSENT_CATEGORIES, TEMPLATE_VARIABLES, DEFAULT_CONSENT_TEMPLATE } from '@/types/consents'
-
-const FIELD_TYPES = [
-  { value: 'text', label: 'Texto' },
-  { value: 'number', label: 'Número' },
-  { value: 'date', label: 'Fecha' },
-  { value: 'boolean', label: 'Sí/No' },
-  { value: 'select', label: 'Selección' },
-]
 
 export default function NuevaPlantillaPage() {
   const router = useRouter()
@@ -83,24 +71,61 @@ export default function NuevaPlantillaPage() {
       alternativesSection: '',
       contraindicationsSection: '',
       aftercareSection: '',
-      requiredFields: [],
       isActive: true,
       isRequired: false,
       requiresWitness: false,
-      requiresPhotoId: false,
       expiryDays: 365,
     },
   })
 
-  const { fields: requiredFields, append: addField, remove: removeField } = useFieldArray({
-    control: form.control,
-    name: 'requiredFields',
-  })
+  const [isSaving, setIsSaving] = useState(false)
 
-  const onSubmit = (data: ConsentTemplateFormData) => {
-    console.log('Nueva plantilla:', data)
-    // TODO: Enviar a API
-    router.push('/consentimientos')
+  // Las secciones de riesgos, alternativas y cuidados no son columnas: se
+  // integran al texto del consentimiento, que es lo que el paciente firma y
+  // lo que queda congelado en content_snapshot.
+  const buildContent = (data: ConsentTemplateFormData) => {
+    const parts = [data.content?.trim() || '']
+    if (data.risksSection?.trim()) {
+      parts.push(`\n\n## Riesgos del procedimiento\n\n${data.risksSection.trim()}`)
+    }
+    if (data.alternativesSection?.trim()) {
+      parts.push(`\n\n## Alternativas de tratamiento\n\n${data.alternativesSection.trim()}`)
+    }
+    if (data.contraindicationsSection?.trim()) {
+      parts.push(`\n\n## Contraindicaciones\n\n${data.contraindicationsSection.trim()}`)
+    }
+    if (data.aftercareSection?.trim()) {
+      parts.push(`\n\n## Cuidados posteriores\n\n${data.aftercareSection.trim()}`)
+    }
+    return parts.join('')
+  }
+
+  const onSubmit = async (data: ConsentTemplateFormData) => {
+    setIsSaving(true)
+    try {
+      const { error } = await createConsentTemplate({
+        name: data.name,
+        content: buildContent(data),
+        category: data.category,
+        code: data.code || null,
+        description: data.description || null,
+        expiry_days: data.expiryDays ?? null,
+        requires_witness: data.requiresWitness,
+        is_required: data.isRequired,
+        is_active: data.isActive,
+      })
+
+      if (error) {
+        toast.error(error)
+        return
+      }
+
+      toast.success('Plantilla creada')
+      router.push('/consentimientos/plantillas')
+      router.refresh()
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const insertVariable = (variable: string) => {
@@ -136,7 +161,7 @@ export default function NuevaPlantillaPage() {
           <Eye className="mr-2 h-4 w-4" />
           {showPreview ? 'Ocultar' : 'Vista Previa'}
         </Button>
-        <Button onClick={form.handleSubmit(onSubmit)}>
+        <Button onClick={form.handleSubmit(onSubmit)} disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
           Guardar Plantilla
         </Button>
@@ -414,139 +439,6 @@ export default function NuevaPlantillaPage() {
               </Card>
 
               {/* Campos adicionales */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Campos Adicionales</CardTitle>
-                      <CardDescription>
-                        Campos personalizados que el paciente debe completar
-                      </CardDescription>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        addField({
-                          key: '',
-                          label: '',
-                          type: 'text',
-                          required: false,
-                        })
-                      }
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Agregar Campo
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {requiredFields.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No hay campos adicionales configurados</p>
-                      <p className="text-sm">
-                        Agrega campos para recopilar información específica del paciente
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {requiredFields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="flex items-start gap-4 p-4 border rounded-lg"
-                        >
-                          <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-grab" />
-                          <div className="flex-1 grid gap-4 sm:grid-cols-4">
-                            <FormField
-                              control={form.control}
-                              name={`requiredFields.${index}.key`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Clave</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="peso_kg"
-                                      {...field}
-                                      className="font-mono text-sm"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`requiredFields.${index}.label`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Etiqueta</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Peso (kg)" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`requiredFields.${index}.type`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Tipo</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {FIELD_TYPES.map((type) => (
-                                        <SelectItem key={type.value} value={type.value}>
-                                          {type.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`requiredFields.${index}.required`}
-                              render={({ field }) => (
-                                <FormItem className="flex items-center gap-2 space-y-0 pt-6">
-                                  <FormControl>
-                                    <Switch
-                                      checked={field.value}
-                                      onCheckedChange={field.onChange}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="text-xs">Obligatorio</FormLabel>
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeField(index)}
-                            className="mt-6"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
 
             {/* Sidebar */}
@@ -614,23 +506,6 @@ export default function NuevaPlantillaPage() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="requiresPhotoId"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel>Foto de Identificación</FormLabel>
-                          <FormDescription className="text-xs">
-                            Capturar foto del documento
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
                 </CardContent>
               </Card>
 

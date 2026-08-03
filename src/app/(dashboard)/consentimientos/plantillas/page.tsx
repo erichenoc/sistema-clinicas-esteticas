@@ -1,6 +1,9 @@
-export const revalidate = 30
+// Datos en vivo detras de login: no se prerenderiza ni se cachea
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import { getConsentTemplates } from '@/actions/consents'
+import { CONSENT_CATEGORIES } from '@/types/consents'
 import { ArrowLeft, Plus, Search, FileText, MoreHorizontal, Copy, Pencil, Trash2, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,75 +24,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-// Mock data - TODO: Connect to database
-const mockTemplates = [
-  {
-    id: '1',
-    name: 'Consentimiento Toxina Botulinica',
-    category: 'Tratamientos Faciales',
-    description: 'Consentimiento para aplicacion de toxina botulinica en areas faciales',
-    status: 'active',
-    usageCount: 45,
-    lastUsed: '2024-02-15',
-    updatedAt: '2024-01-20',
-  },
-  {
-    id: '2',
-    name: 'Consentimiento Rellenos Faciales',
-    category: 'Tratamientos Faciales',
-    description: 'Consentimiento para aplicacion de acido hialuronico y otros rellenos',
-    status: 'active',
-    usageCount: 38,
-    lastUsed: '2024-02-14',
-    updatedAt: '2024-01-15',
-  },
-  {
-    id: '3',
-    name: 'Consentimiento Laser',
-    category: 'Tratamientos Corporales',
-    description: 'Consentimiento para tratamientos con laser de distintos tipos',
-    status: 'active',
-    usageCount: 62,
-    lastUsed: '2024-02-15',
-    updatedAt: '2024-02-01',
-  },
-  {
-    id: '4',
-    name: 'Consentimiento Lipolaser',
-    category: 'Tratamientos Corporales',
-    description: 'Consentimiento para procedimientos de lipolaser',
-    status: 'active',
-    usageCount: 28,
-    lastUsed: '2024-02-12',
-    updatedAt: '2024-01-10',
-  },
-  {
-    id: '5',
-    name: 'Consentimiento General',
-    category: 'General',
-    description: 'Consentimiento informado general para tratamientos esteticos',
-    status: 'active',
-    usageCount: 120,
-    lastUsed: '2024-02-15',
-    updatedAt: '2024-02-10',
-  },
-  {
-    id: '6',
-    name: 'Consentimiento Mesoterapia (Antiguo)',
-    category: 'Tratamientos Corporales',
-    description: 'Version anterior del consentimiento de mesoterapia',
-    status: 'inactive',
-    usageCount: 15,
-    lastUsed: '2023-12-20',
-    updatedAt: '2023-10-15',
-  },
-]
+export default async function PlantillasConsentimientosPage() {
+  const dbTemplates = await getConsentTemplates()
 
-export default function PlantillasConsentimientosPage() {
+  const templates = dbTemplates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: CONSENT_CATEGORIES.find((c) => c.value === t.category)?.label || 'General',
+    description: t.description || 'Sin descripcion',
+    status: t.is_active ? 'active' : 'inactive',
+    usageCount: t.total_signed,
+    updatedAt: t.updated_at,
+  }))
+
   const stats = {
-    total: mockTemplates.length,
-    active: mockTemplates.filter(t => t.status === 'active').length,
-    totalUsage: mockTemplates.reduce((acc, t) => acc + t.usageCount, 0),
+    total: templates.length,
+    active: templates.filter((t) => t.status === 'active').length,
+    totalUsage: templates.reduce((acc, t) => acc + t.usageCount, 0),
   }
 
   return (
@@ -180,7 +131,7 @@ export default function PlantillasConsentimientosPage() {
 
       {/* Templates Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {mockTemplates.map((template) => (
+        {templates.map((template) => (
           <Card key={template.id} className={template.status === 'inactive' ? 'opacity-60' : ''}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">

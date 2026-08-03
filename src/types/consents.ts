@@ -10,27 +10,22 @@ export type ConsentAuditAction = 'created' | 'viewed' | 'downloaded' | 'emailed'
 // =============================================
 // CONSENT TEMPLATE - Plantilla de Consentimiento
 // =============================================
+// Espeja las columnas reales de consent_templates. El texto completo del
+// consentimiento vive en `content`: no hay secciones separadas de riesgos,
+// alternativas ni cuidados posteriores.
 export interface ConsentTemplate {
   id: string
-  clinicId: string
+  clinicId: string | null
   name: string
   code: string | null
   description: string | null
   category: ConsentCategory
-  treatmentIds: string[]
+  treatmentId: string | null
   content: string
-  risksSection: string | null
-  alternativesSection: string | null
-  contraindicationsSection: string | null
-  aftercareSection: string | null
-  requiredFields: RequiredField[]
   version: number
-  isCurrent: boolean
-  previousVersionId: string | null
   isActive: boolean
   isRequired: boolean
   requiresWitness: boolean
-  requiresPhotoId: boolean
   expiryDays: number | null
   createdAt: string
   updatedAt: string
@@ -56,17 +51,11 @@ export interface ConsentTemplateInput {
   code?: string | null
   description?: string | null
   category: ConsentCategory
-  treatmentIds?: string[]
+  treatmentId?: string | null
   content: string
-  risksSection?: string | null
-  alternativesSection?: string | null
-  contraindicationsSection?: string | null
-  aftercareSection?: string | null
-  requiredFields?: RequiredField[]
   isActive?: boolean
   isRequired?: boolean
   requiresWitness?: boolean
-  requiresPhotoId?: boolean
   expiryDays?: number | null
 }
 
@@ -80,34 +69,25 @@ export interface ConsentTemplateWithStats extends ConsentTemplate {
 // =============================================
 // SIGNED CONSENT - Consentimiento Firmado
 // =============================================
+// Espeja las columnas reales de signed_consents.
+// `patientSignatureUrl` guarda la firma como data URI (imagen PNG en base64).
 export interface SignedConsent {
   id: string
-  clinicId: string
-  branchId: string | null
+  clinicId: string | null
   templateId: string
   patientId: string
   sessionId: string | null
   appointmentId: string | null
   treatmentId: string | null
-  obtainedBy: string
+  obtainedBy: string | null
   templateVersion: number
   contentSnapshot: string
   additionalFields: Record<string, unknown>
   patientSignatureUrl: string
-  patientSignatureData: SignatureData | null
-  patientSignedAt: string
-  professionalSignatureUrl: string | null
-  professionalSignedAt: string | null
-  witnessName: string | null
-  witnessIdNumber: string | null
   witnessSignatureUrl: string | null
-  witnessSignedAt: string | null
-  patientIdPhotoUrl: string | null
+  signedAt: string
   ipAddress: string | null
-  userAgent: string | null
-  deviceInfo: Record<string, unknown> | null
   pdfUrl: string | null
-  pdfGeneratedAt: string | null
   status: ConsentStatus
   revokedAt: string | null
   revokedBy: string | null
