@@ -46,99 +46,16 @@ import {
   hasTreatmentTemplate,
 } from '@/components/treatment-templates'
 import type { TreatmentTemplateData } from '@/types/treatment-templates'
-import { getSessionById, getSessionImages, type SessionImageData } from '@/actions/sessions'
+import {
+  getSessionById,
+  getSessionImages,
+  getSessionNotes,
+  type SessionImageData,
+  type SessionListItemData,
+  type ClinicalNoteData,
+} from '@/actions/sessions'
 
 // Mock session data
-const mockSession = {
-  id: '1',
-  clinicId: '1',
-  branchId: null,
-  appointmentId: '1',
-  patientId: '1',
-  professionalId: '1',
-  treatmentId: '1',
-  treatmentName: 'Limpieza Facial Profunda',
-  packageSessionId: null,
-  startedAt: '2024-01-15T09:00:00',
-  endedAt: '2024-01-15T10:00:00',
-  durationMinutes: 60,
-  status: 'completed',
-  treatedZones: [
-    { zone: 'face_full', label: 'Rostro completo' },
-    { zone: 'face_forehead', label: 'Frente' },
-    { zone: 'face_cheeks', label: 'Mejillas' },
-  ],
-  technicalParameters: {
-    skinType: 'Mixta',
-    protocol: 'Limpieza profunda con extracción',
-    products: 'Espuma limpiadora, Tónico, Mascarilla purificante',
-    treatmentTemplate: null as TreatmentTemplateData | null, // Will be populated when template is used
-  },
-  productsUsed: [
-    { id: '1', name: 'Espuma Limpiadora Premium', quantity: 1, lot: 'LOT2024-001', unitCost: 15 },
-    { id: '2', name: 'Tónico Facial', quantity: 1, lot: 'LOT2024-002', unitCost: 8 },
-    { id: '3', name: 'Mascarilla Purificante', quantity: 1, lot: 'LOT2024-003', unitCost: 12 },
-  ],
-  observations: 'Piel sensible, se aplicó protocolo suave. Paciente presentó ligera rojez en zona de mejillas que cedió al finalizar el tratamiento.',
-  patientFeedback: 'Muy satisfecha con el resultado. Sintió la piel muy limpia y fresca.',
-  adverseReactions: null,
-  resultRating: 5,
-  resultNotes: 'Excelentes resultados, piel visiblemente más limpia y luminosa.',
-  patientSignatureUrl: '/signatures/patient-1.png',
-  professionalSignatureUrl: '/signatures/professional-1.png',
-  signedAt: '2024-01-15T10:05:00',
-  followUpRequired: true,
-  followUpNotes: 'Se recomienda siguiente sesión en 4 semanas para mantenimiento.',
-  nextSessionRecommendedAt: '2024-02-15',
-  createdAt: '2024-01-15T09:00:00',
-  updatedAt: '2024-01-15T10:05:00',
-  createdBy: '1',
-  // Related data
-  patient: {
-    id: '1',
-    firstName: 'María',
-    lastName: 'García López',
-    phone: '8095551234',
-    email: 'maria.garcia@email.com',
-    avatar: null,
-    gender: 'female' as const,
-  },
-  professional: {
-    id: '1',
-    name: 'Dra. María García',
-    specialty: 'Dermatología Estética',
-    avatar: null,
-  },
-  treatment: {
-    id: '1',
-    name: 'Limpieza Facial Profunda',
-    price: 80,
-    categoryName: 'Facial',
-    categoryColor: '#ec4899',
-  },
-  clinicalNotes: [
-    {
-      id: '1',
-      type: 'observation',
-      content: 'Paciente refiere piel grasa en zona T',
-      createdAt: '2024-01-15T09:15:00',
-      createdBy: 'Dra. María García',
-    },
-    {
-      id: '2',
-      type: 'procedure',
-      content: 'Se realizó extracción de comedones en nariz y mentón',
-      createdAt: '2024-01-15T09:30:00',
-      createdBy: 'Dra. María García',
-    },
-  ],
-  images: [
-    { id: '1', type: 'before', url: '/images/before-1.jpg', zone: 'Rostro frontal' },
-    { id: '2', type: 'after', url: '/images/after-1.jpg', zone: 'Rostro frontal' },
-    { id: '3', type: 'before', url: '/images/before-2.jpg', zone: 'Perfil derecho' },
-    { id: '4', type: 'after', url: '/images/after-2.jpg', zone: 'Perfil derecho' },
-  ],
-}
 
 // Body zones mapping
 const BODY_ZONES: Record<string, string> = {
@@ -168,21 +85,30 @@ export default function SesionDetallePage() {
   const [selectedImage, setSelectedImage] = useState<SessionImageData | null>(null)
   const [isLoadingImages, setIsLoadingImages] = useState(true)
 
-  // Load session images
+  const [dbSession, setDbSession] = useState<SessionListItemData | null>(null)
+  const [notes, setNotes] = useState<ClinicalNoteData[]>([])
+
+  // Load session, notes and images
   useEffect(() => {
-    async function loadImages() {
+    async function loadAll() {
       setIsLoadingImages(true)
       try {
-        const images = await getSessionImages(sessionId)
+        const [session, sessionNotes, images] = await Promise.all([
+          getSessionById(sessionId),
+          getSessionNotes(sessionId),
+          getSessionImages(sessionId),
+        ])
+        setDbSession(session)
+        setNotes(sessionNotes)
         setSessionImages(images)
       } catch (error) {
-        console.error('Error loading images:', error)
+        console.error('Error loading session:', error)
       } finally {
         setIsLoadingImages(false)
       }
     }
 
-    loadImages()
+    loadAll()
   }, [sessionId])
 
   // Group images by type
@@ -190,7 +116,64 @@ export default function SesionDetallePage() {
   const duringImages = sessionImages.filter(img => img.type === 'during')
   const afterImages = sessionImages.filter(img => img.type === 'after')
 
-  const session = mockSession
+  // Sesion real: se arma con la misma forma que esperaba el render
+  const session = dbSession
+    ? {
+        id: dbSession.id,
+        treatmentName: dbSession.treatment_display_name || dbSession.treatment_name,
+        startedAt: dbSession.started_at,
+        durationMinutes: dbSession.duration_minutes,
+        status: dbSession.status as string,
+        treatedZones: (dbSession.treated_zones || []) as { zone: string; label: string }[],
+        technicalParameters: (dbSession.technical_parameters || {}) as Record<string, unknown> & {
+          treatmentTemplate?: TreatmentTemplateData | null
+        },
+        productsUsed: (dbSession.products_used || []) as {
+          id: string
+          name: string
+          quantity: number
+          lot?: string | null
+          unitCost: number
+        }[],
+        observations: dbSession.observations,
+        patientFeedback: dbSession.patient_feedback,
+        adverseReactions: dbSession.adverse_reactions,
+        resultRating: dbSession.result_rating,
+        signedAt: dbSession.signed_at,
+        followUpRequired: dbSession.follow_up_required,
+        followUpNotes: dbSession.follow_up_notes,
+        nextSessionRecommendedAt: dbSession.next_session_recommended_at,
+        patient: {
+          id: dbSession.patient_id,
+          firstName: (dbSession.patient_name || '').split(' ')[0] || '',
+          lastName: (dbSession.patient_name || '').split(' ').slice(1).join(' '),
+          phone: dbSession.patient_phone,
+          avatar: dbSession.patient_avatar,
+          gender: 'female' as const,
+        },
+        professional: {
+          id: dbSession.professional_id,
+          name: dbSession.professional_name,
+          specialty: null as string | null,
+          avatar: null as string | null,
+        },
+        treatment: {
+          id: dbSession.treatment_id,
+          name: dbSession.treatment_display_name || dbSession.treatment_name,
+          price: dbSession.treatment_price ?? 0,
+          categoryName: dbSession.category_name,
+          categoryColor: dbSession.category_color || '#A67C52',
+        },
+        clinicalNotes: notes.map((n) => ({
+          id: n.id,
+          type: n.note_type || 'general',
+          content: n.content,
+          createdAt: n.created_at,
+          createdBy: 'Profesional',
+        })),
+      }
+    : null
+
 
   const getStatusBadge = (status: string) => {
     const config = SESSION_STATUS_OPTIONS.find((s) => s.value === status)
@@ -216,10 +199,21 @@ export default function SesionDetallePage() {
     }).format(price)
   }
 
-  const totalProductCost = session.productsUsed.reduce(
+  const totalProductCost = (session?.productsUsed || []).reduce(
     (acc, p) => acc + p.quantity * p.unitCost,
     0
   )
+
+  // Mientras carga, o si la sesion no existe, no hay nada que mostrar
+  if (!session) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <p className="text-muted-foreground">
+          {isLoadingImages ? 'Cargando sesión...' : 'La sesión no existe o fue eliminada'}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -418,7 +412,7 @@ export default function SesionDetallePage() {
               <TabsContent value="plantilla" className="space-y-4">
                 <TreatmentTemplateSelector
                   treatmentName={session.treatmentName}
-                  data={session.technicalParameters.treatmentTemplate}
+                  data={session.technicalParameters.treatmentTemplate ?? null}
                   onChange={() => {}} // Read-only in detail view
                   readOnly={true}
                   patientId={session.patient.id}
