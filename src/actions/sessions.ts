@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth/guards'
+import { applyStockMovement } from '@/actions/inventory-movements'
 import type { InjectionPoint } from '@/types/treatment-templates'
 
 // Tipos
@@ -377,6 +378,35 @@ export async function completeSession(
     return { success: false, error: 'Error al completar la sesion' }
   }
 
+  // Lo que se gastó en el paciente sale del inventario. Se permite saldo
+  // negativo a propósito: el producto ya se usó, bloquear el cierre de la
+  // sesión por un descuadre de stock sería peor que reflejar el faltante.
+  const usedProducts = (sessionData?.products_used || []) as {
+    productId?: string
+    product_id?: string
+    quantity?: number
+  }[]
+
+  for (const item of usedProducts) {
+    const productId = item.productId || item.product_id
+    const quantity = Number(item.quantity || 0)
+    if (!productId || quantity <= 0) continue
+
+    const { error: stockError } = await applyStockMovement({
+      productId,
+      quantity: -Math.abs(quantity),
+      movementType: 'consumption',
+      referenceType: 'session',
+      referenceId: id,
+      notes: 'Consumo en sesión',
+      allowNegative: true,
+    })
+
+    if (stockError) {
+      console.error('Error descontando insumo de la sesion:', stockError)
+    }
+  }
+
   // Generar comisión automáticamente si el profesional tiene tasa de comisión
   let commissionGenerated = false
   const commissionRate = sessionData?.users?.commission_rate || 0
@@ -603,6 +633,79 @@ export async function createClinicalNote(
     revalidatePath(`/sesiones/${input.session_id}`)
   }
   return { data: data as ClinicalNoteData, error: null }
+}
+
+// Solo el autor de la nota puede corregirla: una nota clinica firmada por
+// otra persona no se toca.
+export async function updateClinicalNote(
+  id: string,
+  input: { content: string; note_type?: string }
+): Promise<{ error: string | null }> {
+  const ctx = await getAuthContext()
+  if (!ctx) return { error: 'No autorizado' }
+
+  if (!input.content?.trim()) return { error: 'La nota no puede estar vacía' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: note } = await (supabase as any)
+    .from('clinical_notes')
+    .select('professional_id, session_id')
+    .eq('id', id)
+    .single()
+
+  if (!note) return { error: 'La nota no existe' }
+  if (note.professional_id && note.professional_id !== ctx.userId) {
+    return { error: 'Solo quien escribió la nota puede editarla' }
+  }
+
+  const updateData: Record<string, unknown> = { content: input.content.trim() }
+  if (input.note_type) updateData.note_type = input.note_type
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('clinical_notes')
+    .update(updateData)
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error updating clinical note:', error)
+    return { error: 'Error al actualizar la nota' }
+  }
+
+  if (note.session_id) revalidatePath(`/sesiones/${note.session_id}`)
+  return { error: null }
+}
+
+export async function deleteClinicalNote(id: string): Promise<{ error: string | null }> {
+  const ctx = await getAuthContext()
+  if (!ctx) return { error: 'No autorizado' }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: note } = await (supabase as any)
+    .from('clinical_notes')
+    .select('professional_id, session_id')
+    .eq('id', id)
+    .single()
+
+  if (!note) return { error: 'La nota no existe' }
+  if (note.professional_id && note.professional_id !== ctx.userId) {
+    return { error: 'Solo quien escribió la nota puede eliminarla' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from('clinical_notes').delete().eq('id', id)
+
+  if (error) {
+    console.error('Error deleting clinical note:', error)
+    return { error: 'Error al eliminar la nota' }
+  }
+
+  if (note.session_id) revalidatePath(`/sesiones/${note.session_id}`)
+  return { error: null }
 }
 
 // =============================================

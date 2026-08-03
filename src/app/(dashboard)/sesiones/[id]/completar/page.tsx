@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { SessionPhotoUploader } from '@/components/session-photos'
 import { getSessionById, getSessionImages, completeSession, type SessionImageData } from '@/actions/sessions'
+import { getProducts } from '@/actions/inventory'
 
 // Default session data (used while loading)
 const defaultSession = {
@@ -47,14 +48,6 @@ const defaultSession = {
   startedAt: new Date().toISOString(),
 }
 
-// Mock products
-const mockProducts = [
-  { id: '1', name: 'Espuma Limpiadora Premium', unit: 'ml', costPrice: 15 },
-  { id: '2', name: 'Tonico Facial', unit: 'ml', costPrice: 8 },
-  { id: '3', name: 'Mascarilla Purificante', unit: 'unidad', costPrice: 12 },
-  { id: '4', name: 'Suero Vitaminico', unit: 'ml', costPrice: 25 },
-  { id: '5', name: 'Crema Hidratante', unit: 'gr', costPrice: 18 },
-]
 
 // Body zones
 const BODY_ZONES = [
@@ -91,6 +84,10 @@ export default function CompletarSesionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedZones, setSelectedZones] = useState<string[]>([])
   const [productsUsed, setProductsUsed] = useState<ProductUsed[]>([])
+  // Insumos reales del inventario: solo los que llevan existencias
+  const [availableProducts, setAvailableProducts] = useState<
+    { id: string; name: string; unit: string; costPrice: number }[]
+  >([])
   const [rating, setRating] = useState(5)
 
   const [formData, setFormData] = useState({
@@ -109,10 +106,22 @@ export default function CompletarSesionPage() {
     async function loadSession() {
       setIsLoading(true)
       try {
-        const [sessionData, images] = await Promise.all([
+        const [sessionData, images, products] = await Promise.all([
           getSessionById(sessionId),
           getSessionImages(sessionId),
+          getProducts({ isActive: true }),
         ])
+
+        setAvailableProducts(
+          products
+            .filter((p) => p.track_stock)
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              unit: p.unit || 'unidad',
+              costPrice: Number(p.cost_price || 0),
+            }))
+        )
 
         if (sessionData) {
           setSession({
@@ -176,7 +185,7 @@ export default function CompletarSesionPage() {
       productsUsed.map((p) => {
         if (p.id === id) {
           if (field === 'productId') {
-            const product = mockProducts.find((mp) => mp.id === value)
+            const product = availableProducts.find((mp) => mp.id === value)
             return { ...p, productId: value as string, productName: product?.name || '' }
           }
           return { ...p, [field]: value }
@@ -307,7 +316,7 @@ export default function CompletarSesionPage() {
                         <SelectValue placeholder="Selecciona un producto" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockProducts.map((p) => (
+                        {availableProducts.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name}
                           </SelectItem>

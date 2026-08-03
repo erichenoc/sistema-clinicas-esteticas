@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -27,33 +27,15 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-// Mock session data
-const mockSession = {
-  id: '1',
-  patientName: 'Maria Garcia Lopez',
-  treatmentName: 'Limpieza Facial Profunda',
-  professionalName: 'Dra. Maria Garcia',
-  date: new Date().toISOString(),
-}
-
-// Mock notes
-const mockNotes = [
-  {
-    id: '1',
-    content: 'Paciente llego 10 minutos antes de la cita. Se realizo limpieza inicial.',
-    createdBy: 'Dra. Maria Garcia',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    type: 'progress',
-  },
-  {
-    id: '2',
-    content: 'Se aplico mascarilla purificante. Paciente refiere sensacion de frescura.',
-    createdBy: 'Dra. Maria Garcia',
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
-    type: 'progress',
-  },
-]
+import {
+  getSessionById,
+  getSessionNotes,
+  createClinicalNote,
+  updateClinicalNote,
+  deleteClinicalNote,
+} from '@/actions/sessions'
+import type { ClinicalNoteData } from '@/actions/sessions'
+import { getCurrentUser } from '@/actions/auth'
 
 type NoteType = 'progress' | 'observation' | 'warning' | 'recommendation'
 
@@ -70,6 +52,16 @@ interface Note {
   createdBy: string
   createdAt: string
   type: NoteType
+  /** Solo el autor puede editar o borrar su nota */
+  isMine: boolean
+}
+
+interface SessionInfo {
+  patientId: string
+  patientName: string
+  treatmentName: string
+  professionalName: string
+  date: string
 }
 
 export default function NotasSesionPage() {
@@ -85,13 +77,42 @@ export default function NotasSesionPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState('')
 
-  useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setNotes(mockNotes as Note[])
-      setIsLoading(false)
-    }, 500)
+  const [session, setSession] = useState<SessionInfo | null>(null)
+
+  const loadNotes = useCallback(async () => {
+    const [dbSession, dbNotes, currentUser] = await Promise.all([
+      getSessionById(sessionId),
+      getSessionNotes(sessionId),
+      getCurrentUser(),
+    ])
+
+    if (dbSession) {
+      setSession({
+        patientId: dbSession.patient_id,
+        patientName: dbSession.patient_name || 'Paciente',
+        treatmentName: dbSession.treatment_display_name || dbSession.treatment_name || 'Tratamiento',
+        professionalName: dbSession.professional_name || 'Profesional',
+        date: dbSession.started_at || new Date().toISOString(),
+      })
+    }
+
+    setNotes(
+      dbNotes.map((n: ClinicalNoteData) => ({
+        id: n.id,
+        content: n.content,
+        createdBy: n.professional_id === currentUser?.id ? 'Tú' : 'Profesional',
+        createdAt: n.created_at,
+        type: (n.note_type || 'progress') as NoteType,
+        isMine: !n.professional_id || n.professional_id === currentUser?.id,
+      }))
+    )
   }, [sessionId])
+
+  useEffect(() => {
+    loadNotes()
+      .catch(() => toast.error('Error al cargar las notas'))
+      .finally(() => setIsLoading(false))
+  }, [loadNotes])
 
   const handleAddNote = async () => {
     if (!newNote.trim()) {
@@ -99,24 +120,28 @@ export default function NotasSesionPage() {
       return
     }
 
+    if (!session) {
+      toast.error('No se pudo identificar la sesión')
+      return
+    }
+
     setIsSaving(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const note: Note = {
-        id: Date.now().toString(),
+      const { error } = await createClinicalNote({
+        session_id: sessionId,
+        patient_id: session.patientId,
+        note_type: newNoteType,
         content: newNote,
-        createdBy: 'Usuario Actual',
-        createdAt: new Date().toISOString(),
-        type: newNoteType,
+      })
+
+      if (error) {
+        toast.error(error)
+        return
       }
 
-      setNotes([note, ...notes])
       setNewNote('')
+      await loadNotes()
       toast.success('Nota agregada')
-    } catch (error) {
-      toast.error('Error al agregar nota')
     } finally {
       setIsSaving(false)
     }
@@ -133,29 +158,29 @@ export default function NotasSesionPage() {
       return
     }
 
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      setNotes(notes.map((n) => (n.id === id ? { ...n, content: editingContent } : n)))
-      setEditingId(null)
-      setEditingContent('')
-      toast.success('Nota actualizada')
-    } catch (error) {
-      toast.error('Error al actualizar nota')
+    const { error } = await updateClinicalNote(id, { content: editingContent })
+    if (error) {
+      toast.error(error)
+      return
     }
+
+    setEditingId(null)
+    setEditingContent('')
+    await loadNotes()
+    toast.success('Nota actualizada')
   }
 
   const handleDeleteNote = async (id: string) => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+    if (!confirm('¿Eliminar esta nota clínica?')) return
 
-      setNotes(notes.filter((n) => n.id !== id))
-      toast.success('Nota eliminada')
-    } catch (error) {
-      toast.error('Error al eliminar nota')
+    const { error } = await deleteClinicalNote(id)
+    if (error) {
+      toast.error(error)
+      return
     }
+
+    await loadNotes()
+    toast.success('Nota eliminada')
   }
 
   const getNoteTypeInfo = (type: NoteType) => {
@@ -183,7 +208,7 @@ export default function NotasSesionPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Notas de Sesion</h1>
             <p className="text-muted-foreground">
-              {mockSession.treatmentName} - {mockSession.patientName}
+              {session?.treatmentName} - {session?.patientName}
             </p>
           </div>
         </div>
@@ -195,17 +220,17 @@ export default function NotasSesionPage() {
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12">
               <AvatarFallback className="bg-[#A67C52] text-white">
-                {mockSession.patientName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                {session?.patientName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="font-medium">{mockSession.patientName}</p>
-              <p className="text-sm text-muted-foreground">{mockSession.treatmentName}</p>
+              <p className="font-medium">{session?.patientName}</p>
+              <p className="text-sm text-muted-foreground">{session?.treatmentName}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium">{mockSession.professionalName}</p>
+              <p className="text-sm font-medium">{session?.professionalName}</p>
               <p className="text-sm text-muted-foreground">
-                {format(new Date(mockSession.date), "d 'de' MMMM, yyyy", { locale: es })}
+                {session?.date ? format(new Date(session.date), "d 'de' MMMM, yyyy", { locale: es }) : ""}
               </p>
             </div>
           </div>
@@ -344,7 +369,7 @@ export default function NotasSesionPage() {
                           {format(new Date(note.createdAt), 'HH:mm')}
                         </div>
                       </div>
-                      {editingId !== note.id && (
+                      {editingId !== note.id && note.isMine && (
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
