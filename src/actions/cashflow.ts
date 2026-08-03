@@ -239,19 +239,24 @@ export async function getExpenseStats(
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const p of payments as any[]) {
-      if (p.payment_date && p.payment_date >= paidFrom && p.payment_date <= paidTo) {
-        paidThisMonth += Number(p.amount || 0)
-        paidCountThisMonth += 1
-      }
-    }
-
     const cat = (exp.category || 'otros') as ExpenseCategory
     const acc = byCategory.get(cat) || { total: 0, pending: 0 }
     acc.total += total
     acc.pending += pending
     byCategory.set(cat, acc)
+  }
+
+  // Pagos realizados dentro del periodo, sin importar cuando se emitio el gasto
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let paidQuery = (supabase as any).from('expense_payments').select('amount, payment_date')
+  if (start) paidQuery = paidQuery.gte('payment_date', paidFrom)
+  if (end) paidQuery = paidQuery.lte('payment_date', paidTo)
+  const { data: paidRows } = await paidQuery
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const p of ((paidRows || []) as any[])) {
+    paidThisMonth += Number(p.amount || 0)
+    paidCountThisMonth += 1
   }
 
   const round = (n: number) => Math.round(n * 100) / 100

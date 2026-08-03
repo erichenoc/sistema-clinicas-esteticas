@@ -84,6 +84,14 @@ export function GastosClient({
   accessError,
 }: GastosClientProps) {
   const monthOptions = recentPeriods()
+  const SHORTCUT_LABELS: Record<string, string> = {
+    month: 'Este mes',
+    quarter: 'Este trimestre',
+    year: 'Este año',
+    all: 'Histórico',
+  }
+  const periodLabel =
+    SHORTCUT_LABELS[period] ?? monthOptions.find((m) => m.value === period)?.label ?? 'Este mes'
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -184,7 +192,9 @@ export function GastosClient({
         <div className="flex items-center gap-2">
           <Select value={period} onValueChange={handlePeriodChange}>
             <SelectTrigger className="w-[160px]">
-              <SelectValue />
+              {/* Se pasa el texto explicito: en SSR el Select no puede resolver
+                  la etiqueta del item y el contenido no coincidiria al hidratar */}
+              <SelectValue>{periodLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Este mes</SelectItem>

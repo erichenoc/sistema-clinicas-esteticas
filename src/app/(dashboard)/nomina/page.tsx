@@ -401,7 +401,10 @@ export default function NominaPage() {
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <Calendar className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Período" />
+              {/* Texto explicito para que el SSR y el cliente coincidan */}
+              <SelectValue placeholder="Período">
+                {periodOptions.find((o) => o.value === selectedPeriod)?.label}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {periodOptions.map((opt) => (
