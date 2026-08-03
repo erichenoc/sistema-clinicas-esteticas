@@ -280,3 +280,132 @@ export async function getExpenseStats(
     error: null,
   }
 }
+
+// =============================================
+// FACTURACION DEL PERIODO
+// =============================================
+// El flujo de caja da los totales; aqui va el detalle de donde salio ese
+// dinero: que se factura y que se cobra en el mes.
+
+export interface IncomeInvoice {
+  id: string
+  invoiceNumber: string
+  patientName: string
+  issueDate: string
+  total: number
+  paidAmount: number
+  pendingAmount: number
+  status: string
+}
+
+export interface IncomePayment {
+  id: string
+  paymentDate: string
+  invoiceNumber: string
+  patientName: string
+  amount: number
+  method: string
+}
+
+export interface IncomeDetail {
+  periodLabel: string
+  invoices: IncomeInvoice[]
+  payments: IncomePayment[]
+  /** Facturado en el periodo (se haya cobrado o no) */
+  totalInvoiced: number
+  /** Cobrado en el periodo, aunque la factura sea de antes */
+  totalCollected: number
+  /** Lo que falta cobrar de las facturas del periodo */
+  pendingFromPeriod: number
+}
+
+export async function getIncomeDetail(
+  period: CashFlowPeriod = 'month'
+): Promise<{ data: IncomeDetail | null; error: string | null }> {
+  const authError = await requireAdmin()
+  if (authError) return { data: null, error: authError }
+
+  const supabase = createAdminClient()
+  const { start, end, label } = getPeriodRange(period)
+
+  // --- Facturas emitidas en el periodo ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let invoiceQuery = (supabase as any)
+    .from('invoices')
+    .select('id, invoice_number, issue_date, total, status, patients (first_name, last_name), payments (amount)')
+    .neq('status', 'cancelled')
+    .order('issue_date', { ascending: false })
+    .limit(500)
+  if (start) invoiceQuery = invoiceQuery.gte('issue_date', start)
+  if (end) invoiceQuery = invoiceQuery.lte('issue_date', end)
+
+  const { data: invoiceRows, error: invoiceError } = await invoiceQuery
+  if (invoiceError) {
+    console.error('Error fetching invoices for income detail:', invoiceError)
+    return { data: null, error: 'Error al cargar la facturacion' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const invoices: IncomeInvoice[] = ((invoiceRows || []) as any[]).map((inv) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const paid = (inv.payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
+    const total = Number(inv.total || 0)
+    return {
+      id: inv.id,
+      invoiceNumber: inv.invoice_number,
+      patientName: inv.patients
+        ? `${inv.patients.first_name || ''} ${inv.patients.last_name || ''}`.trim() || 'Cliente'
+        : 'Cliente general',
+      issueDate: inv.issue_date,
+      total,
+      paidAmount: Math.round(paid * 100) / 100,
+      pendingAmount: Math.round(Math.max(0, total - paid) * 100) / 100,
+      status: inv.status,
+    }
+  })
+
+  // --- Cobros recibidos en el periodo ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let paymentQuery = (supabase as any)
+    .from('payments')
+    .select('id, amount, payment_date, payment_method, invoices!inner (invoice_number, status, patients (first_name, last_name))')
+    .order('payment_date', { ascending: false })
+    .limit(500)
+  if (start) paymentQuery = paymentQuery.gte('payment_date', start)
+  if (end) paymentQuery = paymentQuery.lte('payment_date', `${end}T23:59:59`)
+
+  const { data: paymentRows, error: paymentError } = await paymentQuery
+  if (paymentError) {
+    console.error('Error fetching payments for income detail:', paymentError)
+    return { data: null, error: 'Error al cargar los cobros' }
+  }
+
+  const payments: IncomePayment[] = ((paymentRows || []) as unknown[])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((p: any) => p.invoices?.status !== 'cancelled')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((p: any) => ({
+      id: p.id,
+      paymentDate: p.payment_date,
+      invoiceNumber: p.invoices?.invoice_number || '—',
+      patientName: p.invoices?.patients
+        ? `${p.invoices.patients.first_name || ''} ${p.invoices.patients.last_name || ''}`.trim() || 'Cliente'
+        : 'Cliente general',
+      amount: Number(p.amount || 0),
+      method: p.payment_method || 'other',
+    }))
+
+  const round = (n: number) => Math.round(n * 100) / 100
+
+  return {
+    data: {
+      periodLabel: label,
+      invoices,
+      payments,
+      totalInvoiced: round(invoices.reduce((s, i) => s + i.total, 0)),
+      totalCollected: round(payments.reduce((s, p) => s + p.amount, 0)),
+      pendingFromPeriod: round(invoices.reduce((s, i) => s + i.pendingAmount, 0)),
+    },
+    error: null,
+  }
+}

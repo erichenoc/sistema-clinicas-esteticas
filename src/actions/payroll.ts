@@ -3,12 +3,13 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sanitizeError } from '@/lib/error-utils'
-import { createExpense } from '@/actions/expenses'
+import { createExpense, registerExpensePayment } from '@/actions/expenses'
 import {
   calculatePayrollLine,
   calculateEmployerCost,
   formatPeriodLabel,
 } from '@/lib/payroll/calculations'
+import { periodBounds } from '@/lib/periods'
 
 // TODO: obtener del usuario actual cuando el sistema sea multi-clinica
 const CLINIC_ID = '00000000-0000-0000-0000-000000000001'
@@ -357,16 +358,24 @@ export async function markPayrollAsPaid(
   if (payroll.status === 'cancelled') return { error: 'Esta nomina fue anulada' }
 
   const label = formatPeriodLabel(payroll.period)
+  const periodEndForPayment = periodBounds(payroll.period).end
 
   // El pago de nomina es dinero que sale: se refleja en el flujo de caja
   let expenseId: string | null = payroll.expense_id
   let expenseError: string | null = null
   if (!expenseId) {
+    // El gasto pertenece al mes de la nomina, no al dia en que se marca
+    // pagada: si no, la nomina de julio aparece como gasto de agosto y el
+    // mes no cuadra con el flujo de caja
+    const { end: periodEnd } = periodBounds(payroll.period)
+
     const { data: expense, error: expError } = await createExpense({
       supplier_name: 'Nomina de empleados',
       category: 'nomina',
       subcategory: 'Sueldos fijos',
       concept: `Pago de nomina ${label}`,
+      issue_date: periodEnd,
+      due_date: periodEnd,
       subtotal: Number(payroll.total_net || 0),
       tax_amount: 0,
       total: Number(payroll.total_net || 0),
@@ -377,6 +386,16 @@ export async function markPayrollAsPaid(
     } else {
       expenseId = expense?.id ?? null
     }
+  }
+
+  // Registrar la salida de dinero en el mes que corresponde
+  if (expenseId && !payroll.expense_id) {
+    const { error: payError } = await registerExpensePayment(expenseId, {
+      amount: Number(payroll.total_net || 0),
+      payment_method: paymentMethod,
+      payment_date: periodEndForPayment,
+    })
+    if (payError) expenseError = expenseError || payError
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

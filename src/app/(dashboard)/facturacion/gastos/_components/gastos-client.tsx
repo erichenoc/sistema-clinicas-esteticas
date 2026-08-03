@@ -55,12 +55,13 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '@/types/expenses'
 import type { ExpenseCategoryKey } from '@/types/expenses'
 import { deleteExpense } from '@/actions/expenses'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
-import type { CashFlowPeriod } from '@/actions/cashflow'
+import type { CashFlowPeriod, IncomeDetail } from '@/actions/cashflow'
 import { recentPeriods } from '@/lib/periods'
 import { generateRecurringExpenses } from '@/actions/recurring-expenses'
 import type { RecurringExpenseData } from '@/actions/recurring-expenses'
 import { NuevoGastoDialog } from './nuevo-gasto-dialog'
 import { GastosFijosDialog } from './gastos-fijos-dialog'
+import { FacturacionMes } from './facturacion-mes'
 import { PagarGastoDialog } from './pagar-gasto-dialog'
 
 type StatusTab = 'all' | 'pending' | 'overdue' | 'paid'
@@ -72,6 +73,7 @@ interface GastosClientProps {
   period: CashFlowPeriod
   recurring: RecurringExpenseData[]
   recurringPeriod: string
+  income: IncomeDetail | null
   accessError: string | null
 }
 
@@ -82,6 +84,7 @@ export function GastosClient({
   period,
   recurring,
   recurringPeriod,
+  income,
   accessError,
 }: GastosClientProps) {
   const monthOptions = recentPeriods()
@@ -97,6 +100,8 @@ export function GastosClient({
   const [isPending, startTransition] = useTransition()
 
   const [tab, setTab] = useState<StatusTab>('all')
+  // Vista principal: lo que se paga o lo que se factura
+  const [view, setView] = useState<'gastos' | 'facturacion'>('gastos')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [search, setSearch] = useState('')
 
@@ -371,6 +376,18 @@ export function GastosClient({
         </Card>
       )}
 
+      {/* Que se mira: lo que se paga o lo que se factura */}
+      <Tabs value={view} onValueChange={(v) => setView(v as 'gastos' | 'facturacion')}>
+        <TabsList>
+          <TabsTrigger value="gastos">Gastos</TabsTrigger>
+          <TabsTrigger value="facturacion">Facturación</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {view === 'facturacion' && <FacturacionMes income={income} />}
+
+      {view === 'gastos' && (
+      <>
       {/* Tabs + filtros */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as StatusTab)}>
         <TabsList>
@@ -523,6 +540,9 @@ export function GastosClient({
           </Table>
         </CardContent>
       </Card>
+
+      </>
+      )}
 
       <PagarGastoDialog
         expense={payingExpense}

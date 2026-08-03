@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { getExpenses } from '@/actions/expenses'
-import { getCashFlowSummary, getExpenseStats } from '@/actions/cashflow'
+import { getCashFlowSummary, getExpenseStats, getIncomeDetail } from '@/actions/cashflow'
 import type { CashFlowPeriod } from '@/actions/cashflow'
 import { getRecurringExpenses } from '@/actions/recurring-expenses'
 import { GastosClient } from './_components/gastos-client'
@@ -33,11 +33,12 @@ export default async function GastosPage({
   // usa el mes en curso
   const recurringPeriod = MONTH_PATTERN.test(period) ? period : currentMonth()
 
-  const [expensesRes, cashFlowRes, statsRes, recurringRes] = await Promise.all([
+  const [expensesRes, cashFlowRes, statsRes, recurringRes, incomeRes] = await Promise.all([
     getExpenses(MONTH_PATTERN.test(period) ? { period } : undefined),
     getCashFlowSummary(period),
     getExpenseStats(period),
     getRecurringExpenses(recurringPeriod),
+    getIncomeDetail(period),
   ])
 
   return (
@@ -48,6 +49,7 @@ export default async function GastosPage({
       period={period}
       recurring={recurringRes.data}
       recurringPeriod={recurringPeriod}
+      income={incomeRes.data}
       accessError={expensesRes.error}
     />
   )
