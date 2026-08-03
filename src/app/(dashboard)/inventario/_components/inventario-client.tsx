@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { deleteProduct } from '@/actions/inventory'
+import { registerStockEntry, registerStockLoss } from '@/actions/inventory-movements'
 import {
   Package,
   Plus,
@@ -191,15 +192,52 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
     setAdjustmentDialogOpen(true)
   }
 
-  const submitAdjustment = () => {
-    console.log('Ajuste:', {
-      product: selectedProduct?.id,
-      type: adjustmentType,
-      quantity: adjustmentQuantity,
-      reason: adjustmentReason,
-    })
-    toast.success(`Stock ${adjustmentType === 'add' ? 'agregado' : 'retirado'} exitosamente`)
-    setAdjustmentDialogOpen(false)
+  // Entrada o salida de stock. El calculo real lo hace Postgres via
+  // apply_inventory_movement, que bloquea la fila para no descuadrar el saldo.
+  const submitAdjustment = async () => {
+    if (!selectedProduct) return
+
+    const quantity = parseFloat(adjustmentQuantity)
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast.error('La cantidad debe ser mayor a cero')
+      return
+    }
+    if (!selectedProduct.trackStock) {
+      toast.error(`"${selectedProduct.name}" no lleva control de existencias`)
+      return
+    }
+
+    setProcessingAction(`adjust-${selectedProduct.id}`)
+    try {
+      const result =
+        adjustmentType === 'add'
+          ? await registerStockEntry({
+              productId: selectedProduct.id,
+              quantity,
+              notes: adjustmentReason.trim() || null,
+            })
+          : await registerStockLoss({
+              productId: selectedProduct.id,
+              quantity,
+              reason: adjustmentReason.trim(),
+            })
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success(
+        `Stock ${adjustmentType === 'add' ? 'agregado' : 'retirado'}. Existencia actual: ${result.balance}`
+      )
+      setAdjustmentDialogOpen(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Error al mover el stock:', error)
+      toast.error('Error al mover el stock')
+    } finally {
+      setProcessingAction(null)
+    }
   }
 
   const handleToggleFilters = () => {
@@ -772,10 +810,19 @@ export function InventarioClient({ products, alerts, movements, stats }: Inventa
             </Button>
             <Button
               onClick={submitAdjustment}
-              disabled={!adjustmentQuantity || !adjustmentReason}
+              disabled={
+                !adjustmentQuantity ||
+                // El motivo solo es obligatorio al retirar: hay que poder auditar la merma
+                (adjustmentType === 'remove' && !adjustmentReason.trim()) ||
+                processingAction === `adjust-${selectedProduct?.id}`
+              }
               variant={adjustmentType === 'remove' ? 'destructive' : 'default'}
             >
-              {adjustmentType === 'add' ? 'Agregar' : 'Retirar'}
+              {processingAction === `adjust-${selectedProduct?.id}`
+                ? 'Guardando...'
+                : adjustmentType === 'add'
+                  ? 'Agregar'
+                  : 'Retirar'}
             </Button>
           </DialogFooter>
         </DialogContent>
