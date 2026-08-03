@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2, PackagePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,14 +27,39 @@ import { toast } from 'sonner'
 import { formatCurrency } from '@/types/billing'
 import { EXPENSE_CATEGORIES, getCategoryDef } from '@/types/expenses'
 import type { ExpenseCategoryKey } from '@/types/expenses'
-import { createExpense, registerExpensePayment } from '@/actions/expenses'
+import { registerExpensePayment } from '@/actions/expenses'
 import type { ExpenseCategory, ExpensePaymentMethod } from '@/actions/expenses'
+import { createExpenseWithStock } from '@/actions/expense-stock'
 import { getSuppliers } from '@/actions/inventory-suppliers'
 import type { SupplierData } from '@/actions/inventory-suppliers'
+import { getProducts } from '@/actions/inventory'
 
 const ITBIS_RATE = 18
 
 const NO_SUPPLIER = '__none__'
+
+// Producto que puede recibir mercancia desde una factura de gasto
+interface StockProductOption {
+  id: string
+  name: string
+  unit: string
+  costPrice: number
+}
+
+// Linea de mercancia de la factura. Se guarda como texto porque viene de inputs.
+interface StockLineDraft {
+  key: string
+  productId: string
+  quantity: string
+  unitCost: string
+}
+
+const emptyLine = (): StockLineDraft => ({
+  key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  productId: '',
+  quantity: '',
+  unitCost: '',
+})
 
 export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false)
@@ -58,10 +83,54 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
   const [notes, setNotes] = useState('')
   const [payNow, setPayNow] = useState(false)
 
+  // Mercancia que entra al inventario con esta factura
+  const [stockProducts, setStockProducts] = useState<StockProductOption[]>([])
+  const [stockLines, setStockLines] = useState<StockLineDraft[]>([])
+
   useEffect(() => {
     if (!open) return
     getSuppliers({ isActive: true }).then(setSuppliers)
+    // Solo productos que llevan existencias: los equipos no se inventarian
+    getProducts({ isActive: true }).then((rows) =>
+      setStockProducts(
+        rows
+          .filter((p) => p.track_stock)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            unit: p.unit || 'unit',
+            costPrice: Number(p.cost_price || 0),
+          }))
+      )
+    )
   }, [open])
+
+  const addStockLine = () => setStockLines((lines) => [...lines, emptyLine()])
+
+  const removeStockLine = (key: string) =>
+    setStockLines((lines) => lines.filter((l) => l.key !== key))
+
+  const updateStockLine = (key: string, patch: Partial<StockLineDraft>) =>
+    setStockLines((lines) => lines.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+
+  // Al elegir producto se precarga su costo conocido, para no teclearlo cada vez
+  const handleSelectStockProduct = (key: string, productId: string) => {
+    const product = stockProducts.find((p) => p.id === productId)
+    updateStockLine(key, {
+      productId,
+      unitCost: product && product.costPrice > 0 ? String(product.costPrice) : '',
+    })
+  }
+
+  const stockItems = stockLines
+    .map((l) => ({
+      product_id: l.productId,
+      quantity: parseFloat(l.quantity) || 0,
+      unit_cost: parseFloat(l.unitCost) || 0,
+    }))
+    .filter((i) => i.product_id && i.quantity > 0)
+
+  const stockTotal = stockItems.reduce((sum, i) => sum + i.quantity * i.unit_cost, 0)
 
   const categoryDef = getCategoryDef(category)
 
@@ -87,6 +156,7 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
     setPaymentMethod('transfer')
     setNotes('')
     setPayNow(false)
+    setStockLines([])
   }
 
   const handleSubmit = async () => {
@@ -106,9 +176,19 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
       return
     }
 
+    // Una linea a medio llenar suele ser un olvido, no una intencion: mejor
+    // avisar que registrar la factura sin la mercancia
+    const incompleteLine = stockLines.find(
+      (l) => (l.productId && !(parseFloat(l.quantity) > 0)) || (!l.productId && l.quantity)
+    )
+    if (incompleteLine) {
+      toast.error('Completa producto y cantidad en todas las líneas de inventario')
+      return
+    }
+
     setIsSaving(true)
     try {
-      const { data, error } = await createExpense({
+      const { data, error, stockWarning } = await createExpenseWithStock({
         supplier_id: selectedSupplier?.id || null,
         supplier_name: selectedSupplier ? null : finalSupplierName,
         supplier_rnc: supplierRnc.trim() || selectedSupplier?.tax_id || null,
@@ -124,11 +204,17 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
         total: totalAmount,
         payment_method: paymentMethod,
         notes: notes.trim() || null,
-      })
+      }, stockItems)
 
       if (error || !data) {
         toast.error(error || 'Error al registrar el gasto')
         return
+      }
+
+      if (stockWarning) {
+        toast.warning(stockWarning)
+      } else if (stockItems.length > 0) {
+        toast.success(`${stockItems.length} producto(s) entraron al inventario`)
       }
 
       // Gasto de contado: se registra el pago completo de una vez
@@ -314,6 +400,102 @@ export function NuevoGastoDialog({ onCreated }: { onCreated: () => void }) {
               </div>
             </div>
           )}
+
+          {/* Mercancia que entra al inventario con esta factura */}
+          <div className="rounded-md border p-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <Label className="text-sm">Productos que entran al inventario</Label>
+                <p className="text-xs text-muted-foreground">
+                  Opcional. Lo que agregues aquí suma al stock automáticamente.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addStockLine}>
+                <PackagePlus className="mr-2 h-4 w-4" />
+                Agregar
+              </Button>
+            </div>
+
+            {stockLines.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Sin productos: este gasto solo afecta el dinero, no el inventario.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {stockLines.map((line) => {
+                  const product = stockProducts.find((p) => p.id === line.productId)
+                  return (
+                    <div key={line.key} className="grid gap-2 sm:grid-cols-[1fr_90px_110px_auto]">
+                      <Select
+                        value={line.productId}
+                        onValueChange={(v) => handleSelectStockProduct(line.key, v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Producto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stockProducts.length === 0 ? (
+                            <SelectItem value="__none__" disabled>
+                              No hay productos que lleven inventario
+                            </SelectItem>
+                          ) : (
+                            stockProducts.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.quantity}
+                        onChange={(e) => updateStockLine(line.key, { quantity: e.target.value })}
+                        placeholder={product?.unit || 'Cant.'}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.unitCost}
+                        onChange={(e) => updateStockLine(line.key, { unitCost: e.target.value })}
+                        placeholder="Costo c/u"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeStockLine(line.key)}
+                        aria-label="Quitar producto"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )
+                })}
+
+                {stockTotal > 0 && (
+                  <div className="flex items-center justify-between border-t pt-2 text-sm">
+                    <span className="text-muted-foreground">Costo de la mercancía</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{formatCurrency(stockTotal)}</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setAmount(String(Math.round(stockTotal * 100) / 100))}
+                      >
+                        Usar como monto
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Comprobantes */}
           <div className="grid gap-4 sm:grid-cols-3">
