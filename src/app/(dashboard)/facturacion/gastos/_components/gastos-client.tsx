@@ -53,7 +53,7 @@ import { toast } from 'sonner'
 import { formatCurrency } from '@/types/billing'
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '@/types/expenses'
 import type { ExpenseCategoryKey } from '@/types/expenses'
-import { deleteExpense } from '@/actions/expenses'
+import { deleteExpenseWithStock } from '@/actions/expense-stock'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
 import type { CashFlowPeriod, IncomeDetail } from '@/actions/cashflow'
 import { recentPeriods, formatDayMonth } from '@/lib/periods'
@@ -134,12 +134,17 @@ export function GastosClient({
     if (!confirm(`Eliminar el gasto ${expense.expense_number}? Esta accion no se puede deshacer.`)) {
       return
     }
-    const { error } = await deleteExpense(expense.id)
+    // Si la factura habia metido mercancia al inventario, se descuenta de vuelta
+    const { error, stockWarning } = await deleteExpenseWithStock(expense.id)
     if (error) {
       toast.error(error)
       return
     }
-    toast.success('Gasto eliminado')
+    if (stockWarning) {
+      toast.warning(stockWarning)
+    } else {
+      toast.success('Gasto eliminado')
+    }
     loadData()
   }
 
