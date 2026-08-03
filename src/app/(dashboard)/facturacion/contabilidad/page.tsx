@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { getItbisSummary, type ItbisSummary } from '@/actions/accounting'
 import {
   ArrowLeft,
   FileSpreadsheet,
   Download,
   Calendar,
-  Building2,
   TrendingUp,
   TrendingDown,
   AlertCircle,
@@ -55,127 +55,52 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import {
   NCF_TYPE_OPTIONS,
-  PAYMENT_TYPE_606_OPTIONS,
   type NCFType,
   type NCFSequence,
   type DGIIReport,
   getPeriodLabel,
-  formatRNC,
 } from '@/types/accounting'
 import { formatCurrency } from '@/types/billing'
 
 // Mock data
-const mockNCFSequences: NCFSequence[] = [
-  {
-    id: '1',
-    clinicId: 'clinic-1',
-    ncfType: 'B01',
-    prefix: 'E31',
-    currentNumber: 156,
-    startNumber: 1,
-    endNumber: 500,
-    expirationDate: '2025-12-31',
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-12-06',
-  },
-  {
-    id: '2',
-    clinicId: 'clinic-1',
-    ncfType: 'B02',
-    prefix: 'E32',
-    currentNumber: 1892,
-    startNumber: 1,
-    endNumber: 5000,
-    expirationDate: '2025-12-31',
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-12-06',
-  },
-  {
-    id: '3',
-    clinicId: 'clinic-1',
-    ncfType: 'B04',
-    prefix: 'E34',
-    currentNumber: 23,
-    startNumber: 1,
-    endNumber: 100,
-    expirationDate: '2025-12-31',
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-12-06',
-  },
-]
+// No existe tabla de secuencias NCF: mostrar rangos inventados en un modulo
+// tributario haria creer que hay comprobantes disponibles que no existen.
+const mockNCFSequences: NCFSequence[] = []
 
-const mockReports: DGIIReport[] = [
-  {
-    id: '1',
-    clinicId: 'clinic-1',
-    period: '202412',
-    reportType: '607',
-    status: 'draft',
-    totalRecords: 145,
-    totalAmount: 2850000,
-    totalTax: 513000,
-    createdAt: '2024-12-01',
-    updatedAt: '2024-12-06',
-  },
-  {
-    id: '2',
-    clinicId: 'clinic-1',
-    period: '202412',
-    reportType: '606',
-    status: 'draft',
-    totalRecords: 28,
-    totalAmount: 485000,
-    totalTax: 87300,
-    createdAt: '2024-12-01',
-    updatedAt: '2024-12-06',
-  },
-  {
-    id: '3',
-    clinicId: 'clinic-1',
-    period: '202411',
-    reportType: '607',
-    status: 'submitted',
-    totalRecords: 132,
-    totalAmount: 2650000,
-    totalTax: 477000,
-    submittedAt: '2024-12-05',
-    dgiiReference: 'DGII-2024-607-001234',
-    createdAt: '2024-11-01',
-    updatedAt: '2024-12-05',
-  },
-  {
-    id: '4',
-    clinicId: 'clinic-1',
-    period: '202411',
-    reportType: '606',
-    status: 'submitted',
-    totalRecords: 25,
-    totalAmount: 420000,
-    totalTax: 75600,
-    submittedAt: '2024-12-05',
-    dgiiReference: 'DGII-2024-606-001234',
-    createdAt: '2024-11-01',
-    updatedAt: '2024-12-05',
-  },
-]
+// Sin tabla de reportes generados: el historial arranca vacio
+const mockReports: DGIIReport[] = []
 
-const mockITBISSummary = {
-  period: '202412',
-  salesB01Total: 850000,
-  salesB02Total: 2000000,
-  salesTaxableAmount: 2850000,
-  salesItbisCollected: 513000,
-  purchasesTotal: 485000,
-  purchasesItbisPaid: 87300,
-  itbisToPayOrCredit: 425700,
+
+// Mientras carga, se muestran ceros en vez de cifras falsas
+const EMPTY_ITBIS: ItbisSummary = {
+  period: '',
+  salesB01Total: 0,
+  salesB02Total: 0,
+  salesTaxableAmount: 0,
+  salesItbisCollected: 0,
+  purchasesTotal: 0,
+  purchasesItbisPaid: 0,
+  itbisToPayOrCredit: 0,
+  invoicesIssued: 0,
+}
+
+const currentPeriod = () => {
+  const now = new Date()
+  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
 export default function ContabilidadPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState('202412')
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState(currentPeriod)
+  const [isGenerating] = useState(false)
+
+  // ITBIS real: cobrado en facturas menos pagado en gastos del periodo
+  const [itbis, setItbis] = useState<ItbisSummary | null>(null)
+  // Se fija al montar: llamar Date.now() en cada render rompe la pureza de React
+  const [soonThreshold] = useState(() => new Date(Date.now() + 60 * 24 * 60 * 60 * 1000))
+
+  useEffect(() => {
+    getItbisSummary(selectedPeriod).then(setItbis)
+  }, [selectedPeriod])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -204,16 +129,18 @@ export default function ContabilidadPage() {
     return Math.round((used / total) * 100)
   }
 
+  // El archivo oficial de la DGII tiene un layout de posiciones fijas que no
+  // se puede adivinar: generarlo mal seria presentar una declaracion incorrecta.
+  // Hasta implementarlo contra la norma vigente, se dice la verdad.
   const handleGenerateReport = async (reportType: '606' | '607') => {
-    setIsGenerating(true)
-    // Simular generacion
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsGenerating(false)
-    toast.success(`Reporte ${reportType} generado exitosamente`)
+    toast.info(
+      `La exportacion del formato ${reportType} para la DGII aun no esta implementada. ` +
+        'Las cifras de ITBIS de esta pantalla si son reales y sirven para declarar.'
+    )
   }
 
   const handleDownloadReport = (report: DGIIReport) => {
-    toast.success(`Descargando reporte ${report.reportType} - ${getPeriodLabel(report.period)}`)
+    toast.info(`La descarga del formato ${report.reportType} aun no esta implementada`)
   }
 
   // Generate period options (last 12 months)
@@ -285,7 +212,7 @@ export default function ContabilidadPage() {
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(mockITBISSummary.salesItbisCollected)}</div>
+            <div className="text-2xl font-bold">{formatCurrency((itbis ?? EMPTY_ITBIS).salesItbisCollected)}</div>
             <p className="text-xs text-muted-foreground">En ventas del periodo</p>
           </CardContent>
         </Card>
@@ -295,7 +222,7 @@ export default function ContabilidadPage() {
             <TrendingDown className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(mockITBISSummary.purchasesItbisPaid)}</div>
+            <div className="text-2xl font-bold">{formatCurrency((itbis ?? EMPTY_ITBIS).purchasesItbisPaid)}</div>
             <p className="text-xs text-muted-foreground">En compras del periodo</p>
           </CardContent>
         </Card>
@@ -306,7 +233,7 @@ export default function ContabilidadPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">
-              {formatCurrency(mockITBISSummary.itbisToPayOrCredit)}
+              {formatCurrency((itbis ?? EMPTY_ITBIS).itbisToPayOrCredit)}
             </div>
             <p className="text-xs text-muted-foreground">Balance del periodo</p>
           </CardContent>
@@ -318,7 +245,7 @@ export default function ContabilidadPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockReports.find(r => r.period === selectedPeriod && r.reportType === '607')?.totalRecords || 0}
+              {(itbis ?? EMPTY_ITBIS).invoicesIssued}
             </div>
             <p className="text-xs text-muted-foreground">Facturas del periodo</p>
           </CardContent>
@@ -543,7 +470,7 @@ export default function ContabilidadPage() {
                 {mockNCFSequences.map((seq) => {
                   const usagePercent = getSequenceUsagePercent(seq)
                   const isLowStock = usagePercent > 80
-                  const isExpiringSoon = new Date(seq.expirationDate) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) // 60 days
+                  const isExpiringSoon = new Date(seq.expirationDate) < soonThreshold
 
                   return (
                     <Card key={seq.id} className={isLowStock || isExpiringSoon ? 'border-amber-200 bg-amber-50/50' : ''}>
@@ -606,20 +533,20 @@ export default function ContabilidadPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Facturas B01 (Credito Fiscal)</span>
-                    <span className="font-medium">{formatCurrency(mockITBISSummary.salesB01Total)}</span>
+                    <span className="font-medium">{formatCurrency((itbis ?? EMPTY_ITBIS).salesB01Total)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Facturas B02 (Consumo)</span>
-                    <span className="font-medium">{formatCurrency(mockITBISSummary.salesB02Total)}</span>
+                    <span className="font-medium">{formatCurrency((itbis ?? EMPTY_ITBIS).salesB02Total)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-medium">Total Gravado</span>
-                    <span className="font-bold">{formatCurrency(mockITBISSummary.salesTaxableAmount)}</span>
+                    <span className="font-bold">{formatCurrency((itbis ?? EMPTY_ITBIS).salesTaxableAmount)}</span>
                   </div>
                   <div className="flex justify-between text-green-600">
                     <span className="font-medium">ITBIS Cobrado (18%)</span>
-                    <span className="font-bold">{formatCurrency(mockITBISSummary.salesItbisCollected)}</span>
+                    <span className="font-bold">{formatCurrency((itbis ?? EMPTY_ITBIS).salesItbisCollected)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -638,12 +565,12 @@ export default function ContabilidadPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Compras</span>
-                    <span className="font-medium">{formatCurrency(mockITBISSummary.purchasesTotal)}</span>
+                    <span className="font-medium">{formatCurrency((itbis ?? EMPTY_ITBIS).purchasesTotal)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-red-600">
                     <span className="font-medium">ITBIS Pagado (18%)</span>
-                    <span className="font-bold">{formatCurrency(mockITBISSummary.purchasesItbisPaid)}</span>
+                    <span className="font-bold">{formatCurrency((itbis ?? EMPTY_ITBIS).purchasesItbisPaid)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -663,19 +590,19 @@ export default function ContabilidadPage() {
                 <div className="text-center p-4 bg-white/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">ITBIS Cobrado</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(mockITBISSummary.salesItbisCollected)}
+                    {formatCurrency((itbis ?? EMPTY_ITBIS).salesItbisCollected)}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-white/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">ITBIS Pagado (Credito)</p>
                   <p className="text-2xl font-bold text-red-600">
-                    -{formatCurrency(mockITBISSummary.purchasesItbisPaid)}
+                    -{formatCurrency((itbis ?? EMPTY_ITBIS).purchasesItbisPaid)}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-primary/10 rounded-lg border-2 border-primary/20">
                   <p className="text-sm font-medium">ITBIS a Pagar</p>
                   <p className="text-3xl font-bold text-primary">
-                    {formatCurrency(mockITBISSummary.itbisToPayOrCredit)}
+                    {formatCurrency((itbis ?? EMPTY_ITBIS).itbisToPayOrCredit)}
                   </p>
                 </div>
               </div>
