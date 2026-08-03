@@ -41,7 +41,7 @@ import {
   type PayrollAdjustment,
   type PayrollLine,
 } from '@/actions/payroll'
-import { recentPeriods } from '@/lib/periods'
+import { recentPeriods, formatShortDate } from '@/lib/periods'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useUser } from '@/contexts/user-context'
 import {
@@ -477,9 +477,9 @@ export default function NominaPage() {
           </AlertTitle>
           <AlertDescription>
             {isPaid
-              ? `Pagada el ${payroll.paidAt ? new Date(payroll.paidAt).toLocaleDateString('es-DO') : '—'}. Los montos quedaron congelados y el pago aparece en el flujo de caja.`
+              ? `Pagada el ${formatShortDate(payroll.paidAt)}. Los montos quedaron congelados y el pago aparece en el flujo de caja.`
               : isClosed
-                ? `Cerrada${payroll.closedByName ? ` por ${payroll.closedByName}` : ''}${payroll.closedAt ? ` el ${new Date(payroll.closedAt).toLocaleDateString('es-DO')}` : ''}. Marcala como pagada cuando entregues el dinero.`
+                ? `Cerrada${payroll.closedByName ? ` por ${payroll.closedByName}` : ''}${payroll.closedAt ? ` el ${formatShortDate(payroll.closedAt)}` : ''}. Marcala como pagada cuando entregues el dinero.`
                 : 'Estos montos se calculan al momento y cambian si editas sueldos. Cierra el mes para dejarlos fijos como documento histórico.'}
           </AlertDescription>
         </Alert>
@@ -847,7 +847,7 @@ export default function NominaPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {entry.paidAt ? new Date(entry.paidAt).toLocaleDateString('es-DO') : '—'}
+                        {formatShortDate(entry.paidAt)}
                       </TableCell>
                       <TableCell>
                         <Button

@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner'
 import { formatCurrency } from '@/types/billing'
 import { EXPENSE_PAYMENT_METHOD_LABELS } from '@/types/expenses'
+import { formatShortDate } from '@/lib/periods'
 import {
   getExpensePayments,
   registerExpensePayment,
@@ -205,7 +206,7 @@ export function PagarGastoDialog({
                         {' '}
                         · {EXPENSE_PAYMENT_METHOD_LABELS[p.payment_method] || p.payment_method}
                         {' · '}
-                        {new Date(p.payment_date).toLocaleDateString('es-DO')}
+                        {formatShortDate(p.payment_date)}
                       </span>
                     </div>
                     <Button

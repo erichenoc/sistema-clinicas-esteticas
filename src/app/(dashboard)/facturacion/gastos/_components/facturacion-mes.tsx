@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/types/billing'
 import type { IncomeDetail } from '@/actions/cashflow'
+import { formatDayMonth } from '@/lib/periods'
 
 const METHOD_LABELS: Record<string, string> = {
   cash: 'Efectivo',
@@ -27,10 +28,6 @@ const STATUS_LABELS: Record<string, string> = {
   partial: 'Abonada',
   pending: 'Pendiente',
   overdue: 'Vencida',
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit' })
 }
 
 export function FacturacionMes({ income }: { income: IncomeDetail | null }) {
@@ -119,7 +116,7 @@ export function FacturacionMes({ income }: { income: IncomeDetail | null }) {
                         </Link>
                       </TableCell>
                       <TableCell className="max-w-[180px] truncate">{inv.patientName}</TableCell>
-                      <TableCell>{formatDate(inv.issueDate)}</TableCell>
+                      <TableCell>{formatDayMonth(inv.issueDate)}</TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(inv.total)}
                       </TableCell>
@@ -180,7 +177,7 @@ export function FacturacionMes({ income }: { income: IncomeDetail | null }) {
                 ) : (
                   payments.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>{formatDate(p.paymentDate)}</TableCell>
+                      <TableCell>{formatDayMonth(p.paymentDate)}</TableCell>
                       <TableCell>{p.invoiceNumber}</TableCell>
                       <TableCell className="max-w-[180px] truncate">{p.patientName}</TableCell>
                       <TableCell>{METHOD_LABELS[p.method] || p.method}</TableCell>

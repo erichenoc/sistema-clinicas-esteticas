@@ -56,7 +56,7 @@ import type { ExpenseCategoryKey } from '@/types/expenses'
 import { deleteExpense } from '@/actions/expenses'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
 import type { CashFlowPeriod, IncomeDetail } from '@/actions/cashflow'
-import { recentPeriods } from '@/lib/periods'
+import { recentPeriods, formatDayMonth } from '@/lib/periods'
 import { generateRecurringExpenses } from '@/actions/recurring-expenses'
 import type { RecurringExpenseData } from '@/actions/recurring-expenses'
 import { NuevoGastoDialog } from './nuevo-gasto-dialog'
@@ -497,12 +497,7 @@ export function GastosClient({
                       )}
                     </TableCell>
                     <TableCell>
-                      {expense.due_date
-                        ? new Date(expense.due_date).toLocaleDateString('es-DO', {
-                            day: '2-digit',
-                            month: 'short',
-                          })
-                        : '—'}
+                      {formatDayMonth(expense.due_date)}
                     </TableCell>
                     <TableCell>{getStatusBadge(expense)}</TableCell>
                     <TableCell>
