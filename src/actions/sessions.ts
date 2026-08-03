@@ -526,19 +526,18 @@ export async function getSessionStats(): Promise<{
 // NOTAS CLINICAS
 // =============================================
 
+// Refleja las columnas REALES de clinical_notes en Supabase.
+// No hay clinic_id, title, is_important, updated_at ni created_by:
+// la autoria se guarda en professional_id.
 export interface ClinicalNoteData {
   id: string
-  clinic_id: string
   session_id: string | null
   patient_id: string
-  type: string
-  title: string | null
+  professional_id: string | null
+  note_type: string | null
   content: string
-  is_important: boolean
-  is_private: boolean
+  is_private: boolean | null
   created_at: string
-  updated_at: string
-  created_by: string
 }
 
 export async function getSessionNotes(sessionId: string): Promise<ClinicalNoteData[]> {
@@ -564,26 +563,33 @@ export async function createClinicalNote(
   input: {
     session_id?: string
     patient_id: string
-    type: string
-    title?: string
+    note_type?: string
     content: string
-    is_important?: boolean
     is_private?: boolean
   }
 ): Promise<{ data: ClinicalNoteData | null; error: string | null }> {
-  // Autor y clínica SIEMPRE del servidor: nunca confiar en un userId del cliente.
+  // Autor SIEMPRE del servidor: nunca confiar en un userId del cliente.
   const ctx = await getAuthContext()
   if (!ctx) return { data: null, error: 'No autorizado' }
 
+  if (!input.content?.trim()) {
+    return { data: null, error: 'La nota no puede estar vacía' }
+  }
+
   const supabase = createAdminClient()
 
+  // Se listan las columnas una por una en vez de propagar `input`: propagar
+  // campos que la tabla no tiene hace que PostgREST rechace el insert entero.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('clinical_notes')
     .insert({
-      clinic_id: ctx.clinicId,
-      ...input,
-      created_by: ctx.userId,
+      session_id: input.session_id || null,
+      patient_id: input.patient_id,
+      professional_id: ctx.userId,
+      note_type: input.note_type || 'general',
+      content: input.content.trim(),
+      is_private: input.is_private ?? false,
     })
     .select()
     .single()

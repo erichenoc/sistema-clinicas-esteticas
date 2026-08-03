@@ -72,8 +72,9 @@ export interface MedicalHistoryRecord {
   uses_retinoids: boolean | null
   sun_exposure_level: string | null
   additional_notes: string | null
+  // El fototipo NO vive en esta tabla: es columna `fitzpatrick_type` de
+  // `patients`. Se expone aqui para que el formulario lo lea como un campo mas.
   skin_type_fitzpatrick: string | null
-  created_at: string
   updated_at: string
 }
 
@@ -81,7 +82,8 @@ export async function getMedicalHistory(patientId: string): Promise<MedicalHisto
   if (!(await getAuthContext())) return null
   const supabase = createAdminClient()
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('patient_medical_history')
     .select('*')
     .eq('patient_id', patientId)
@@ -92,7 +94,21 @@ export async function getMedicalHistory(patientId: string): Promise<MedicalHisto
     return null
   }
 
-  return data as MedicalHistoryRecord | null
+  if (!data) return null
+
+  // El fototipo se guarda en `patients`: se une aqui para que el formulario
+  // reciba el historial completo en un solo objeto.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: patient } = await (supabase as any)
+    .from('patients')
+    .select('fitzpatrick_type')
+    .eq('id', patientId)
+    .single()
+
+  return {
+    ...data,
+    skin_type_fitzpatrick: patient?.fitzpatrick_type ?? null,
+  } as MedicalHistoryRecord
 }
 
 export async function saveMedicalHistory(data: MedicalHistoryData) {
@@ -119,8 +135,23 @@ export async function saveMedicalHistory(data: MedicalHistoryData) {
     uses_retinoids: data.uses_retinoids,
     sun_exposure_level: data.sun_exposure_level,
     additional_notes: data.additional_notes,
-    skin_type_fitzpatrick: data.skin_type_fitzpatrick,
     updated_at: new Date().toISOString(),
+  }
+
+  // `skin_type_fitzpatrick` NO es columna de patient_medical_history: el
+  // fototipo vive en patients.fitzpatrick_type. Incluirlo en este payload
+  // hacia que PostgREST rechazara el guardado completo del historial.
+  if (data.skin_type_fitzpatrick !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: patientError } = await (supabase as any)
+      .from('patients')
+      .update({ fitzpatrick_type: data.skin_type_fitzpatrick || null })
+      .eq('id', data.patient_id)
+
+    if (patientError) {
+      console.error('Error saving fitzpatrick type:', patientError)
+      throw new Error('Error al guardar el fototipo de piel')
+    }
   }
 
   if (existing) {
