@@ -1,4 +1,5 @@
-export const revalidate = 30
+// Datos en vivo detras de login: no se prerenderiza ni se cachea
+export const dynamic = 'force-dynamic'
 
 import { getPurchaseOrders, getPurchaseOrderStats, getSuppliers, getProducts } from '@/actions/inventory'
 import { OrdenesCompraClient } from './_components/ordenes-compra-client'
