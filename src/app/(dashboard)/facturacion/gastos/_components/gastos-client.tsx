@@ -52,6 +52,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/types/billing'
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '@/types/expenses'
+import type { ExpenseCategoryKey } from '@/types/expenses'
 import { deleteExpense } from '@/actions/expenses'
 import type { ExpenseListItem, CashFlowSummary, ExpenseStats } from '@/actions/expenses'
 import type { CashFlowPeriod } from '@/actions/cashflow'
@@ -399,7 +400,11 @@ export function GastosClient({
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue />
+            <SelectValue>
+              {categoryFilter === 'all'
+                ? 'Todas las categorías'
+                : EXPENSE_CATEGORY_LABELS[categoryFilter as ExpenseCategoryKey] || categoryFilter}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las categorías</SelectItem>
