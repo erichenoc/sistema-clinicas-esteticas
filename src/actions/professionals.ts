@@ -758,10 +758,16 @@ export async function updateCommission(
     if (input.periodEnd !== undefined) updateData.period_end = input.periodEnd
     if (input.notes !== undefined) updateData.notes = input.notes
     if (input.status !== undefined) {
-      updateData.status = input.status
+      // Pagar mueve dinero: tiene que pasar por payCommission, que ademas
+      // registra el gasto. Marcarla pagada aqui la dejaba fuera del flujo de caja.
       if (input.status === 'paid') {
-        updateData.paid_at = new Date().toISOString()
-      } else if (input.status === 'approved') {
+        return {
+          success: false,
+          error: 'Usa el boton Pagar para registrar la salida de dinero de la comision',
+        }
+      }
+      updateData.status = input.status
+      if (input.status === 'approved') {
         updateData.approved_at = new Date().toISOString()
       }
     }
@@ -817,6 +823,15 @@ export async function updateCommissionStatus(
 ): Promise<{ success: boolean; error: string | null }> {
   const supabase = createAdminClient()
 
+  // Pagar mueve dinero: solo payCommission puede hacerlo, porque ademas
+  // registra el gasto que hace visible la salida en el flujo de caja.
+  if (status === 'paid') {
+    return {
+      success: false,
+      error: 'Usa el boton Pagar para registrar la salida de dinero de la comision',
+    }
+  }
+
   const updateData: Record<string, unknown> = {
     status,
   }
@@ -824,9 +839,6 @@ export async function updateCommissionStatus(
   if (status === 'approved') {
     updateData.approved_at = new Date().toISOString()
     updateData.approved_by = userId
-  } else if (status === 'paid') {
-    updateData.paid_at = new Date().toISOString()
-    updateData.paid_by = userId
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

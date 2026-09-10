@@ -16,6 +16,7 @@ import {
   Save,
   X,
   Loader2,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -71,6 +72,7 @@ import {
   deleteCommission,
   type CommissionData,
 } from '@/actions/professionals'
+import { payCommission, revertCommissionPayment } from '@/actions/commissions'
 
 interface Professional {
   id: string
@@ -199,23 +201,60 @@ export default function ComisionesPage() {
     }
   }
 
+  // Pagar una comision es dinero que sale: crea el gasto y lo registra en el
+  // flujo de caja. Antes solo cambiaba el estado y el costo no aparecia en ningun lado.
   const handlePayComision = async (id: string) => {
+    const comision = comisiones.find(c => c.id === id)
+    if (
+      comision &&
+      !confirm(
+        `Pagar la comisión de ${comision.professionalName}?\n\n` +
+          `Se registrará un gasto de ${formatPrice(comision.commission_amount || 0)} ` +
+          'en la categoría Nómina / Comisiones, para que aparezca en el flujo de caja.'
+      )
+    ) {
+      return
+    }
+
     setIsSaving(true)
     try {
-      const result = await updateCommission(id, { status: 'paid' })
+      const result = await payCommission(id)
 
       if (result.error) {
         toast.error(result.error)
         return
       }
 
-      setComisiones(prev =>
-        prev.map(c => c.id === id ? { ...c, status: 'paid', paid_at: new Date().toISOString() } : c)
-      )
-      toast.success('Comisión marcada como pagada')
+      await loadData()
+      toast.success('Comisión pagada y registrada en los gastos')
     } catch (error) {
-      console.error('Error updating commission:', error)
-      toast.error('Error al marcar como pagada')
+      console.error('Error paying commission:', error)
+      toast.error('Error al pagar la comisión')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Deshacer un pago hecho por error: borra el gasto y la devuelve a pendiente
+  const handleRevertPago = async (id: string) => {
+    if (!confirm('Revertir el pago de esta comisión? Se eliminará el gasto que registró la salida de dinero.')) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const result = await revertCommissionPayment(id)
+
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      await loadData()
+      toast.success('Pago revertido. La comisión vuelve a estar pendiente.')
+    } catch (error) {
+      console.error('Error reverting commission payment:', error)
+      toast.error('Error al revertir el pago')
     } finally {
       setIsSaving(false)
     }
@@ -556,10 +595,23 @@ export default function ComisionesPage() {
                                 Pagar
                               </Button>
                             )}
-                            {comision.status === 'paid' && comision.paid_at && (
-                              <span className="text-xs text-muted-foreground mr-2">
-                                {new Date(comision.paid_at).toLocaleDateString('es-MX')}
-                              </span>
+                            {comision.status === 'paid' && (
+                              <>
+                                {comision.paid_at && (
+                                  <span className="text-xs text-muted-foreground mr-2">
+                                    {new Date(comision.paid_at).toLocaleDateString('es-MX')}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Revertir el pago y eliminar su gasto"
+                                  onClick={() => handleRevertPago(comision.id)}
+                                  disabled={isSaving}
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
                             <Button size="sm" variant="ghost" onClick={() => handleEditComision(comision)}>
                               <Pencil className="h-4 w-4" />

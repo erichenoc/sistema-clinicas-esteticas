@@ -69,6 +69,8 @@ export interface PayrollHistoryEntry {
   totalNet: number
   closedAt: string | null
   paidAt: string | null
+  /** null en una nomina pagada = el dinero salio sin quedar en el flujo de caja */
+  expenseId: string | null
 }
 
 /** Ajustes que el usuario puede hacer antes de cerrar el mes */
@@ -211,7 +213,9 @@ export async function getPayrollPeriod(
     .eq('period', period)
     .maybeSingle()
 
-  if (!saved) {
+  // Una nomina anulada deja el mes abierto otra vez: se vuelve a calcular.
+  // El documento anulado sigue visible en el historial.
+  if (!saved || saved.status === 'cancelled') {
     return { data: await buildDraft(period, adjustments), error: null }
   }
 
@@ -263,8 +267,14 @@ export async function closePayrollPeriod(
     .eq('period', period)
     .maybeSingle()
 
-  if (existing) {
+  if (existing && existing.status !== 'cancelled') {
     return { error: `La nomina de ${formatPeriodLabel(period)} ya esta cerrada` }
+  }
+
+  // Si la anterior fue anulada, se reemplaza: el rastro quedo en audit_logs
+  if (existing) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('payroll_periods').delete().eq('id', existing.id)
   }
 
   const draft = await buildDraft(period, adjustments)
@@ -336,11 +346,54 @@ export async function closePayrollPeriod(
   return { error: null }
 }
 
-// Marca la nomina como pagada y registra la salida de dinero como gasto
+// Crea el gasto de una nomina y registra su pago.
+// El gasto pertenece al mes de la nomina, no al dia en que se marca pagada:
+// si no, la nomina de julio aparece como gasto de agosto y el mes no cuadra.
+async function createPayrollExpense(
+  period: string,
+  totalNet: number,
+  paymentMethod: PayrollPaymentMethod
+): Promise<{ expenseId: string | null; error: string | null }> {
+  const { end: periodEnd } = periodBounds(period)
+  const label = formatPeriodLabel(period)
+
+  const { data: expense, error: expError } = await createExpense({
+    supplier_name: 'Nomina de empleados',
+    category: 'nomina',
+    subcategory: 'Sueldos fijos',
+    concept: `Pago de nomina ${label}`,
+    issue_date: periodEnd,
+    due_date: periodEnd,
+    subtotal: totalNet,
+    tax_amount: 0,
+    total: totalNet,
+    payment_method: paymentMethod,
+  })
+
+  if (expError || !expense) {
+    return { expenseId: null, error: expError || 'No se pudo registrar el gasto de la nomina' }
+  }
+
+  const { error: payError } = await registerExpensePayment(expense.id, {
+    amount: totalNet,
+    payment_method: paymentMethod,
+    payment_date: periodEnd,
+  })
+
+  if (payError) {
+    return { expenseId: expense.id, error: `El gasto se creo pero el pago no se registro: ${payError}` }
+  }
+
+  return { expenseId: expense.id, error: null }
+}
+
+// Marca la nomina como pagada y registra la salida de dinero como gasto.
+// Si el gasto no se puede crear, la nomina NO se marca como pagada: de lo
+// contrario el dinero sale sin aparecer nunca en el flujo de caja.
 export async function markPayrollAsPaid(
   periodId: string,
   paymentMethod: PayrollPaymentMethod = 'transfer'
-): Promise<{ error: string | null; expenseError?: string | null }> {
+): Promise<{ error: string | null }> {
   const { error: authError } = await requirePayrollAccess()
   if (authError) return { error: authError }
 
@@ -357,45 +410,15 @@ export async function markPayrollAsPaid(
   if (payroll.status === 'paid') return { error: 'Esta nomina ya esta marcada como pagada' }
   if (payroll.status === 'cancelled') return { error: 'Esta nomina fue anulada' }
 
-  const label = formatPeriodLabel(payroll.period)
-  const periodEndForPayment = periodBounds(payroll.period).end
-
-  // El pago de nomina es dinero que sale: se refleja en el flujo de caja
   let expenseId: string | null = payroll.expense_id
-  let expenseError: string | null = null
   if (!expenseId) {
-    // El gasto pertenece al mes de la nomina, no al dia en que se marca
-    // pagada: si no, la nomina de julio aparece como gasto de agosto y el
-    // mes no cuadra con el flujo de caja
-    const { end: periodEnd } = periodBounds(payroll.period)
-
-    const { data: expense, error: expError } = await createExpense({
-      supplier_name: 'Nomina de empleados',
-      category: 'nomina',
-      subcategory: 'Sueldos fijos',
-      concept: `Pago de nomina ${label}`,
-      issue_date: periodEnd,
-      due_date: periodEnd,
-      subtotal: Number(payroll.total_net || 0),
-      tax_amount: 0,
-      total: Number(payroll.total_net || 0),
-      payment_method: paymentMethod,
-    })
-    if (expError) {
-      expenseError = expError
-    } else {
-      expenseId = expense?.id ?? null
-    }
-  }
-
-  // Registrar la salida de dinero en el mes que corresponde
-  if (expenseId && !payroll.expense_id) {
-    const { error: payError } = await registerExpensePayment(expenseId, {
-      amount: Number(payroll.total_net || 0),
-      payment_method: paymentMethod,
-      payment_date: periodEndForPayment,
-    })
-    if (payError) expenseError = expenseError || payError
+    const result = await createPayrollExpense(
+      payroll.period,
+      Number(payroll.total_net || 0),
+      paymentMethod
+    )
+    if (result.error) return { error: result.error }
+    expenseId = result.expenseId
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -417,7 +440,309 @@ export async function markPayrollAsPaid(
 
   revalidatePath('/nomina')
   revalidatePath('/facturacion/gastos')
-  return { error: null, expenseError }
+  revalidatePath('/facturacion')
+  return { error: null }
+}
+
+// Repara nominas que quedaron pagadas sin gasto: el dinero salio pero no
+// aparece en el flujo de caja. Crea el gasto que falto.
+export async function ensurePayrollExpense(
+  periodId: string
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requirePayrollAccess()
+  if (authError) return { error: authError }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: payroll } = await (supabase as any)
+    .from('payroll_periods')
+    .select('id, period, status, total_net, expense_id, payment_method')
+    .eq('id', periodId)
+    .single()
+
+  if (!payroll) return { error: 'Nomina no encontrada' }
+  if (payroll.status !== 'paid') return { error: 'Solo aplica a nominas ya pagadas' }
+  if (payroll.expense_id) return { error: 'Esta nomina ya tiene su gasto registrado' }
+
+  const result = await createPayrollExpense(
+    payroll.period,
+    Number(payroll.total_net || 0),
+    (payroll.payment_method as PayrollPaymentMethod) || 'transfer'
+  )
+  if (result.error) return { error: result.error }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payroll_periods')
+    .update({ expense_id: result.expenseId, updated_at: new Date().toISOString() })
+    .eq('id', periodId)
+
+  if (error) {
+    console.error('Error linking payroll expense:', error)
+    return { error: 'El gasto se creo pero no quedo enlazado a la nomina' }
+  }
+
+  revalidatePath('/nomina')
+  revalidatePath('/facturacion/gastos')
+  revalidatePath('/facturacion')
+  return { error: null }
+}
+
+// Revierte el pago: borra el gasto y sus abonos, y devuelve la nomina a
+// cerrada para poder corregirla. Es la salida cuando se pago por error.
+export async function unmarkPayrollAsPaid(
+  periodId: string
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requirePayrollAccess()
+  if (authError) return { error: authError }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: payroll } = await (supabase as any)
+    .from('payroll_periods')
+    .select('id, status, expense_id')
+    .eq('id', periodId)
+    .single()
+
+  if (!payroll) return { error: 'Nomina no encontrada' }
+  if (payroll.status !== 'paid') return { error: 'Esta nomina no esta marcada como pagada' }
+
+  if (payroll.expense_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('expense_payments').delete().eq('expense_id', payroll.expense_id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: expError } = await (supabase as any)
+      .from('expenses')
+      .delete()
+      .eq('id', payroll.expense_id)
+    if (expError) {
+      console.error('Error deleting payroll expense:', expError)
+      return { error: 'No se pudo revertir el gasto de la nomina' }
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payroll_periods')
+    .update({
+      status: 'closed',
+      paid_at: null,
+      payment_method: null,
+      expense_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', periodId)
+
+  if (error) {
+    console.error('Error unmarking payroll as paid:', error)
+    return { error: 'Error al revertir el pago de la nomina' }
+  }
+
+  revalidatePath('/nomina')
+  revalidatePath('/facturacion/gastos')
+  revalidatePath('/facturacion')
+  return { error: null }
+}
+
+// Anula una nomina cerrada o pagada por error. Queda en el historial como
+// documento anulado y su gasto desaparece del flujo de caja.
+export async function cancelPayrollPeriod(
+  periodId: string,
+  reason?: string | null
+): Promise<{ error: string | null }> {
+  const { userId, error: authError } = await requirePayrollAccess()
+  if (authError) return { error: authError }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: payroll } = await (supabase as any)
+    .from('payroll_periods')
+    .select('*, payroll_items (*)')
+    .eq('id', periodId)
+    .single()
+
+  if (!payroll) return { error: 'Nomina no encontrada' }
+  if (payroll.status === 'cancelled') return { error: 'Esta nomina ya esta anulada' }
+
+  // Anular una nomina pagada borra dinero del flujo de caja: queda el rastro
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: auditError } = await (supabase as any).from('audit_logs').insert({
+    clinic_id: payroll.clinic_id ?? null,
+    user_id: userId,
+    action: 'cancel_payroll_period',
+    table_name: 'payroll_periods',
+    record_id: periodId,
+    old_data: payroll,
+  })
+
+  if (auditError) {
+    console.error('Error writing audit log for payroll cancellation:', auditError)
+    return { error: 'No se pudo registrar la auditoria. La nomina no fue anulada.' }
+  }
+
+  if (payroll.expense_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('expense_payments').delete().eq('expense_id', payroll.expense_id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('expenses')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', payroll.expense_id)
+  }
+
+  const cancelNote = `[Anulada${reason?.trim() ? `: ${reason.trim()}` : ''}]`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payroll_periods')
+    .update({
+      status: 'cancelled',
+      notes: payroll.notes ? `${payroll.notes}\n${cancelNote}` : cancelNote,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', periodId)
+
+  if (error) {
+    console.error('Error cancelling payroll period:', error)
+    return { error: 'Error al anular la nomina' }
+  }
+
+  revalidatePath('/nomina')
+  revalidatePath('/facturacion/gastos')
+  revalidatePath('/facturacion')
+  return { error: null }
+}
+
+// Recalcula los totales del periodo a partir de sus lineas guardadas.
+// Se llama cada vez que se corrige una linea de una nomina ya cerrada.
+async function recalculatePayrollTotals(periodId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: items } = await (supabase as any)
+    .from('payroll_items')
+    .select('gross_salary, total_deductions, net_salary, apply_deductions')
+    .eq('payroll_period_id', periodId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = ((items || []) as any[]).map((i) => ({
+    grossSalary: Number(i.gross_salary || 0),
+    totalDeductions: Number(i.total_deductions || 0),
+    netSalary: Number(i.net_salary || 0),
+    applyDeductions: i.apply_deductions !== false,
+  }))
+
+  const round = (n: number) => Math.round(n * 100) / 100
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('payroll_periods')
+    .update({
+      employee_count: lines.length,
+      total_gross: round(lines.reduce((s, l) => s + l.grossSalary, 0)),
+      total_deductions: round(lines.reduce((s, l) => s + l.totalDeductions, 0)),
+      total_net: round(lines.reduce((s, l) => s + l.netSalary, 0)),
+      employer_cost: calculateEmployerCost(lines),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', periodId)
+}
+
+export interface UpdatePayrollLineInput {
+  baseSalary?: number
+  commissions?: number
+  bonuses?: number
+  overtime?: number
+  otherDeductions?: number
+  applyDeductions?: boolean
+  notes?: string | null
+}
+
+/**
+ * Corrige una linea de una nomina ya cerrada y recalcula el mes.
+ * Cerrar congela los montos, pero un error de digitacion no puede dejar la
+ * nomina inservible: mientras no se haya pagado, se puede corregir.
+ */
+export async function updatePayrollLine(
+  itemId: string,
+  input: UpdatePayrollLineInput
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requirePayrollAccess()
+  if (authError) return { error: authError }
+
+  const supabase = createAdminClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: item } = await (supabase as any)
+    .from('payroll_items')
+    .select('*, payroll_periods:payroll_period_id (id, status, period)')
+    .eq('id', itemId)
+    .single()
+
+  if (!item) return { error: 'Linea de nomina no encontrada' }
+
+  const period = item.payroll_periods
+  if (!period) return { error: 'La linea no pertenece a ninguna nomina' }
+  if (period.status === 'paid') {
+    return {
+      error: 'La nomina ya esta pagada. Revierte el pago para poder corregirla.',
+    }
+  }
+  if (period.status === 'cancelled') return { error: 'Esta nomina fue anulada' }
+
+  const baseSalary = input.baseSalary ?? Number(item.base_salary || 0)
+  const commissions = input.commissions ?? Number(item.commissions || 0)
+  const bonuses = input.bonuses ?? Number(item.bonuses || 0)
+  const overtime = input.overtime ?? Number(item.overtime || 0)
+  const otherDeductions = input.otherDeductions ?? Number(item.other_deductions || 0)
+  const applyDeductions = input.applyDeductions ?? item.apply_deductions !== false
+
+  const negative = [baseSalary, commissions, bonuses, overtime, otherDeductions].some(
+    (n) => !Number.isFinite(n) || n < 0
+  )
+  if (negative) return { error: 'Los montos no pueden ser negativos' }
+
+  const calc = calculatePayrollLine({
+    baseSalary,
+    commissions,
+    bonuses,
+    overtime,
+    otherDeductions,
+    applyDeductions,
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('payroll_items')
+    .update({
+      base_salary: baseSalary,
+      commissions,
+      bonuses,
+      overtime,
+      apply_deductions: applyDeductions,
+      gross_salary: calc.grossSalary,
+      afp_employee: calc.afpEmployee,
+      ars_employee: calc.arsEmployee,
+      isr_withholding: calc.isrWithholding,
+      other_deductions: calc.otherDeductions,
+      total_deductions: calc.totalDeductions,
+      net_salary: calc.netSalary,
+      notes: input.notes !== undefined ? input.notes?.trim() || null : item.notes,
+    })
+    .eq('id', itemId)
+
+  if (error) {
+    console.error('Error updating payroll line:', error)
+    return { error: sanitizeError(error, 'Error al corregir la linea de la nomina') }
+  }
+
+  await recalculatePayrollTotals(period.id)
+
+  revalidatePath('/nomina')
+  return { error: null }
 }
 
 // Reabrir un mes cerrado por error. No se permite si ya se pago.
@@ -436,7 +761,10 @@ export async function reopenPayrollPeriod(periodId: string): Promise<{ error: st
 
   if (!payroll) return { error: 'Nomina no encontrada' }
   if (payroll.status === 'paid') {
-    return { error: 'No se puede reabrir una nomina ya pagada. Anulala si fue un error.' }
+    return { error: 'Revierte primero el pago para poder corregir o reabrir esta nomina.' }
+  }
+  if (payroll.status === 'cancelled') {
+    return { error: 'Esta nomina fue anulada: el mes ya esta abierto para calcularse de nuevo.' }
   }
 
   // Al borrar el periodo se van sus items en cascada y el mes vuelve a calcularse
@@ -464,7 +792,7 @@ export async function getPayrollHistory(): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('payroll_periods')
-    .select('id, period, status, employee_count, total_gross, total_net, closed_at, paid_at')
+    .select('id, period, status, employee_count, total_gross, total_net, closed_at, paid_at, expense_id')
     .eq('clinic_id', CLINIC_ID)
     .order('period', { ascending: false })
     .limit(60)
@@ -486,6 +814,7 @@ export async function getPayrollHistory(): Promise<{
       totalNet: Number(p.total_net || 0),
       closedAt: p.closed_at,
       paidAt: p.paid_at,
+      expenseId: p.expense_id,
     })),
     error: null,
   }

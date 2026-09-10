@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import type { ExpenseCategory, ExpenseStats, CashFlowSummary } from '@/actions/expenses'
+import { getCommissionsSummary } from '@/actions/commissions'
 import { MONTH_NAMES, formatPeriodLabel, periodBounds } from '@/lib/periods'
 
 // =============================================
@@ -162,6 +163,13 @@ export async function getCashFlowSummary(
     0
   )
 
+  // --- COMISIONES ---
+  // Las pagadas ya salieron como gasto y estan dentro de `expenses`; aqui solo
+  // se muestran aparte para saber cuanto del gasto del mes fueron comisiones.
+  // Las pendientes son deuda viva con los profesionales: suman a lo que falta pagar.
+  const commissions = await getCommissionsSummary({ start, end })
+  const totalPendingToPay = pendingToPay + commissions.pendingAmount
+
   const round = (n: number) => Math.round(n * 100) / 100
 
   return {
@@ -170,10 +178,12 @@ export async function getCashFlowSummary(
       expenses: round(expenses),
       balance: round(income - expenses),
       pending_to_collect: round(pendingToCollect),
-      pending_to_pay: round(pendingToPay),
+      pending_to_pay: round(totalPendingToPay),
       // Si cobro todo lo que me deben y pago todo lo que debo
-      projected_balance: round(income - expenses + pendingToCollect - pendingToPay),
+      projected_balance: round(income - expenses + pendingToCollect - totalPendingToPay),
       period_label: label,
+      commissions_paid: round(commissions.paidAmount),
+      commissions_pending: round(commissions.pendingAmount),
     },
     error: null,
   }

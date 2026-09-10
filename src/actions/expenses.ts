@@ -104,9 +104,13 @@ export interface CashFlowSummary {
   expenses: number        // pagado a proveedores/gastos en el periodo
   balance: number         // lo que queda
   pending_to_collect: number
-  pending_to_pay: number
+  pending_to_pay: number   // incluye comisiones generadas y aun no pagadas
   projected_balance: number
   period_label: string
+  /** Comisiones pagadas en el periodo (ya contadas dentro de expenses) */
+  commissions_paid: number
+  /** Comisiones generadas que todavia se le deben a los profesionales */
+  commissions_pending: number
 }
 
 // =============================================

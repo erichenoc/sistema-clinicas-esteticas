@@ -307,6 +307,23 @@ export function GastosClient({
                 <span className="font-medium">{formatCurrency(cashFlow.projected_balance)}</span>
               </div>
             </div>
+
+            {/* Las comisiones son costo real: pagadas ya estan dentro de lo que salio,
+                pendientes son deuda con los profesionales y suman a lo que falta pagar */}
+            {(cashFlow.commissions_paid > 0 || cashFlow.commissions_pending > 0) && (
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 text-sm">
+                <div className="flex justify-between rounded-md bg-muted/40 px-3 py-2">
+                  <span className="text-muted-foreground">Comisiones pagadas</span>
+                  <span className="font-medium">{formatCurrency(cashFlow.commissions_paid)}</span>
+                </div>
+                <div className="flex justify-between rounded-md bg-muted/40 px-3 py-2">
+                  <span className="text-muted-foreground">Comisiones por pagar</span>
+                  <span className="font-medium text-amber-600">
+                    {formatCurrency(cashFlow.commissions_pending)}
+                  </span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

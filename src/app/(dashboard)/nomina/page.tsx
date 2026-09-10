@@ -21,6 +21,9 @@ import {
   Lock,
   Unlock,
   Wallet,
+  RotateCcw,
+  Ban,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -35,7 +38,11 @@ import {
   getPayrollHistory,
   closePayrollPeriod,
   markPayrollAsPaid,
+  unmarkPayrollAsPaid,
+  cancelPayrollPeriod,
+  ensurePayrollExpense,
   reopenPayrollPeriod,
+  updatePayrollLine,
   type PayrollPeriodData,
   type PayrollHistoryEntry,
   type PayrollAdjustment,
@@ -129,6 +136,8 @@ export default function NominaPage() {
   const [adjBonuses, setAdjBonuses] = useState('')
   const [adjOvertime, setAdjOvertime] = useState('')
   const [adjOther, setAdjOther] = useState('')
+  const [adjBase, setAdjBase] = useState('')
+  const [isSavingAdjustment, setIsSavingAdjustment] = useState(false)
 
   // Volante de pago del empleado
   const [receiptLine, setReceiptLine] = useState<PayrollLine | null>(null)
@@ -201,11 +210,39 @@ export default function NominaPage() {
     setAdjBonuses(line.bonuses ? String(line.bonuses) : '')
     setAdjOvertime(line.overtime ? String(line.overtime) : '')
     setAdjOther(line.otherDeductions ? String(line.otherDeductions) : '')
+    setAdjBase(line.baseSalary ? String(line.baseSalary) : '')
   }
 
-  // Los ajustes viven en pantalla hasta que se cierra el mes; ahi se guardan
+  // Los ajustes viven en pantalla hasta que se cierra el mes; ahi se guardan.
+  // Si la nomina ya esta cerrada (y no pagada), la correccion va directo a la
+  // linea guardada y el mes se recalcula.
   const handleSaveAdjustments = async () => {
-    if (!adjustingLine?.userId) return
+    if (!adjustingLine) return
+
+    if (isClosed && adjustingLine.id) {
+      setIsSavingAdjustment(true)
+      try {
+        const { error } = await updatePayrollLine(adjustingLine.id, {
+          baseSalary: parseFloat(adjBase) || 0,
+          commissions: parseFloat(adjCommissions) || 0,
+          bonuses: parseFloat(adjBonuses) || 0,
+          overtime: parseFloat(adjOvertime) || 0,
+          otherDeductions: parseFloat(adjOther) || 0,
+        })
+        if (error) {
+          toast.error(error)
+          return
+        }
+        setAdjustingLine(null)
+        toast.success('Línea corregida y totales recalculados')
+        await loadEmployees()
+      } finally {
+        setIsSavingAdjustment(false)
+      }
+      return
+    }
+
+    if (!adjustingLine.userId) return
     const next: Record<string, PayrollAdjustment> = {
       ...adjustments,
       [adjustingLine.userId]: {
@@ -268,16 +305,79 @@ export default function NominaPage() {
 
     setIsProcessing(true)
     try {
-      const { error, expenseError } = await markPayrollAsPaid(payroll.id)
+      const { error } = await markPayrollAsPaid(payroll.id)
       if (error) {
         toast.error(error)
         return
       }
-      if (expenseError) {
-        toast.warning(`Nómina marcada como pagada, pero el gasto no se registró: ${expenseError}`)
-      } else {
-        toast.success('Nómina pagada y registrada en el flujo de caja')
+      toast.success('Nómina pagada y registrada en el flujo de caja')
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Revertir el pago: borra el gasto y devuelve la nomina a cerrada para corregirla
+  const handleUnmarkPaid = async () => {
+    if (!payroll?.id) return
+    if (
+      !confirm(
+        `Revertir el pago de la nómina de ${payroll.periodLabel}?\n\n` +
+          'Se eliminará el gasto que registró la salida de dinero y la nómina volverá ' +
+          'a estar cerrada para que puedas corregirla.'
+      )
+    ) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const { error } = await unmarkPayrollAsPaid(payroll.id)
+      if (error) {
+        toast.error(error)
+        return
       }
+      toast.success('Pago revertido. Ya puedes corregir la nómina.')
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Anular: la nomina queda en el historial como anulada y el mes se abre otra vez
+  const handleCancelPayroll = async () => {
+    if (!payroll?.id) return
+    const reason = prompt(
+      `Anular la nómina de ${payroll.periodLabel}?\n\n` +
+        'Quedará en el historial como anulada, su gasto sale del flujo de caja y el mes ' +
+        'se podrá volver a calcular.\n\nMotivo (opcional):'
+    )
+    if (reason === null) return
+
+    setIsProcessing(true)
+    try {
+      const { error } = await cancelPayrollPeriod(payroll.id, reason)
+      if (error) {
+        toast.error(error)
+        return
+      }
+      toast.success('Nómina anulada')
+      await loadEmployees()
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Nomina pagada sin gasto: el dinero salio pero no aparece en el flujo de caja
+  const handleFixMissingExpense = async (periodId: string) => {
+    setIsProcessing(true)
+    try {
+      const { error } = await ensurePayrollExpense(periodId)
+      if (error) {
+        toast.error(error)
+        return
+      }
+      toast.success('Gasto registrado. La nómina ya aparece en el flujo de caja.')
       await loadEmployees()
     } finally {
       setIsProcessing(false)
@@ -446,6 +546,28 @@ export default function NominaPage() {
                 </Button>
               </>
             )}
+            {canManageSalaries && isPaid && (
+              <Button
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                onClick={handleUnmarkPaid}
+                disabled={isProcessing}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Revertir pago
+              </Button>
+            )}
+            {canManageSalaries && isClosed && (
+              <Button
+                variant="outline"
+                className="flex-1 sm:flex-none text-red-600 hover:text-red-700"
+                onClick={handleCancelPayroll}
+                disabled={isProcessing}
+              >
+                <Ban className="mr-2 h-4 w-4" />
+                Anular
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -454,6 +576,30 @@ export default function NominaPage() {
         <Alert variant="destructive">
           <AlertTitle>Acceso restringido</AlertTitle>
           <AlertDescription>{accessError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Nomina pagada cuyo gasto nunca se registro: el dinero salio y no se ve */}
+      {payroll && isPaid && !payroll.expenseId && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Esta nómina no aparece en los gastos</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Se marcó como pagada pero nunca se registró el gasto de {formatPrice(totalNet)}, así que
+              no está contada en el flujo de caja.
+            </span>
+            {canManageSalaries && payroll.id && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleFixMissingExpense(payroll.id!)}
+                disabled={isProcessing}
+              >
+                Registrar gasto
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -644,12 +790,12 @@ export default function NominaPage() {
                               <FileText className="mr-2 h-4 w-4" />
                               Ver volante de pago
                             </DropdownMenuItem>
-                            {canManageSalaries && !isClosed && nomina.userId && (
+                            {canManageSalaries && !isPaid && (nomina.userId || nomina.id) && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onSelect={() => openAdjustments(nomina)}>
                                   <Calculator className="mr-2 h-4 w-4" />
-                                  Ajustar comisiones y bonos
+                                  {isClosed ? 'Corregir esta línea' : 'Ajustar comisiones y bonos'}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -839,7 +985,12 @@ export default function NominaPage() {
                       </TableCell>
                       <TableCell>
                         {entry.status === 'paid' ? (
-                          <Badge className="bg-green-500">Pagado</Badge>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge className="bg-green-500">Pagado</Badge>
+                            {!entry.expenseId && (
+                              <Badge variant="destructive" className="text-xs">Sin gasto</Badge>
+                            )}
+                          </div>
                         ) : entry.status === 'cancelled' ? (
                           <Badge variant="outline">Anulado</Badge>
                         ) : (
@@ -850,16 +1001,29 @@ export default function NominaPage() {
                         {formatShortDate(entry.paidAt)}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPeriod(entry.period)
-                            setActiveTab('nomina')
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPeriod(entry.period)
+                              setActiveTab('nomina')
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {canManageSalaries && entry.status === 'paid' && !entry.expenseId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Registrar el gasto que falta"
+                              onClick={() => handleFixMissingExpense(entry.id)}
+                              disabled={isProcessing}
+                            >
+                              <AlertTriangle className="h-4 w-4 text-red-600" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1041,13 +1205,23 @@ export default function NominaPage() {
       <Dialog open={!!adjustingLine} onOpenChange={(open) => !open && setAdjustingLine(null)}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Ajustar {adjustingLine?.employeeName}</DialogTitle>
+            <DialogTitle>
+              {isClosed ? 'Corregir' : 'Ajustar'} {adjustingLine?.employeeName}
+            </DialogTitle>
             <DialogDescription>
-              Sueldo base {formatPrice(adjustingLine?.baseSalary || 0)}. Los ajustes se guardan al
-              cerrar la nómina.
+              {isClosed
+                ? 'La nómina está cerrada. Al guardar se recalculan las deducciones y los totales del mes.'
+                : `Sueldo base ${formatPrice(adjustingLine?.baseSalary || 0)}. Los ajustes se guardan al cerrar la nómina.`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
+            {isClosed && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="adj-base">Sueldo base (RD$)</Label>
+                <Input id="adj-base" type="number" min="0" step="0.01" value={adjBase}
+                  onChange={(e) => setAdjBase(e.target.value)} placeholder="0.00" />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="adj-com">Comisiones (RD$)</Label>
               <Input id="adj-com" type="number" min="0" step="0.01" value={adjCommissions}
@@ -1072,7 +1246,9 @@ export default function NominaPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdjustingLine(null)}>Cancelar</Button>
-            <Button onClick={handleSaveAdjustments}>Aplicar</Button>
+            <Button onClick={handleSaveAdjustments} disabled={isSavingAdjustment}>
+              {isSavingAdjustment ? 'Guardando...' : isClosed ? 'Guardar corrección' : 'Aplicar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
